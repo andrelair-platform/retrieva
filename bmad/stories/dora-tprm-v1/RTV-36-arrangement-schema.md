@@ -32,13 +32,18 @@ Parent epic **RTV-28** (#499). Per the domain-model ADR (`docs/architecture/dora
 
 ## Technical Notes
 
-- Mongoose (current stack); keep it TS-ready (this lands around the RTV-19..27 TS migration — coordinate typing).
+- **PostgreSQL + Drizzle** (per `docs/architecture/datastore-postgresql.md`) — author this schema
+  directly in Postgres with real FKs; use `drizzle-zod` so Zod stays the DTO source of truth. NOT
+  Mongoose. Depends on RTV-45 (Mongo→Postgres migration) being in place.
+- FKs (AC-1/3) are database-enforced; "graph traversal indexes" (AC-6) support the recursive-CTE
+  queries RTV-28/32 build on.
 - No group *features* here — schema only (ADR §8).
 
 ## Definition of Done
-- [ ] ACs met; vitest green; seed fixture loads; ADR §1 shape honoured
+- [ ] ACs met; vitest green (pg testcontainer/pg-mem); seed fixture loads; ADR §1 shape honoured
 - [ ] Parent epic RTV-28 (#499) updated
 
 ## Dependencies
 - Parent: andrelair-platform/retrieva#499 (RTV-28)
+- Depends on: RTV-45 (PostgreSQL + Drizzle in place)
 - Blocks: RTV-37, RTV-38, RTV-41

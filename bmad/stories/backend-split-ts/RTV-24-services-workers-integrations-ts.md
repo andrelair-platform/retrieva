@@ -26,7 +26,7 @@ The heavy logic lives here: RAG (`services/rag.js`, `fileIngestionService.js`, `
 - [ ] AC-1: `services/*.js`, `workers/**`, `config/*.js`, `prompts/*.js`, `utils/*.js` → `.ts`.
 - [ ] AC-2: LangChain/LangGraph message + chain types used (no `any` on LLM payloads); the LLMOps trace tree (`startTrace`/spans/generations) and prompt-manager (`resolveRagPrompt`, Git fallback) stay behaviourally identical and typed (per `llmops.md`).
 - [ ] AC-3: BullMQ job payloads typed (Job data/return generics); socket.io event maps typed (`Server<ClientToServer, ServerToClient>`).
-- [ ] AC-4: Stripe + Qdrant + ioredis + mongoose clients typed from their packages; multimodal ingestion (Docling/VLM caption) path typed.
+- [ ] AC-4: Stripe + Qdrant + ioredis + the DB client (**Drizzle/pg**, post-RTV-45 — not mongoose) typed from their packages; multimodal ingestion (Docling/VLM caption) path typed.
 - [ ] AC-5: All vitest (unit + integration incl. rag/conversation/auth/health) green; governance egress behaviour unchanged (LiteLLM-only per the egress netpol).
 
 ## Technical Notes
