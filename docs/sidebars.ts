@@ -29,6 +29,7 @@ const sidebars: SidebarsConfig = {
         'architecture/multimodal-ingestion',
         'architecture/prompt-management',
         'architecture/concentration-graph',
+        'architecture/dora-tprm-domain-model',
       ],
     },
     {
