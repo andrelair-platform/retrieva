@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'strategy/product-vision',
+        'strategy/product-maturity',
         'strategy/yc-one-pager',
       ],
     },
