@@ -19,11 +19,13 @@ As a **Backend Developer**, I want the domain models and the DORA relational gra
 
 ## Background
 
-The DORA graph is the product thesis — the relational integrity spreadsheets can't model. It's exactly where an untyped `any` silently corrupts data. Zod is already a dependency, so schemas become the single source of truth via `z.infer` (no duplicate type + validator). Mongoose models get typed too.
+The DORA graph is the product thesis — the relational integrity spreadsheets can't model. It's exactly where an untyped `any` silently corrupts data. Zod is already a dependency, so schemas become the single source of truth via `z.infer` (no duplicate type + validator).
+
+> **Datastore:** PostgreSQL + Drizzle, per `docs/architecture/datastore-postgresql.md` (depends on RTV-45). Model the graph as **Drizzle tables with real FKs**, related to Zod via `drizzle-zod` — NOT Mongoose.
 
 ## Acceptance Criteria
 
-- [ ] AC-1: All `models/*.js` → `.ts`; each Mongoose schema typed (interface or `InferSchemaType`), exported document/model types.
+- [ ] AC-1: All `models/*.js` → typed **Drizzle table** definitions in `.ts`; exported row/insert types (via `drizzle-zod` where a Zod schema exists).
 - [ ] AC-2: DORA graph entities (entity, ICT third-party service, contractual arrangement / RT.02.01 fields, function, subprocessor/nth-party) modelled as explicit TypeScript types; relationships typed (no `any` on graph edges).
 - [ ] AC-3: Existing Zod schemas are the DTO source of truth — request/response DTO types derived via `z.infer<typeof schema>`; no hand-written duplicate of a Zod-validated shape.
 - [ ] AC-4: `strict: true` (or at least `strictNullChecks` + `noImplicitAny`) enforced **for the `models/` + domain directories** via tsconfig `include`/overrides, without breaking the still-JS rest.
@@ -32,7 +34,7 @@ The DORA graph is the product thesis — the relational integrity spreadsheets c
 ## Technical Notes
 
 - Convert leaf models first (no cross-model deps), then aggregates.
-- Where a Zod schema and a Mongoose schema describe the same entity, keep ONE canonical shape and derive the other.
+- Where a Zod schema and a Drizzle table describe the same entity, keep ONE canonical shape and derive the other (`drizzle-zod`).
 - Don't boil the ocean on strict for the whole repo here — scope strict to the converted dirs; repo-wide strict is RTV-25.
 
 ## Definition of Done
