@@ -18,11 +18,40 @@ env:
 
 jobs:
   # ===========================================================================
+  # Change detection — skip the heavy jobs when a PR only touches docs/bmad
+  # markdown. `CI Success` (the sole required check) still runs and passes, so
+  # docs-only PRs are not blocked. Heavy jobs run whenever real code changes.
+  # ===========================================================================
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'nginx/**'
+              - 'infra/**'
+              - '**/Dockerfile'
+              - 'Dockerfile*'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/**'
+
+  # ===========================================================================
   # Backend (Node.js/Express) Tests
   # ===========================================================================
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
 
     defaults:
       run:
@@ -97,6 +126,8 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
 
     steps:
       - name: Checkout code
@@ -136,9 +167,9 @@ jobs:
   frontend-e2e:
     name: Frontend E2E Tests
     runs-on: ubuntu-latest
-    # Run after unit tests pass, and only on PRs to main/dev (not on every push)
-    needs: [frontend-test]
-    if: github.event_name == 'pull_request'
+    # Run after unit tests pass, only on PRs, and only when code actually changed
+    needs: [changes, frontend-test]
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
 
     steps:
       - name: Checkout code
@@ -181,6 +212,8 @@ jobs:
   backend-security:
     name: Backend Security Audit
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
 
     defaults:
       run:
@@ -210,6 +243,8 @@ jobs:
   docker-build:
     name: Docker Build Check (${{ matrix.service }})
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
 
     strategy:
       matrix:
@@ -246,6 +281,8 @@ jobs:
   storybook-build:
     name: Storybook Build
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -270,31 +307,36 @@ jobs:
   # ===========================================================================
   ci-success:
     name: CI Success
-    needs: [backend-test, frontend-test, backend-security, docker-build, frontend-e2e, storybook-build]
+    needs: [changes, backend-test, frontend-test, backend-security, docker-build, frontend-e2e, storybook-build]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all jobs passed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           BACKEND_RESULT: ${{ needs.backend-test.result }}
           FRONTEND_RESULT: ${{ needs.frontend-test.result }}
+          SECURITY_RESULT: ${{ needs.backend-security.result }}
+          DOCKER_RESULT: ${{ needs.docker-build.result }}
           E2E_RESULT: ${{ needs.frontend-e2e.result }}
           STORYBOOK_RESULT: ${{ needs.storybook-build.result }}
         run: |
-          if [[ "$BACKEND_RESULT" != "success" ]]; then
-            echo "Backend tests failed"
+          # Change detection must succeed — otherwise the gates below are meaningless.
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Change detection failed (result=$CHANGES_RESULT)"; exit 1
+          fi
+          # The heavy jobs are gated on `changes.outputs.code`. A 'skipped' result
+          # therefore means "no code changed → correctly not run" and counts as OK.
+          # Only a real 'failure'/'cancelled' fails this gate.
+          fail=0
+          for name in BACKEND FRONTEND SECURITY DOCKER E2E STORYBOOK; do
+            var="${name}_RESULT"; r="${!var}"
+            if [[ "$r" != "success" && "$r" != "skipped" ]]; then
+              echo "$name job did not pass (result=$r)"; fail=1
+            fi
+          done
+          if [[ $fail -eq 0 ]]; then
+            echo "All CI checks passed (heavy jobs skipped = no code change)."
+          else
             exit 1
           fi
-          if [[ "$FRONTEND_RESULT" != "success" ]]; then
-            echo "Frontend tests failed"
-            exit 1
-          fi
-          if [[ "$E2E_RESULT" != "success" && "$E2E_RESULT" != "skipped" ]]; then
-            echo "Frontend E2E tests failed"
-            exit 1
-          fi
-          if [[ "$STORYBOOK_RESULT" != "success" ]]; then
-            echo "Storybook build failed"
-            exit 1
-          fi
-          echo "All CI checks passed!"
