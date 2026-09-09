@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'strategy/product-vision',
         'strategy/product-maturity',
+        'strategy/defensibility-and-moat',
         'strategy/yc-one-pager',
       ],
     },
