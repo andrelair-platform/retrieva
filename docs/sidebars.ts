@@ -32,6 +32,7 @@ const sidebars: SidebarsConfig = {
         'architecture/concentration-graph',
         'architecture/dora-tprm-domain-model',
         'architecture/datastore-postgresql',
+        'architecture/authorization-model',
       ],
     },
     {
