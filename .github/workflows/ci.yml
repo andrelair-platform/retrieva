@@ -36,8 +36,6 @@ jobs:
             code:
               - 'backend/**'
               - 'frontend/**'
-              - 'nginx/**'
-              - 'infra/**'
               - '**/Dockerfile'
               - 'Dockerfile*'
               - 'package.json'
