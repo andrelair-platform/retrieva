@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'architecture/overview',
+        'architecture/solution-architecture',
         'architecture/rag-pipeline',
         'architecture/semantic-chunking',
         'architecture/multi-tenancy',
