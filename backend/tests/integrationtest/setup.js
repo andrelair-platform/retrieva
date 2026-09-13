@@ -6,8 +6,11 @@
  */
 
 import { vi } from 'vitest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
+import { startPg, stopPg } from './pgSetup.js';
+import { connectPg, disconnectPg, getDb } from '../../config/db.js';
+import { runMigrations } from '../../db/migrate.js';
 
 // Test environment configuration
 export const TEST_CONFIG = {
@@ -34,60 +37,56 @@ export const TEST_CONFIG = {
   SETUP_TIMEOUT: 30000,
 };
 
-// MongoDB Memory Server instance
-let mongoServer;
+// All tables to TRUNCATE between tests (order-independent via CASCADE).
+const ALL_TABLES = [
+  'provider_dependencies',
+  'provider_nodes',
+  'critical_function_dependencies',
+  'critical_functions',
+  'messages',
+  'conversations',
+  'vendor_questionnaires',
+  'assessments',
+  'workspace_members',
+  'organization_members',
+  'workspaces',
+  'organizations',
+  'users',
+  'questionnaire_templates',
+];
 
 /**
- * Initialize test database
+ * Initialize test database — real Postgres (CI service container or local testcontainer)
+ * + Drizzle migrations applied. Replaces the mongodb-memory-server harness (RTV-49).
  */
 export const setupTestDatabase = async () => {
-  mongoServer = await MongoMemoryServer.create({
-    instance: {
-      launchTimeout: 60000, // 60 seconds timeout for instance startup
-    },
-  });
-  const mongoUri = mongoServer.getUri();
-
-  // Set environment for test database
-  process.env.MONGODB_URI = mongoUri;
   process.env.NODE_ENV = 'test';
   process.env.JWT_ACCESS_SECRET = 'test-access-secret-key-that-is-at-least-32-characters-long';
   process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key-that-is-at-least-32-characters-long';
   process.env.JWT_ACCESS_EXPIRY = '15m';
   process.env.JWT_REFRESH_EXPIRY = '7d';
 
-  // Connect mongoose
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(mongoUri);
-  }
-
-  return mongoUri;
+  const url = await startPg();
+  await connectPg();
+  await runMigrations();
+  return url;
 };
 
 /**
  * Cleanup test database
  */
 export const cleanupTestDatabase = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-  }
-
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await disconnectPg();
+  await stopPg();
 };
 
 /**
- * Clear all collections between tests
+ * Clear all tables between tests (order-independent).
  */
 export const clearCollections = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-      await collections[key].deleteMany({});
-    }
-  }
+  await getDb().execute(
+    sql.raw(`truncate table ${ALL_TABLES.join(', ')} restart identity cascade`)
+  );
 };
 
 /**
@@ -104,12 +103,10 @@ export const createTestUser = async (app, userData = TEST_CONFIG.TEST_USER) => {
     throw new Error(`Failed to register test user: ${JSON.stringify(registerRes.body)}`);
   }
 
-  // For integration tests, we'll manually verify the user in the database
-  const User = mongoose.model('User');
-  await User.updateOne(
-    { email: userData.email },
-    { $set: { isEmailVerified: true, isActive: true } }
-  );
+  // For integration tests, manually verify the user (Drizzle repo).
+  const { userRepository } = await import('../../repositories/drizzle/UserRepository.js');
+  const u = await userRepository.findByEmail(userData.email);
+  if (u) await userRepository.markEmailVerified(u.id);
 
   // Login to get tokens
   const loginRes = await request.post(`${TEST_CONFIG.API_BASE}/auth/login`).send({
@@ -198,9 +195,9 @@ export const testDataGenerators = {
   longQuestion: () => 'x'.repeat(2001),
 
   /**
-   * Generate MongoDB ObjectId
+   * Generate a random UUID (Postgres id) — replaces the old ObjectId generator.
    */
-  objectId: () => new mongoose.Types.ObjectId().toString(),
+  objectId: () => randomUUID(),
 };
 
 /**
