@@ -1,7 +1,7 @@
 ---
 id: RTV-47-adopt-drizzle
 title: "Adopt Drizzle — client, drizzle-kit migrations, drizzle-zod, pg test harness"
-status: Ready
+status: In Progress
 type: Story
 epic: datastore-migration
 milestone: "RTV — Datastore migration (Postgres + Drizzle)"
