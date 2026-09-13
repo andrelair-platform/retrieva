@@ -91,11 +91,7 @@ export const loadWorkspaceSafe = async (req, res, next) => {
   }
 
   // SECURITY FIX (BOLA): Verify user has access to this workspace
-  const membership = await WorkspaceMember.findOne({
-    workspaceId: id,
-    userId,
-    status: 'active',
-  });
+  const membership = await workspaceMemberRepository.findMembership(id, userId);
 
   const isOwner = workspace.userId && workspace.userId.toString() === userId.toString();
 

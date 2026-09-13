@@ -112,17 +112,33 @@ describe('parseSubproviderExtraction (P2 auto-extraction)', () => {
 });
 
 describe('getGraph (P3 viz contract)', () => {
-  const lean = (arr) => ({ find: () => ({ lean: async () => arr }) });
-  const models = {
-    Workspace: lean([{ _id: 'az', name: 'Azure', vendorTier: 'critical' }, { _id: 'oa', name: 'OpenAI', vendorTier: 'important' }]),
-    CriticalFunction: lean([{ _id: 'cf1', name: 'Claims', criticality: 'critical', dependsOn: ['az', 'oa'] }]),
-    ProviderDependency: lean([
-      { parent: { kind: 'workspace', workspaceId: 'oa', name: 'OpenAI' }, child: { kind: 'external', name: 'Azure-infra' }, source: 'extracted', confirmed: true },
-    ]),
+  // RTV-49: getGraph reads through injected Drizzle repos (deps), not Mongoose models.
+  const deps = {
+    workspaceRepo: {
+      findByOrganization: async () => [
+        { id: 'az', name: 'Azure', vendorTier: 'critical' },
+        { id: 'oa', name: 'OpenAI', vendorTier: 'important' },
+      ],
+    },
+    criticalFunctionRepo: {
+      listByOrg: async () => [
+        { id: 'cf1', name: 'Claims', criticality: 'critical', dependsOn: ['az', 'oa'] },
+      ],
+    },
+    providerGraphRepo: {
+      listDependencies: async () => [
+        {
+          parent: { kind: 'workspace', workspaceId: 'oa', name: 'OpenAI' },
+          child: { kind: 'external', name: 'Azure-infra' },
+          source: 'extracted',
+          confirmed: true,
+        },
+      ],
+    },
   };
 
   it('returns viz nodes (functions, providers, subproviders) + typed edges', async () => {
-    const g = await getGraph('org1', { models });
+    const g = await getGraph('org1', deps);
     const types = g.nodes.reduce((m, n) => ((m[n.type] = (m[n.type] || 0) + 1), m), {});
     expect(types.function).toBe(1);
     expect(types.provider).toBe(2);

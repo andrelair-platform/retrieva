@@ -192,7 +192,6 @@ async function createCompleteAssessment(request, token, workspaceId, framework =
 
 describe('Risk Decision & Clause Sign-off Integration Tests', () => {
   let request;
-  let mongoServer;
   let user1Token;
   let user1Id;
   let user2Token;

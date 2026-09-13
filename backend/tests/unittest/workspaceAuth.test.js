@@ -1,7 +1,8 @@
 /**
  * Unit Tests for Workspace Auth Middleware
  *
- * Tests the workspace authorization middleware functions
+ * Tests the workspace authorization middleware functions.
+ * RTV-49: migrated off Mongoose models → Drizzle repositories.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,15 +17,16 @@ vi.mock('../../config/logger.js', () => ({
   },
 }));
 
-vi.mock('../../models/WorkspaceMember.js', () => ({
-  WorkspaceMember: {
-    find: vi.fn(),
-    findOne: vi.fn(),
+vi.mock('../../repositories/drizzle/WorkspaceMemberRepository.js', () => ({
+  workspaceMemberRepository: {
+    findActiveQueryableWithWorkspace: vi.fn(),
+    findOwnerMembership: vi.fn(),
+    findMembership: vi.fn(),
   },
 }));
 
-vi.mock('../../models/Workspace.js', () => ({
-  Workspace: {
+vi.mock('../../repositories/drizzle/WorkspaceRepository.js', () => ({
+  workspaceRepository: {
     findById: vi.fn(),
   },
 }));
@@ -35,8 +37,8 @@ import {
   canInviteMembers,
   getUserWorkspaceIds,
 } from '../../middleware/workspaceAuth.js';
-import { WorkspaceMember } from '../../models/WorkspaceMember.js';
-import { Workspace } from '../../models/Workspace.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
 
 describe('Workspace Auth Middleware', () => {
   let mockReq;
@@ -82,10 +84,7 @@ describe('Workspace Auth Middleware', () => {
     it('should return 403 when user has no workspace memberships', async () => {
       mockReq.user = { userId: 'user-123' };
 
-      const _mockFind = vi.fn().mockReturnValue({
-        populate: vi.fn().mockResolvedValue([]),
-      });
-      WorkspaceMember.find.mockReturnValue({ populate: vi.fn().mockResolvedValue([]) });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -100,18 +99,13 @@ describe('Workspace Auth Middleware', () => {
     it('should return 403 when all workspaces are in error state', async () => {
       mockReq.user = { userId: 'user-123' };
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([
-          {
-            workspaceId: {
-              _id: 'ws-1',
-              syncStatus: 'error',
-            },
-            role: 'member',
-            permissions: { canQuery: true },
-          },
-        ]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        {
+          workspace: { id: 'ws-1', syncStatus: 'error' },
+          role: 'member',
+          permissions: { canQuery: true },
+        },
+      ]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -126,25 +120,22 @@ describe('Workspace Auth Middleware', () => {
     it('should attach authorized workspaces and call next on success', async () => {
       mockReq.user = { userId: 'user-123' };
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([
-          {
-            workspaceId: {
-              _id: { toString: () => 'ws-1' },
-              name: 'Test Workspace',
-              syncStatus: 'synced',
-            },
-            role: 'member',
-            permissions: { canQuery: true },
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        {
+          workspace: {
+            id: { toString: () => 'ws-1' },
+            name: 'Test Workspace',
+            syncStatus: 'synced',
           },
-        ]),
-      });
+          role: 'member',
+          permissions: { canQuery: true },
+        },
+      ]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
       expect(mockReq.authorizedWorkspaces).toHaveLength(1);
       expect(mockReq.authorizedWorkspaces[0]).toMatchObject({
-        _id: { toString: expect.any(Function) },
         workspaceId: 'ws-1',
         workspaceName: 'Test Workspace',
         role: 'member',
@@ -156,15 +147,13 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.headers = { 'x-workspace-id': 'ws-B' }; // attacker requests another workspace
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([
-          {
-            workspaceId: { _id: { toString: () => 'ws-A' }, name: 'My WS', syncStatus: 'synced' },
-            role: 'member',
-            permissions: { canQuery: true },
-          },
-        ]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        {
+          workspace: { id: { toString: () => 'ws-A' }, name: 'My WS', syncStatus: 'synced' },
+          role: 'member',
+          permissions: { canQuery: true },
+        },
+      ]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -179,15 +168,13 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.headers = { 'x-workspace-id': 'ws-A' };
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([
-          {
-            workspaceId: { _id: { toString: () => 'ws-A' }, name: 'My WS', syncStatus: 'synced' },
-            role: 'member',
-            permissions: { canQuery: true },
-          },
-        ]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        {
+          workspace: { id: { toString: () => 'ws-A' }, name: 'My WS', syncStatus: 'synced' },
+          role: 'member',
+          permissions: { canQuery: true },
+        },
+      ]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -198,23 +185,21 @@ describe('Workspace Auth Middleware', () => {
     it('should filter out null workspace references', async () => {
       mockReq.user = { userId: 'user-123' };
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([
-          {
-            workspaceId: null, // Deleted workspace
-            role: 'member',
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        {
+          workspace: null, // Deleted workspace
+          role: 'member',
+        },
+        {
+          workspace: {
+            id: { toString: () => 'ws-2' },
+            name: 'Valid Workspace',
+            syncStatus: 'synced',
           },
-          {
-            workspaceId: {
-              _id: { toString: () => 'ws-2' },
-              name: 'Valid Workspace',
-              syncStatus: 'synced',
-            },
-            role: 'member',
-            permissions: { canQuery: true },
-          },
-        ]),
-      });
+          role: 'member',
+          permissions: { canQuery: true },
+        },
+      ]);
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -225,9 +210,9 @@ describe('Workspace Auth Middleware', () => {
     it('should return 500 on unexpected error', async () => {
       mockReq.user = { userId: 'user-123' };
 
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockRejectedValue(new Error('Database error')),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockRejectedValue(
+        new Error('Database error')
+      );
 
       await requireWorkspaceAccess(mockReq, mockRes, mockNext);
 
@@ -271,7 +256,7 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.params = { workspaceId: 'ws-1' };
 
-      WorkspaceMember.findOne.mockResolvedValue(null);
+      workspaceMemberRepository.findOwnerMembership.mockResolvedValue(null);
 
       await requireWorkspaceOwner(mockReq, mockRes, mockNext);
 
@@ -287,15 +272,15 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.params = { workspaceId: 'ws-1' };
 
-      WorkspaceMember.findOne.mockResolvedValue({
+      workspaceMemberRepository.findOwnerMembership.mockResolvedValue({
         userId: 'user-123',
         workspaceId: 'ws-1',
         role: 'owner',
         status: 'active',
       });
 
-      const mockWorkspace = { _id: 'ws-1', workspaceName: 'Test' };
-      Workspace.findById.mockResolvedValue(mockWorkspace);
+      const mockWorkspace = { id: 'ws-1', name: 'Test' };
+      workspaceRepository.findById.mockResolvedValue(mockWorkspace);
 
       await requireWorkspaceOwner(mockReq, mockRes, mockNext);
 
@@ -308,22 +293,18 @@ describe('Workspace Auth Middleware', () => {
       mockReq.params = {};
       mockReq.body = { workspaceId: 'ws-1' };
 
-      WorkspaceMember.findOne.mockResolvedValue({
+      workspaceMemberRepository.findOwnerMembership.mockResolvedValue({
         userId: 'user-123',
         workspaceId: 'ws-1',
         role: 'owner',
         status: 'active',
       });
 
-      Workspace.findById.mockResolvedValue({ _id: 'ws-1' });
+      workspaceRepository.findById.mockResolvedValue({ id: 'ws-1' });
 
       await requireWorkspaceOwner(mockReq, mockRes, mockNext);
 
-      expect(WorkspaceMember.findOne).toHaveBeenCalledWith(
-        expect.objectContaining({
-          workspaceId: 'ws-1',
-        })
-      );
+      expect(workspaceMemberRepository.findOwnerMembership).toHaveBeenCalledWith('ws-1', 'user-123');
       expect(mockNext).toHaveBeenCalled();
     });
   });
@@ -352,7 +333,7 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.params = { workspaceId: 'ws-1' };
 
-      WorkspaceMember.findOne.mockResolvedValue(null);
+      workspaceMemberRepository.findMembership.mockResolvedValue(null);
 
       await canInviteMembers(mockReq, mockRes, mockNext);
 
@@ -368,7 +349,7 @@ describe('Workspace Auth Middleware', () => {
       mockReq.user = { userId: 'user-123' };
       mockReq.params = { workspaceId: 'ws-1' };
 
-      WorkspaceMember.findOne.mockResolvedValue({
+      workspaceMemberRepository.findMembership.mockResolvedValue({
         role: 'member',
         permissions: { canInvite: false },
       });
@@ -391,7 +372,7 @@ describe('Workspace Auth Middleware', () => {
         role: 'owner',
         permissions: { canInvite: false }, // Doesn't matter for owner
       };
-      WorkspaceMember.findOne.mockResolvedValue(membership);
+      workspaceMemberRepository.findMembership.mockResolvedValue(membership);
 
       await canInviteMembers(mockReq, mockRes, mockNext);
 
@@ -407,7 +388,7 @@ describe('Workspace Auth Middleware', () => {
         role: 'member',
         permissions: { canInvite: true },
       };
-      WorkspaceMember.findOne.mockResolvedValue(membership);
+      workspaceMemberRepository.findMembership.mockResolvedValue(membership);
 
       await canInviteMembers(mockReq, mockRes, mockNext);
 
@@ -421,14 +402,10 @@ describe('Workspace Auth Middleware', () => {
   // ============================================================================
   describe('getUserWorkspaceIds', () => {
     it('should return array of workspace IDs', async () => {
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi
-          .fn()
-          .mockResolvedValue([
-            { workspaceId: { _id: { toString: () => 'ws-id-1' } } },
-            { workspaceId: { _id: { toString: () => 'ws-id-2' } } },
-          ]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        { workspace: { id: { toString: () => 'ws-id-1' } } },
+        { workspace: { id: { toString: () => 'ws-id-2' } } },
+      ]);
 
       const result = await getUserWorkspaceIds('user-123');
 
@@ -436,14 +413,10 @@ describe('Workspace Auth Middleware', () => {
     });
 
     it('should filter out null workspace references', async () => {
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi
-          .fn()
-          .mockResolvedValue([
-            { workspaceId: null },
-            { workspaceId: { _id: { toString: () => 'ws-id-2' } } },
-          ]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([
+        { workspace: null },
+        { workspace: { id: { toString: () => 'ws-id-2' } } },
+      ]);
 
       const result = await getUserWorkspaceIds('user-123');
 
@@ -451,27 +424,21 @@ describe('Workspace Auth Middleware', () => {
     });
 
     it('should return empty array when no memberships', async () => {
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([]),
-      });
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([]);
 
       const result = await getUserWorkspaceIds('user-123');
 
       expect(result).toEqual([]);
     });
 
-    it('should query for active memberships with canQuery permission', async () => {
-      WorkspaceMember.find.mockReturnValue({
-        populate: vi.fn().mockResolvedValue([]),
-      });
+    it('should query active, query-permitted memberships for the user', async () => {
+      workspaceMemberRepository.findActiveQueryableWithWorkspace.mockResolvedValue([]);
 
       await getUserWorkspaceIds('user-123');
 
-      expect(WorkspaceMember.find).toHaveBeenCalledWith({
-        userId: 'user-123',
-        status: 'active',
-        'permissions.canQuery': true,
-      });
+      expect(workspaceMemberRepository.findActiveQueryableWithWorkspace).toHaveBeenCalledWith(
+        'user-123'
+      );
     });
   });
 });

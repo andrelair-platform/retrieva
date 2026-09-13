@@ -1,19 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
+import { randomUUID } from 'crypto';
 import { WorkspaceService, serializeWorkspace } from '../../services/WorkspaceService.js';
 
 // ---------------------------------------------------------------------------
-// Mock module-level imports so the singleton doesn't crash on load
+// Mock module-level imports so the singleton doesn't crash on load.
+// RTV-49: the service is on Drizzle repositories now (no Mongoose models).
 // ---------------------------------------------------------------------------
-vi.mock('../../models/Workspace.js', () => ({ Workspace: {} }));
-vi.mock('../../models/WorkspaceMember.js', () => ({ WorkspaceMember: {} }));
-vi.mock('../../models/OrganizationMember.js', () => ({ OrganizationMember: {} }));
-vi.mock('../../models/User.js', () => ({ User: {} }));
+vi.mock('../../repositories/drizzle/WorkspaceRepository.js', () => ({ workspaceRepository: {} }));
+vi.mock('../../repositories/drizzle/WorkspaceMemberRepository.js', () => ({
+  workspaceMemberRepository: {},
+}));
+vi.mock('../../repositories/drizzle/OrganizationMemberRepository.js', () => ({
+  organizationMemberRepository: {},
+}));
+vi.mock('../../repositories/drizzle/UserRepository.js', () => ({ userRepository: {} }));
+vi.mock('../../repositories/drizzle/AssessmentRepository.js', () => ({ assessmentRepository: {} }));
 vi.mock('../../config/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('../../services/emailService.js', () => ({
   emailService: { sendWorkspaceInvitation: vi.fn().mockResolvedValue(undefined) },
+}));
+vi.mock('../../services/fileIngestionService.js', () => ({
+  deleteAssessmentCollection: vi.fn().mockResolvedValue(undefined),
 }));
 // Lazy-imported inside _purgeWorkspaceData (#417) — mock so it doesn't hit Qdrant.
 vi.mock('../../config/vectorStore.js', () => ({
@@ -23,13 +32,13 @@ vi.mock('../../config/vectorStore.js', () => ({
 // ---------------------------------------------------------------------------
 // Shared fixtures
 // ---------------------------------------------------------------------------
-const WS_ID = new mongoose.Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa').toString();
-const USER_ID = new mongoose.Types.ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb').toString();
-const MEMBER_ID = new mongoose.Types.ObjectId('cccccccccccccccccccccccc').toString();
+const WS_ID = randomUUID();
+const USER_ID = randomUUID();
+const MEMBER_ID = randomUUID();
 
 function makeWorkspace(overrides = {}) {
   return {
-    _id: { toString: () => WS_ID },
+    id: WS_ID,
     name: 'Acme Workspace',
     description: 'test',
     syncStatus: 'idle',
@@ -45,14 +54,14 @@ function makeWorkspace(overrides = {}) {
     exitStrategyDoc: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    save: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
 function makeOwnerMembership(overrides = {}) {
   return {
-    workspaceId: { toString: () => WS_ID },
+    id: MEMBER_ID,
+    workspaceId: WS_ID,
     userId: USER_ID,
     role: 'owner',
     status: 'active',
@@ -65,42 +74,32 @@ function makeDeps(overrides = {}) {
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const emailService = { sendWorkspaceInvitation: vi.fn().mockResolvedValue(undefined) };
 
-  const Workspace = {
+  const workspaceRepo = {
     create: vi.fn(),
     findById: vi.fn(),
-    findByIdAndDelete: vi.fn(),
-    find: vi.fn(),
+    updateById: vi.fn(),
+    deleteById: vi.fn().mockResolvedValue(undefined),
+    findByOrganization: vi.fn(),
   };
-  const WorkspaceMember = {
-    findOne: vi.fn(),
-    findById: vi.fn(),
+  const memberRepo = {
     addOwner: vi.fn().mockResolvedValue(undefined),
-    deleteMany: vi.fn().mockResolvedValue(undefined),
-    getUserWorkspaces: vi.fn(),
-    getWorkspaceMembers: vi.fn(),
+    findMembership: vi.fn(),
+    findOwnerMembership: vi.fn(),
+    findById: vi.fn(),
+    updateById: vi.fn().mockResolvedValue(undefined),
+    findActiveWithWorkspace: vi.fn(),
+    findByWorkspaceWithUser: vi.fn(),
     inviteMember: vi.fn(),
   };
-  const OrganizationMember = { findOne: vi.fn().mockResolvedValue(null) };
-  const User = {
-    findOne: vi.fn(),
+  const orgMemberRepo = { findActiveByUserId: vi.fn().mockResolvedValue(null) };
+  const userRepo = {
+    findByEmail: vi.fn(),
     findById: vi.fn(),
-    updateOne: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    updateOnboarding: vi.fn().mockResolvedValue(undefined),
   };
-
-  // Cascade-purge deps (#417). find() is chainable: .select().lean() → result.
-  const chain = (result) => ({
-    select: vi.fn(() => ({ lean: vi.fn().mockResolvedValue(result) })),
-  });
-  const Assessment = {
-    find: vi.fn(() => chain([])),
-    deleteMany: vi.fn().mockResolvedValue(undefined),
+  const assessmentRepo = {
+    findByWorkspaces: vi.fn().mockResolvedValue({ assessments: [] }),
   };
-  const Conversation = {
-    find: vi.fn(() => chain([])),
-    deleteMany: vi.fn().mockResolvedValue(undefined),
-  };
-  const Message = { deleteMany: vi.fn().mockResolvedValue(undefined) };
-  const VendorQuestionnaire = { deleteMany: vi.fn().mockResolvedValue(undefined) };
   const deleteAssessmentCollection = vi.fn().mockResolvedValue(undefined);
   const storage = {
     deleteFile: vi.fn().mockResolvedValue(undefined),
@@ -108,14 +107,11 @@ function makeDeps(overrides = {}) {
   };
 
   return {
-    Workspace,
-    WorkspaceMember,
-    OrganizationMember,
-    User,
-    Assessment,
-    Conversation,
-    Message,
-    VendorQuestionnaire,
+    workspaceRepo,
+    memberRepo,
+    orgMemberRepo,
+    userRepo,
+    assessmentRepo,
     deleteAssessmentCollection,
     storage,
     logger,
@@ -158,33 +154,36 @@ describe('WorkspaceService.createWorkspace', () => {
 
   it('creates workspace and adds owner', async () => {
     const ws = makeWorkspace();
-    deps.Workspace.create.mockResolvedValue(ws);
+    deps.workspaceRepo.create.mockResolvedValue(ws);
 
     const result = await svc.createWorkspace(USER_ID, { name: 'Acme' });
 
-    expect(deps.Workspace.create).toHaveBeenCalledWith(
+    expect(deps.workspaceRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Acme', userId: USER_ID })
     );
-    expect(deps.WorkspaceMember.addOwner).toHaveBeenCalledWith(ws._id, USER_ID);
+    expect(deps.memberRepo.addOwner).toHaveBeenCalledWith(ws.id, USER_ID);
     expect(result.name).toBe('Acme Workspace');
   });
 
   it('attaches organizationId when creator belongs to an org', async () => {
-    const orgId = new mongoose.Types.ObjectId();
-    deps.OrganizationMember.findOne.mockResolvedValue({ organizationId: orgId, status: 'active' });
-    deps.Workspace.create.mockResolvedValue(makeWorkspace());
+    const orgId = randomUUID();
+    deps.orgMemberRepo.findActiveByUserId.mockResolvedValue({
+      organizationId: orgId,
+      status: 'active',
+    });
+    deps.workspaceRepo.create.mockResolvedValue(makeWorkspace());
 
     await svc.createWorkspace(USER_ID, { name: 'Acme' });
 
-    expect(deps.Workspace.create).toHaveBeenCalledWith(
+    expect(deps.workspaceRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: orgId })
     );
   });
 
   it('fires onboarding checklist update (non-blocking)', async () => {
-    deps.Workspace.create.mockResolvedValue(makeWorkspace());
+    deps.workspaceRepo.create.mockResolvedValue(makeWorkspace());
     await svc.createWorkspace(USER_ID, { name: 'Acme' });
-    expect(deps.User.updateOne).toHaveBeenCalled();
+    expect(deps.userRepo.updateOnboarding).toHaveBeenCalled();
   });
 });
 
@@ -201,19 +200,19 @@ describe('WorkspaceService.getWorkspace', () => {
   });
 
   it('throws 403 if user is not a member', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findMembership.mockResolvedValue(null);
     await expect(svc.getWorkspace(WS_ID, USER_ID)).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it('throws 404 if workspace does not exist', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Workspace.findById.mockResolvedValue(null);
+    deps.memberRepo.findMembership.mockResolvedValue(makeOwnerMembership());
+    deps.workspaceRepo.findById.mockResolvedValue(null);
     await expect(svc.getWorkspace(WS_ID, USER_ID)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('returns serialized workspace with role and permissions', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Workspace.findById.mockResolvedValue(makeWorkspace());
+    deps.memberRepo.findMembership.mockResolvedValue(makeOwnerMembership());
+    deps.workspaceRepo.findById.mockResolvedValue(makeWorkspace());
 
     const result = await svc.getWorkspace(WS_ID, USER_ID);
 
@@ -236,29 +235,31 @@ describe('WorkspaceService.updateWorkspace', () => {
   });
 
   it('throws 403 if caller is not owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(null);
     await expect(svc.updateWorkspace(WS_ID, USER_ID, { name: 'X' })).rejects.toMatchObject({
       statusCode: 403,
     });
   });
 
   it('throws 404 if workspace not found', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Workspace.findById.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.workspaceRepo.findById.mockResolvedValue(null);
     await expect(svc.updateWorkspace(WS_ID, USER_ID, { name: 'X' })).rejects.toMatchObject({
       statusCode: 404,
     });
   });
 
-  it('updates name and calls save', async () => {
-    const ws = makeWorkspace();
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Workspace.findById.mockResolvedValue(ws);
+  it('updates name via the repository', async () => {
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.workspaceRepo.findById.mockResolvedValue(makeWorkspace());
+    deps.workspaceRepo.updateById.mockResolvedValue(makeWorkspace({ name: 'New Name' }));
 
     const result = await svc.updateWorkspace(WS_ID, USER_ID, { name: 'New Name' });
 
-    expect(ws.name).toBe('New Name');
-    expect(ws.save).toHaveBeenCalled();
+    expect(deps.workspaceRepo.updateById).toHaveBeenCalledWith(
+      WS_ID,
+      expect.objectContaining({ name: 'New Name' })
+    );
     expect(result.name).toBe('New Name');
   });
 });
@@ -276,54 +277,40 @@ describe('WorkspaceService.deleteWorkspace', () => {
   });
 
   it('throws 403 if caller is not owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(null);
     await expect(svc.deleteWorkspace(WS_ID, USER_ID)).rejects.toMatchObject({ statusCode: 403 });
   });
 
-  it('deletes members then workspace', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Workspace.findByIdAndDelete.mockResolvedValue(undefined);
+  it('deletes the workspace (FK cascade removes children)', async () => {
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
 
     await svc.deleteWorkspace(WS_ID, USER_ID);
 
-    expect(deps.WorkspaceMember.deleteMany).toHaveBeenCalledWith({ workspaceId: WS_ID });
-    expect(deps.Workspace.findByIdAndDelete).toHaveBeenCalledWith(WS_ID);
+    expect(deps.workspaceRepo.deleteById).toHaveBeenCalledWith(WS_ID);
   });
 
-  it('cascade-purges all vendor data before deleting the workspace (#417)', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Assessment.find.mockReturnValue({
-      select: () => ({
-        lean: () => Promise.resolve([{ _id: 'a1', documents: [{ storageKey: 'k1' }] }]),
-      }),
-    });
-    deps.Conversation.find.mockReturnValue({
-      select: () => ({ lean: () => Promise.resolve([{ _id: 'c1' }]) }),
+  it('cascade-purges external vendor data before deleting the workspace (#417)', async () => {
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.assessmentRepo.findByWorkspaces.mockResolvedValue({
+      assessments: [{ id: 'a1', documents: [{ storageKey: 'k1' }] }],
     });
 
     await svc.deleteWorkspace(WS_ID, USER_ID);
 
-    // per-assessment Qdrant collection + stored file
+    // per-assessment Qdrant collection + stored file purged
     expect(deps.deleteAssessmentCollection).toHaveBeenCalledWith('a1');
     expect(deps.storage.deleteFile).toHaveBeenCalledWith('k1');
-    // Mongo cascade
-    expect(deps.Message.deleteMany).toHaveBeenCalledWith({ conversationId: { $in: ['c1'] } });
-    expect(deps.Conversation.deleteMany).toHaveBeenCalledWith({ workspaceId: WS_ID });
-    expect(deps.VendorQuestionnaire.deleteMany).toHaveBeenCalledWith({ workspaceId: WS_ID });
-    expect(deps.Assessment.deleteMany).toHaveBeenCalledWith({ workspaceId: WS_ID });
-    // workspace removed last
-    expect(deps.Workspace.findByIdAndDelete).toHaveBeenCalledWith(WS_ID);
+    // workspace removed last (FK cascade drops rows)
+    expect(deps.workspaceRepo.deleteById).toHaveBeenCalledWith(WS_ID);
   });
 
   it('still deletes the workspace if a purge step fails (best-effort)', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.Assessment.find.mockReturnValue({
-      select: () => ({ lean: () => Promise.reject(new Error('db down')) }),
-    });
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.assessmentRepo.findByWorkspaces.mockRejectedValue(new Error('db down'));
 
     await svc.deleteWorkspace(WS_ID, USER_ID);
 
-    expect(deps.Workspace.findByIdAndDelete).toHaveBeenCalledWith(WS_ID);
+    expect(deps.workspaceRepo.deleteById).toHaveBeenCalledWith(WS_ID);
   });
 });
 
@@ -340,12 +327,12 @@ describe('WorkspaceService.getMyWorkspaces', () => {
   });
 
   it('returns org workspaces with org role when user is org member', async () => {
-    deps.OrganizationMember.findOne.mockResolvedValue({
+    deps.orgMemberRepo.findActiveByUserId.mockResolvedValue({
       organizationId: 'org-1',
       role: 'org_admin',
       joinedAt: new Date(),
     });
-    deps.Workspace.find.mockResolvedValue([makeWorkspace()]);
+    deps.workspaceRepo.findByOrganization.mockResolvedValue([makeWorkspace()]);
 
     const result = await svc.getMyWorkspaces(USER_ID);
 
@@ -355,10 +342,9 @@ describe('WorkspaceService.getMyWorkspaces', () => {
   });
 
   it('returns direct memberships when user has no org', async () => {
-    deps.OrganizationMember.findOne.mockResolvedValue(null);
-    const ws = makeWorkspace();
-    deps.WorkspaceMember.getUserWorkspaces.mockResolvedValue([
-      { workspaceId: ws, role: 'member', permissions: {}, invitedAt: new Date() },
+    deps.orgMemberRepo.findActiveByUserId.mockResolvedValue(null);
+    deps.memberRepo.findActiveWithWorkspace.mockResolvedValue([
+      { workspace: makeWorkspace(), role: 'member', permissions: {}, invitedAt: new Date() },
     ]);
 
     const result = await svc.getMyWorkspaces(USER_ID);
@@ -374,40 +360,42 @@ describe('WorkspaceService.getMyWorkspaces', () => {
 describe('WorkspaceService.inviteMember', () => {
   let deps;
   let svc;
-  const inviteeId = new mongoose.Types.ObjectId('eeeeeeeeeeeeeeeeeeeeeeee');
+  const inviteeId = randomUUID();
 
   beforeEach(() => {
     deps = makeDeps();
     svc = new WorkspaceService(deps);
-    deps.Workspace.findById.mockResolvedValue(makeWorkspace());
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.User.findOne.mockResolvedValue({ _id: inviteeId, email: 'bob@example.com', name: 'Bob' });
-    deps.User.findById.mockReturnValue({
-      select: vi.fn().mockResolvedValue({ name: 'Alice', email: 'alice@example.com' }),
+    deps.workspaceRepo.findById.mockResolvedValue(makeWorkspace());
+    deps.memberRepo.findMembership.mockResolvedValue(makeOwnerMembership());
+    deps.userRepo.findByEmail.mockResolvedValue({
+      id: inviteeId,
+      email: 'bob@example.com',
+      name: 'Bob',
     });
-    deps.WorkspaceMember.inviteMember.mockResolvedValue({
-      _id: MEMBER_ID,
+    deps.userRepo.findById.mockResolvedValue({ name: 'Alice', email: 'alice@example.com' });
+    deps.memberRepo.inviteMember.mockResolvedValue({
+      id: MEMBER_ID,
       role: 'member',
       status: 'active',
     });
   });
 
   it('throws 404 if invitee is not registered', async () => {
-    deps.User.findOne.mockResolvedValue(null);
+    deps.userRepo.findByEmail.mockResolvedValue(null);
     await expect(
       svc.inviteMember(WS_ID, USER_ID, { email: 'x@x.com', role: 'member' })
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('throws 403 if inviter is not a member', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findMembership.mockResolvedValue(null);
     await expect(
       svc.inviteMember(WS_ID, USER_ID, { email: 'bob@example.com', role: 'member' })
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it('throws 409 if user is already a member', async () => {
-    deps.WorkspaceMember.inviteMember.mockRejectedValue(
+    deps.memberRepo.inviteMember.mockRejectedValue(
       new Error('already a member of this workspace')
     );
     await expect(
@@ -441,47 +429,40 @@ describe('WorkspaceService.revokeMember', () => {
   });
 
   it('throws 403 if requester is not owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(null);
     await expect(svc.revokeMember(WS_ID, USER_ID, MEMBER_ID)).rejects.toMatchObject({
       statusCode: 403,
     });
   });
 
   it('throws 404 if member not found', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.WorkspaceMember.findById.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.memberRepo.findById.mockResolvedValue(null);
     await expect(svc.revokeMember(WS_ID, USER_ID, MEMBER_ID)).rejects.toMatchObject({
       statusCode: 404,
     });
   });
 
   it('throws 400 when trying to revoke an owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.WorkspaceMember.findById.mockResolvedValue({
-      workspaceId: { toString: () => WS_ID },
-      role: 'owner',
-      save: vi.fn(),
-    });
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.memberRepo.findById.mockResolvedValue({ workspaceId: WS_ID, role: 'owner' });
     await expect(svc.revokeMember(WS_ID, USER_ID, MEMBER_ID)).rejects.toMatchObject({
       statusCode: 400,
     });
   });
 
   it('sets status to revoked', async () => {
-    const member = {
-      workspaceId: { toString: () => WS_ID },
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.memberRepo.findById.mockResolvedValue({
+      workspaceId: WS_ID,
       role: 'member',
       status: 'active',
       userId: 'u2',
-      save: vi.fn(),
-    };
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.WorkspaceMember.findById.mockResolvedValue(member);
+    });
 
     await svc.revokeMember(WS_ID, USER_ID, MEMBER_ID);
 
-    expect(member.status).toBe('revoked');
-    expect(member.save).toHaveBeenCalled();
+    expect(deps.memberRepo.updateById).toHaveBeenCalledWith(MEMBER_ID, { status: 'revoked' });
   });
 });
 
@@ -498,37 +479,35 @@ describe('WorkspaceService.updateMember', () => {
   });
 
   it('throws 403 if requester is not owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(null);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(null);
     await expect(
       svc.updateMember(WS_ID, USER_ID, MEMBER_ID, { role: 'viewer' })
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it('throws 400 when trying to modify owner', async () => {
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.WorkspaceMember.findById.mockResolvedValue({
-      workspaceId: { toString: () => WS_ID },
-      role: 'owner',
-      save: vi.fn(),
-    });
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.memberRepo.findById.mockResolvedValue({ workspaceId: WS_ID, role: 'owner' });
     await expect(
       svc.updateMember(WS_ID, USER_ID, MEMBER_ID, { role: 'viewer' })
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it('updates role and saves', async () => {
+  it('updates role via the repository', async () => {
     const member = {
-      workspaceId: { toString: () => WS_ID },
+      workspaceId: WS_ID,
       role: 'member',
       permissions: { canQuery: true, canViewSources: true, canInvite: false },
-      save: vi.fn().mockResolvedValue(undefined),
     };
-    deps.WorkspaceMember.findOne.mockResolvedValue(makeOwnerMembership());
-    deps.WorkspaceMember.findById.mockResolvedValue(member);
+    deps.memberRepo.findOwnerMembership.mockResolvedValue(makeOwnerMembership());
+    deps.memberRepo.findById.mockResolvedValue(member);
+    deps.memberRepo.updateById.mockResolvedValue({ ...member, role: 'viewer' });
 
     await svc.updateMember(WS_ID, USER_ID, MEMBER_ID, { role: 'viewer' });
 
-    expect(member.role).toBe('viewer');
-    expect(member.save).toHaveBeenCalled();
+    expect(deps.memberRepo.updateById).toHaveBeenCalledWith(
+      MEMBER_ID,
+      expect.objectContaining({ role: 'viewer' })
+    );
   });
 });

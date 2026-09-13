@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the repository the helper depends on.
 const findMembership = vi.fn();
-vi.mock('../../repositories/WorkspaceMemberRepository.js', () => ({
+vi.mock('../../repositories/drizzle/WorkspaceMemberRepository.js', () => ({
   workspaceMemberRepository: {
     findMembership: (...args) => findMembership(...args),
   },
