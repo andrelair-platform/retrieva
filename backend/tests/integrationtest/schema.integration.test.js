@@ -14,6 +14,8 @@ import {
   workspaces,
   conversations,
   messages,
+  providerNodes,
+  providerDependencies,
 } from '../../db/schema/index.js';
 
 let db;
@@ -38,12 +40,12 @@ describe('Drizzle schema (RTV-48)', () => {
     await stopPg();
   });
 
-  it('applied the migration — all 13 tables exist', async () => {
+  it('applied the migration — all 14 tables exist', async () => {
     const res = await db.execute(
       sql`select count(*)::int as n from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`
     );
-    // 13 domain tables + Drizzle's __drizzle_migrations bookkeeping table.
-    expect(res.rows[0].n).toBeGreaterThanOrEqual(13);
+    // 14 domain tables + Drizzle's __drizzle_migrations bookkeeping table.
+    expect(res.rows[0].n).toBeGreaterThanOrEqual(14);
   });
 
   it('CRUD across the core graph (user → org → workspace → conversation → message)', async () => {
@@ -109,6 +111,84 @@ describe('Drizzle schema (RTV-48)', () => {
     });
     expect(loaded.messages).toHaveLength(1);
     expect(loaded.user.id).toBe(user.id);
+  });
+
+  it('rejects an out-of-set value on a text+CHECK taxonomy column (industry)', async () => {
+    const [user] = await db.insert(users).values(mkUser()).returning();
+    await expect(
+      db.insert(organizations).values({ name: 'Bad Co', ownerId: user.id, industry: 'aerospace' })
+    ).rejects.toThrow();
+  });
+
+  it('provider graph: nodes are unique per org, edges reference node ids, shared substrate is detectable', async () => {
+    const [user] = await db.insert(users).values(mkUser()).returning();
+    const [org] = await db
+      .insert(organizations)
+      .values({ name: 'Graph Org', ownerId: user.id })
+      .returning();
+
+    // Two vendors (v1, v2) both sub-process via the same external substrate (Azure).
+    const [v1] = await db
+      .insert(providerNodes)
+      .values({
+        organizationId: org.id,
+        kind: 'external',
+        canonicalName: 'vendor-1',
+        displayName: 'Vendor 1',
+      })
+      .returning();
+    const [v2] = await db
+      .insert(providerNodes)
+      .values({
+        organizationId: org.id,
+        kind: 'external',
+        canonicalName: 'vendor-2',
+        displayName: 'Vendor 2',
+      })
+      .returning();
+    const [azure] = await db
+      .insert(providerNodes)
+      .values({
+        organizationId: org.id,
+        kind: 'external',
+        canonicalName: 'azure',
+        displayName: 'Azure',
+      })
+      .returning();
+
+    // canonical_name is unique per org.
+    await expect(
+      db
+        .insert(providerNodes)
+        .values({
+          organizationId: org.id,
+          kind: 'external',
+          canonicalName: 'azure',
+          displayName: 'Azure (dup)',
+        })
+    ).rejects.toThrow();
+
+    await db.insert(providerDependencies).values([
+      { organizationId: org.id, parentNodeId: v1.id, childNodeId: azure.id },
+      { organizationId: org.id, parentNodeId: v2.id, childNodeId: azure.id },
+    ]);
+
+    // Edge must reference a real node (FK integrity).
+    await expect(
+      db.insert(providerDependencies).values({
+        organizationId: org.id,
+        parentNodeId: v1.id,
+        childNodeId: '00000000-0000-0000-0000-000000000000',
+      })
+    ).rejects.toThrow();
+
+    // Shared substrate = a child node reached by >1 parent — a plain GROUP BY.
+    const shared = await db.execute(
+      sql`select child_node_id, count(*)::int as fanin from provider_dependencies where organization_id = ${org.id} group by child_node_id having count(*) > 1`
+    );
+    expect(shared.rows).toHaveLength(1);
+    expect(shared.rows[0].child_node_id).toBe(azure.id);
+    expect(shared.rows[0].fanin).toBe(2);
   });
 
   it('enforces the partial-unique idempotency index on conversations', async () => {
