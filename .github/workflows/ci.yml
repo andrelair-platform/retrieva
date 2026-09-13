@@ -78,6 +78,22 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # PostgreSQL for Drizzle integration tests (RTV-47 → RTV-45 migration).
+      # Runs alongside Mongo during the transition; Mongo is removed at RTV-49.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: retrieva
+          POSTGRES_PASSWORD: retrieva
+          POSTGRES_DB: retrieva_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U retrieva"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -100,6 +116,7 @@ jobs:
         env:
           NODE_ENV: test
           MONGODB_URI: mongodb://localhost:27017/test_db
+          DATABASE_URL: postgresql://retrieva:retrieva@localhost:5432/retrieva_test
           REDIS_URL: redis://localhost:6378
           REDIS_HOST: localhost
           REDIS_PORT: 6378
