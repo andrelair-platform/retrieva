@@ -53,7 +53,9 @@ class AssessmentService {
       status: 'uploading',
     }));
 
-    const assessment = await this.assessmentRepo.create({
+    // Explicit workspaceId (authz'd upstream) + no reliable tenant context here
+    // (multipart body is parsed after setTenantContext) → unscoped create.
+    const assessment = await this.assessmentRepo.createUnscoped({
       workspaceId,
       name: name.trim(),
       vendorName: vendorName.trim(),
