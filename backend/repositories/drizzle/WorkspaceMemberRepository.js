@@ -65,6 +65,65 @@ export class WorkspaceMemberRepository extends BaseDrizzleRepository {
   async deleteByWorkspace(workspaceId) {
     return this.deleteWhere(eq(workspaceMembers.workspaceId, workspaceId));
   }
+
+  /** Add the creating user as owner (ported from the model static). */
+  async addOwner(workspaceId, userId) {
+    return this.create({
+      workspaceId,
+      userId,
+      role: 'owner',
+      status: 'active',
+      permissions: { canQuery: true, canViewSources: true, canInvite: true },
+    });
+  }
+
+  /**
+   * Invite a user: reactivate a revoked membership, reject an already-active one,
+   * else create. Ported from the WorkspaceMember.inviteMember static.
+   */
+  async inviteMember(workspaceId, userId, invitedBy, role = 'member') {
+    const existing = await this.findOne(
+      and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId))
+    );
+    if (existing) {
+      if (existing.status === 'revoked') {
+        return this.updateById(existing.id, {
+          status: 'active',
+          role,
+          invitedBy,
+          invitedAt: new Date(),
+        });
+      }
+      throw new Error('User is already a member of this workspace');
+    }
+    return this.create({
+      workspaceId,
+      userId,
+      role,
+      invitedBy,
+      status: 'active',
+      permissions: { canQuery: true, canViewSources: true, canInvite: role === 'owner' },
+    });
+  }
+
+  /** All active memberships for a user WITH their workspace (replaces getUserWorkspaces). */
+  async findActiveWithWorkspace(userId) {
+    return this.db.query.workspaceMembers.findMany({
+      where: and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')),
+      with: { workspace: true },
+    });
+  }
+
+  /** Non-revoked members of a workspace WITH the user (replaces getWorkspaceMembers). */
+  async findByWorkspaceWithUser(workspaceId) {
+    return this.db.query.workspaceMembers.findMany({
+      where: and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        sql`${workspaceMembers.status} <> 'revoked'`
+      ),
+      with: { user: { columns: { id: true, name: true, email: true } } },
+    });
+  }
 }
 
 export const workspaceMemberRepository = new WorkspaceMemberRepository();

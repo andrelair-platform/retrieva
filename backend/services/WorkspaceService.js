@@ -1,20 +1,18 @@
 import { AppError } from '../utils/index.js';
-import { Workspace } from '../models/Workspace.js';
-import { WorkspaceMember } from '../models/WorkspaceMember.js';
-import { OrganizationMember } from '../models/OrganizationMember.js';
-import { User } from '../models/User.js';
-import { Assessment } from '../models/Assessment.js';
-import { Conversation } from '../models/Conversation.js';
-import { Message } from '../models/Message.js';
-import { VendorQuestionnaire } from '../models/VendorQuestionnaire.js';
+import { workspaceRepository } from '../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../repositories/drizzle/WorkspaceMemberRepository.js';
+import { organizationMemberRepository } from '../repositories/drizzle/OrganizationMemberRepository.js';
+import { userRepository } from '../repositories/drizzle/UserRepository.js';
+import { assessmentRepository } from '../repositories/drizzle/AssessmentRepository.js';
 import { deleteAssessmentCollection } from './fileIngestionService.js';
+import { safeDecrypt } from '../utils/security/fieldEncryption.js';
 import * as storageModule from '../config/storage.js';
 import logger from '../config/logger.js';
 import { emailService } from './emailService.js';
 
 export function serializeWorkspace(ws, extras = {}) {
   return {
-    id: ws._id.toString(),
+    id: ws.id.toString(),
     name: ws.name,
     description: ws.description,
     syncStatus: ws.syncStatus,
@@ -36,14 +34,11 @@ export function serializeWorkspace(ws, extras = {}) {
 
 class WorkspaceService {
   constructor(deps = {}) {
-    this.Workspace = deps.Workspace || Workspace;
-    this.WorkspaceMember = deps.WorkspaceMember || WorkspaceMember;
-    this.OrganizationMember = deps.OrganizationMember || OrganizationMember;
-    this.User = deps.User || User;
-    this.Assessment = deps.Assessment || Assessment;
-    this.Conversation = deps.Conversation || Conversation;
-    this.Message = deps.Message || Message;
-    this.VendorQuestionnaire = deps.VendorQuestionnaire || VendorQuestionnaire;
+    this.workspaceRepo = deps.workspaceRepo || workspaceRepository;
+    this.memberRepo = deps.memberRepo || workspaceMemberRepository;
+    this.orgMemberRepo = deps.orgMemberRepo || organizationMemberRepository;
+    this.userRepo = deps.userRepo || userRepository;
+    this.assessmentRepo = deps.assessmentRepo || assessmentRepository;
     this.deleteAssessmentCollection = deps.deleteAssessmentCollection || deleteAssessmentCollection;
     this.storage = deps.storage || storageModule;
     this.logger = deps.logger || logger;
@@ -62,9 +57,9 @@ class WorkspaceService {
       vendorFunctions,
     } = data;
 
-    const orgMembership = await this.OrganizationMember.findOne({ userId, status: 'active' });
+    const orgMembership = await this.orgMemberRepo.findActiveByUserId(userId);
 
-    const workspace = await this.Workspace.create({
+    const workspace = await this.workspaceRepo.create({
       name: name.trim(),
       description: description?.trim() || '',
       userId,
@@ -72,21 +67,21 @@ class WorkspaceService {
       vendorTier: vendorTier || null,
       serviceType: serviceType || null,
       country: country?.trim() || '',
-      contractStart: contractStart || null,
-      contractEnd: contractEnd || null,
+      contractStart: contractStart ? new Date(contractStart) : null,
+      contractEnd: contractEnd ? new Date(contractEnd) : null,
       vendorFunctions: Array.isArray(vendorFunctions) ? vendorFunctions : [],
     });
 
-    await this.WorkspaceMember.addOwner(workspace._id, userId);
+    await this.memberRepo.addOwner(workspace.id, userId);
 
-    this.User.updateOne(
-      { _id: userId, 'onboardingChecklist.vendorCreated': false },
-      { $set: { 'onboardingChecklist.vendorCreated': true } }
-    ).catch(() => {});
+    // Flip the onboarding flag (fire-and-forget, idempotent merge).
+    this.userRepo
+      .updateOnboarding(userId, { checklist: { vendorCreated: true } })
+      .catch(() => {});
 
     this.logger.info('Workspace created', {
       service: 'workspace',
-      workspaceId: workspace._id,
+      workspaceId: workspace.id,
       userId,
     });
 
@@ -94,14 +89,10 @@ class WorkspaceService {
   }
 
   async getWorkspace(workspaceId, userId) {
-    const membership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId,
-      status: 'active',
-    });
+    const membership = await this.memberRepo.findMembership(workspaceId, userId);
     if (!membership) throw new AppError('You are not a member of this workspace', 403);
 
-    const workspace = await this.Workspace.findById(workspaceId);
+    const workspace = await this.workspaceRepo.findById(workspaceId);
     if (!workspace) throw new AppError('Workspace not found', 404);
 
     return serializeWorkspace(workspace, {
@@ -111,15 +102,10 @@ class WorkspaceService {
   }
 
   async updateWorkspace(workspaceId, userId, data) {
-    const membership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId,
-      status: 'active',
-      role: 'owner',
-    });
+    const membership = await this.memberRepo.findOwnerMembership(workspaceId, userId);
     if (!membership) throw new AppError('Only workspace owners can update workspace details', 403);
 
-    const workspace = await this.Workspace.findById(workspaceId);
+    const workspace = await this.workspaceRepo.findById(workspaceId);
     if (!workspace) throw new AppError('Workspace not found', 404);
 
     const {
@@ -137,62 +123,56 @@ class WorkspaceService {
       vendorFunctions,
     } = data;
 
-    if (name?.trim()) workspace.name = name.trim();
-    if (description !== undefined) workspace.description = description?.trim() || '';
-    if (vendorTier !== undefined) workspace.vendorTier = vendorTier || null;
-    if (country !== undefined) workspace.country = country?.trim() || '';
-    if (serviceType !== undefined) workspace.serviceType = serviceType || null;
+    const patch = {};
+    if (name?.trim()) patch.name = name.trim();
+    if (description !== undefined) patch.description = description?.trim() || '';
+    if (vendorTier !== undefined) patch.vendorTier = vendorTier || null;
+    if (country !== undefined) patch.country = country?.trim() || '';
+    if (serviceType !== undefined) patch.serviceType = serviceType || null;
     if (contractStart !== undefined)
-      workspace.contractStart = contractStart ? new Date(contractStart) : null;
-    if (contractEnd !== undefined)
-      workspace.contractEnd = contractEnd ? new Date(contractEnd) : null;
+      patch.contractStart = contractStart ? new Date(contractStart) : null;
+    if (contractEnd !== undefined) patch.contractEnd = contractEnd ? new Date(contractEnd) : null;
     if (nextReviewDate !== undefined)
-      workspace.nextReviewDate = nextReviewDate ? new Date(nextReviewDate) : null;
-    if (vendorStatus !== undefined) workspace.vendorStatus = vendorStatus;
-    if (Array.isArray(certifications)) workspace.certifications = certifications;
-    if (Array.isArray(vendorFunctions)) workspace.vendorFunctions = vendorFunctions;
-    if (exitStrategyDoc !== undefined) workspace.exitStrategyDoc = exitStrategyDoc || null;
+      patch.nextReviewDate = nextReviewDate ? new Date(nextReviewDate) : null;
+    if (vendorStatus !== undefined) patch.vendorStatus = vendorStatus;
+    if (Array.isArray(certifications)) patch.certifications = certifications;
+    if (Array.isArray(vendorFunctions)) patch.vendorFunctions = vendorFunctions;
+    if (exitStrategyDoc !== undefined) patch.exitStrategyDoc = exitStrategyDoc || null;
 
-    await workspace.save();
+    const updated =
+      Object.keys(patch).length > 0
+        ? await this.workspaceRepo.updateById(workspaceId, patch)
+        : workspace;
 
-    return serializeWorkspace(workspace);
+    return serializeWorkspace(updated);
   }
 
   async deleteWorkspace(workspaceId, userId) {
-    const membership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId,
-      status: 'active',
-      role: 'owner',
-    });
+    const membership = await this.memberRepo.findOwnerMembership(workspaceId, userId);
     if (!membership) throw new AppError('Only workspace owners can delete a workspace', 403);
 
-    // Cascade-purge the vendor's data BEFORE removing the workspace (#417):
-    // indexed vectors, per-assessment collections, files, and Mongo records.
+    // Purge external data (Qdrant/files) BEFORE deleting the workspace row; the DB
+    // FKs then cascade-delete members/conversations/messages/questionnaires/assessments.
     await this._purgeWorkspaceData(workspaceId);
 
-    await this.WorkspaceMember.deleteMany({ workspaceId });
-    await this.Workspace.findByIdAndDelete(workspaceId);
+    await this.workspaceRepo.deleteById(workspaceId); // cascade removes child rows
 
     this.logger.info('Workspace deleted', { service: 'workspace', workspaceId });
   }
 
   /**
-   * Erase all data tied to a workspace (#417 — GDPR erasure / clean offboarding).
-   * Best-effort: each step is isolated so a single store being unavailable never
-   * blocks the workspace deletion. Runs without tenant context (deleteMany is not
-   * tenant-hooked; explicit workspaceId filters are authoritative).
+   * Erase external data tied to a workspace (#417 — GDPR erasure / clean offboarding):
+   * Qdrant chunks/collections + stored files. The Postgres rows are removed by FK cascade
+   * when the workspace is deleted. Best-effort; each step isolated.
    */
   async _purgeWorkspaceData(workspaceId) {
     const wid = String(workspaceId);
 
-    // Gather assessments first — we need their ids (per-assessment Qdrant
-    // collections) and file keys before deleting the Mongo records.
+    // Gather assessments (unscoped — explicit workspace) for their ids + file keys.
     let assessments = [];
     try {
-      assessments = await this.Assessment.find({ workspaceId })
-        .select('_id documents.storageKey')
-        .lean();
+      const res = await this.assessmentRepo.findByWorkspaces([wid], { limit: 10000 });
+      assessments = res.assessments;
     } catch (err) {
       this.logger.warn('Purge: failed to list assessments', {
         workspaceId: wid,
@@ -200,7 +180,7 @@ class WorkspaceService {
       });
     }
 
-    // 1. Qdrant: purge all of the workspace's chunks from the shared collection.
+    // 1. Qdrant: purge the workspace's chunks from the shared collection.
     try {
       const { deleteWorkspaceChunks } = await import('../config/vectorStore.js');
       await deleteWorkspaceChunks(wid);
@@ -214,10 +194,10 @@ class WorkspaceService {
     // 2. Qdrant per-assessment collections + 3. stored files.
     for (const a of assessments) {
       try {
-        await this.deleteAssessmentCollection(String(a._id));
+        await this.deleteAssessmentCollection(String(a.id));
       } catch (err) {
         this.logger.warn('Purge: failed to delete assessment collection', {
-          assessmentId: String(a._id),
+          assessmentId: String(a.id),
           error: err.message,
         });
       }
@@ -234,21 +214,6 @@ class WorkspaceService {
       }
     }
 
-    // 4. Mongo cascade: messages (by conversation), conversations, questionnaires,
-    // assessments.
-    try {
-      const convs = await this.Conversation.find({ workspaceId }).select('_id').lean();
-      const convIds = convs.map((c) => c._id);
-      if (convIds.length) {
-        await this.Message.deleteMany({ conversationId: { $in: convIds } });
-      }
-      await this.Conversation.deleteMany({ workspaceId });
-      await this.VendorQuestionnaire.deleteMany({ workspaceId });
-      await this.Assessment.deleteMany({ workspaceId });
-    } catch (err) {
-      this.logger.warn('Purge: Mongo cascade failed', { workspaceId: wid, error: err.message });
-    }
-
     this.logger.info('Workspace data purged', {
       service: 'workspace',
       workspaceId: wid,
@@ -257,12 +222,12 @@ class WorkspaceService {
   }
 
   async getMyWorkspaces(userId) {
-    const orgMembership = await this.OrganizationMember.findOne({ userId, status: 'active' });
+    const orgMembership = await this.orgMemberRepo.findActiveByUserId(userId);
 
     if (orgMembership) {
-      const orgWorkspaces = await this.Workspace.find({
-        organizationId: orgMembership.organizationId,
-      });
+      const orgWorkspaces = await this.workspaceRepo.findByOrganization(
+        orgMembership.organizationId
+      );
       const roleMap = { org_admin: 'owner', analyst: 'member', viewer: 'viewer' };
       const myRole = roleMap[orgMembership.role] || 'member';
       const canInvite = orgMembership.role === 'org_admin';
@@ -275,11 +240,11 @@ class WorkspaceService {
       );
     }
 
-    const memberships = await this.WorkspaceMember.getUserWorkspaces(userId);
+    const memberships = await this.memberRepo.findActiveWithWorkspace(userId);
     return memberships
-      .filter((m) => m.workspaceId)
+      .filter((m) => m.workspace)
       .map((m) =>
-        serializeWorkspace(m.workspaceId, {
+        serializeWorkspace(m.workspace, {
           myRole: m.role,
           permissions: m.permissions,
           joinedAt: m.invitedAt,
@@ -288,19 +253,15 @@ class WorkspaceService {
   }
 
   async getWorkspaceMembers(workspaceId, userId) {
-    const requesterMembership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId,
-      status: 'active',
-    });
+    const requesterMembership = await this.memberRepo.findMembership(workspaceId, userId);
     if (!requesterMembership) throw new AppError('You are not a member of this workspace', 403);
 
-    const members = await this.WorkspaceMember.getWorkspaceMembers(workspaceId);
+    const members = await this.memberRepo.findByWorkspaceWithUser(workspaceId);
     return members.map((m) => ({
-      id: m._id.toString(),
-      userId: m.userId?._id?.toString(),
-      user: m.userId
-        ? { id: m.userId._id.toString(), name: m.userId.name, email: m.userId.email }
+      id: m.id.toString(),
+      userId: m.user?.id?.toString(),
+      user: m.user
+        ? { id: m.user.id.toString(), name: safeDecrypt(m.user.name), email: m.user.email }
         : null,
       role: m.role,
       status: m.status,
@@ -310,31 +271,22 @@ class WorkspaceService {
   }
 
   async inviteMember(workspaceId, inviterId, { email, role = 'member' }) {
-    const userToInvite = await this.User.findOne({ email: email.toLowerCase() });
+    const userToInvite = await this.userRepo.findByEmail(email);
     if (!userToInvite) throw new AppError('User not found. They must register first.', 404);
 
-    const inviterMembership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId: inviterId,
-      status: 'active',
-    });
+    const inviterMembership = await this.memberRepo.findMembership(workspaceId, inviterId);
     if (!inviterMembership) throw new AppError('You are not a member of this workspace', 403);
 
-    if (inviterMembership.role !== 'owner' && !inviterMembership.permissions.canInvite) {
+    if (inviterMembership.role !== 'owner' && !inviterMembership.permissions?.canInvite) {
       throw new AppError('You do not have permission to invite members', 403);
     }
 
-    const workspace = await this.Workspace.findById(workspaceId);
+    const workspace = await this.workspaceRepo.findById(workspaceId);
     if (!workspace) throw new AppError('Workspace not found', 404);
 
     let membership;
     try {
-      membership = await this.WorkspaceMember.inviteMember(
-        workspaceId,
-        userToInvite._id,
-        inviterId,
-        role
-      );
+      membership = await this.memberRepo.inviteMember(workspaceId, userToInvite.id, inviterId, role);
     } catch (err) {
       if (err.message.includes('already a member')) {
         throw new AppError('User is already a member of this workspace', 409);
@@ -342,12 +294,12 @@ class WorkspaceService {
       throw err;
     }
 
-    const inviter = await this.User.findById(inviterId).select('name email');
+    const inviter = await this.userRepo.findById(inviterId);
 
     this.logger.info('User invited to workspace', {
       service: 'workspace-member',
       workspaceId,
-      invitedUserId: userToInvite._id,
+      invitedUserId: userToInvite.id,
       invitedBy: inviterId,
       role,
     });
@@ -358,7 +310,7 @@ class WorkspaceService {
         toName: userToInvite.name,
         inviterName: inviter?.name || inviter?.email || 'A team member',
         workspaceName: workspace.name,
-        workspaceId: workspace._id.toString(),
+        workspaceId: workspace.id.toString(),
         role,
       })
       .catch((err) => {
@@ -370,8 +322,8 @@ class WorkspaceService {
 
     return {
       membership: {
-        id: membership._id,
-        userId: userToInvite._id,
+        id: membership.id,
+        userId: userToInvite.id,
         email: userToInvite.email,
         name: userToInvite.name,
         role: membership.role,
@@ -383,22 +335,16 @@ class WorkspaceService {
   }
 
   async revokeMember(workspaceId, requesterId, memberId) {
-    const requesterMembership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId: requesterId,
-      status: 'active',
-      role: 'owner',
-    });
+    const requesterMembership = await this.memberRepo.findOwnerMembership(workspaceId, requesterId);
     if (!requesterMembership) throw new AppError('Only workspace owners can revoke access', 403);
 
-    const memberToRevoke = await this.WorkspaceMember.findById(memberId);
-    if (!memberToRevoke || memberToRevoke.workspaceId.toString() !== workspaceId) {
+    const memberToRevoke = await this.memberRepo.findById(memberId);
+    if (!memberToRevoke || String(memberToRevoke.workspaceId) !== String(workspaceId)) {
       throw new AppError('Member not found', 404);
     }
     if (memberToRevoke.role === 'owner') throw new AppError('Cannot revoke owner access', 400);
 
-    memberToRevoke.status = 'revoked';
-    await memberToRevoke.save();
+    await this.memberRepo.updateById(memberId, { status: 'revoked' });
 
     this.logger.info('User access revoked from workspace', {
       service: 'workspace-member',
@@ -409,32 +355,30 @@ class WorkspaceService {
   }
 
   async updateMember(workspaceId, requesterId, memberId, { role, permissions } = {}) {
-    const requesterMembership = await this.WorkspaceMember.findOne({
-      workspaceId,
-      userId: requesterId,
-      status: 'active',
-      role: 'owner',
-    });
+    const requesterMembership = await this.memberRepo.findOwnerMembership(workspaceId, requesterId);
     if (!requesterMembership)
       throw new AppError('Only workspace owners can update member permissions', 403);
 
-    const member = await this.WorkspaceMember.findById(memberId);
-    if (!member || member.workspaceId.toString() !== workspaceId) {
+    const member = await this.memberRepo.findById(memberId);
+    if (!member || String(member.workspaceId) !== String(workspaceId)) {
       throw new AppError('Member not found', 404);
     }
     if (member.role === 'owner') throw new AppError('Cannot modify owner permissions', 400);
 
-    if (role && ['member', 'viewer'].includes(role)) member.role = role;
+    const patch = {};
+    const nextRole = role && ['member', 'viewer'].includes(role) ? role : member.role;
+    if (role && ['member', 'viewer'].includes(role)) patch.role = role;
 
     if (permissions) {
-      member.permissions = {
+      patch.permissions = {
         ...member.permissions,
         ...permissions,
-        canInvite: permissions.canInvite === true && role !== 'viewer',
+        canInvite: permissions.canInvite === true && nextRole !== 'viewer',
       };
     }
 
-    await member.save();
+    const updated =
+      Object.keys(patch).length > 0 ? await this.memberRepo.updateById(memberId, patch) : member;
 
     this.logger.info('Member permissions updated', {
       service: 'workspace-member',
@@ -443,7 +387,7 @@ class WorkspaceService {
       updatedBy: requesterId,
     });
 
-    return member;
+    return updated;
   }
 }
 
