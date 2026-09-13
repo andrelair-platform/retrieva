@@ -8,7 +8,7 @@ import { workspaces, workspaceMembers } from './workspaces.js';
 import { conversations, messages } from './conversations.js';
 import { assessments } from './assessments.js';
 import { criticalFunctions, criticalFunctionDependencies } from './criticalFunctions.js';
-import { providerDependencies } from './providerDependencies.js';
+import { providerNodes, providerDependencies } from './providerDependencies.js';
 import { questionnaireTemplates, vendorQuestionnaires } from './questionnaires.js';
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -33,6 +33,7 @@ export const organizationsRelations = relations(organizations, ({ one, many }) =
   members: many(organizationMembers),
   workspaces: many(workspaces),
   criticalFunctions: many(criticalFunctions),
+  providerNodes: many(providerNodes),
   providerDependencies: many(providerDependencies),
   // reciprocal of users.organization
   users: many(users, { relationName: 'org_membership' }),
@@ -59,6 +60,7 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   assessments: many(assessments),
   vendorQuestionnaires: many(vendorQuestionnaires),
   conversations: many(conversations),
+  providerNodes: many(providerNodes),
 }));
 
 export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) => ({
@@ -115,20 +117,34 @@ export const criticalFunctionDependenciesRelations = relations(
   })
 );
 
+export const providerNodesRelations = relations(providerNodes, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [providerNodes.organizationId],
+    references: [organizations.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [providerNodes.workspaceId],
+    references: [workspaces.id],
+  }),
+  // edges where this node is the parent / child
+  outgoingEdges: many(providerDependencies, { relationName: 'edge_parent' }),
+  incomingEdges: many(providerDependencies, { relationName: 'edge_child' }),
+}));
+
 export const providerDependenciesRelations = relations(providerDependencies, ({ one }) => ({
   organization: one(organizations, {
     fields: [providerDependencies.organizationId],
     references: [organizations.id],
   }),
-  parentWorkspace: one(workspaces, {
-    fields: [providerDependencies.parentWorkspaceId],
-    references: [workspaces.id],
-    relationName: 'provider_parent',
+  parentNode: one(providerNodes, {
+    fields: [providerDependencies.parentNodeId],
+    references: [providerNodes.id],
+    relationName: 'edge_parent',
   }),
-  childWorkspace: one(workspaces, {
-    fields: [providerDependencies.childWorkspaceId],
-    references: [workspaces.id],
-    relationName: 'provider_child',
+  childNode: one(providerNodes, {
+    fields: [providerDependencies.childNodeId],
+    references: [providerNodes.id],
+    relationName: 'edge_child',
   }),
 }));
 

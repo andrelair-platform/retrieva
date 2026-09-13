@@ -2,11 +2,20 @@
 // models/WorkspaceMember.js. A workspace is both a project space AND a vendor
 // profile (DORA Art. 28). certifications/vendor_functions/alerts_sent_at/permissions
 // are document-shaped → JSONB.
-import { pgTable, uuid, text, timestamp, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  index,
+  uniqueIndex,
+  check,
+} from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import {
   workspaceSyncStatusEnum,
   tierEnum,
-  serviceTypeEnum,
   vendorStatusEnum,
   workspaceMemberRoleEnum,
   memberStatusEnum,
@@ -26,7 +35,7 @@ export const workspaces = pgTable(
     syncStatus: workspaceSyncStatusEnum('sync_status').notNull().default('idle'),
     vendorTier: tierEnum('vendor_tier'), // nullable
     country: text('country').notNull().default(''),
-    serviceType: serviceTypeEnum('service_type'), // nullable
+    serviceType: text('service_type'), // nullable; growable taxonomy → text + CHECK
     contractStart: timestamp('contract_start', { withTimezone: true }),
     contractEnd: timestamp('contract_end', { withTimezone: true }),
     nextReviewDate: timestamp('next_review_date', { withTimezone: true }),
@@ -51,6 +60,11 @@ export const workspaces = pgTable(
     index('workspaces_user_id_idx').on(t.userId),
     index('workspaces_organization_id_idx').on(t.organizationId),
     index('workspaces_user_name_idx').on(t.userId, t.name),
+    // Mirrors SERVICE_TYPES (enums.js). Nullable → NULL is allowed.
+    check(
+      'workspaces_service_type_check',
+      sql`${t.serviceType} is null or ${t.serviceType} in ('cloud', 'software', 'data', 'network', 'other')`
+    ),
   ]
 );
 

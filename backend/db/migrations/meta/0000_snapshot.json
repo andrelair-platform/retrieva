@@ -1,5 +1,5 @@
 {
-  "id": "bd9e3484-afd0-4287-8951-ea3db937a4c9",
+  "id": "bc4197d0-ce79-495e-ac4a-51428d013d65",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -406,8 +406,7 @@
         },
         "industry": {
           "name": "industry",
-          "type": "org_industry",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'other'"
@@ -439,8 +438,7 @@
         },
         "plan": {
           "name": "plan",
-          "type": "org_plan",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'starter'"
@@ -493,7 +491,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "organizations_industry_check": {
+          "name": "organizations_industry_check",
+          "value": "\"organizations\".\"industry\" in ('insurance', 'banking', 'investment', 'payments', 'other')"
+        },
+        "organizations_plan_check": {
+          "name": "organizations_plan_check",
+          "value": "\"organizations\".\"plan\" in ('starter', 'professional', 'business', 'enterprise')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.workspace_members": {
@@ -715,8 +722,7 @@
         },
         "service_type": {
           "name": "service_type",
-          "type": "service_type",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -878,7 +884,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "workspaces_service_type_check": {
+          "name": "workspaces_service_type_check",
+          "value": "\"workspaces\".\"service_type\" is null or \"workspaces\".\"service_type\" in ('cloud', 'software', 'data', 'network', 'other')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.conversations": {
@@ -1536,57 +1547,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "parent_kind": {
-          "name": "parent_kind",
-          "type": "provider_node_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "parent_workspace_id": {
-          "name": "parent_workspace_id",
+        "parent_node_id": {
+          "name": "parent_node_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
-        },
-        "parent_name": {
-          "name": "parent_name",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true
         },
-        "parent_tier": {
-          "name": "parent_tier",
-          "type": "tier",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "child_kind": {
-          "name": "child_kind",
-          "type": "provider_node_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "child_workspace_id": {
-          "name": "child_workspace_id",
+        "child_node_id": {
+          "name": "child_node_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
-        },
-        "child_name": {
-          "name": "child_name",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true
-        },
-        "child_tier": {
-          "name": "child_tier",
-          "type": "tier",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
         },
         "relationship": {
           "name": "relationship",
@@ -1646,6 +1617,33 @@
         }
       },
       "indexes": {
+        "provider_deps_edge_uniq": {
+          "name": "provider_deps_edge_uniq",
+          "columns": [
+            {
+              "expression": "parent_node_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "child_node_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "relationship",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "provider_deps_org_idx": {
           "name": "provider_deps_org_idx",
           "columns": [
@@ -1661,17 +1659,11 @@
           "method": "btree",
           "with": {}
         },
-        "provider_deps_org_parent_name_idx": {
-          "name": "provider_deps_org_parent_name_idx",
+        "provider_deps_parent_idx": {
+          "name": "provider_deps_parent_idx",
           "columns": [
             {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "parent_name",
+              "expression": "parent_node_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1682,17 +1674,11 @@
           "method": "btree",
           "with": {}
         },
-        "provider_deps_org_child_name_idx": {
-          "name": "provider_deps_org_child_name_idx",
+        "provider_deps_child_idx": {
+          "name": "provider_deps_child_idx",
           "columns": [
             {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "child_name",
+              "expression": "child_node_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1718,12 +1704,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "provider_dependencies_parent_workspace_id_workspaces_id_fk": {
-          "name": "provider_dependencies_parent_workspace_id_workspaces_id_fk",
+        "provider_dependencies_parent_node_id_provider_nodes_id_fk": {
+          "name": "provider_dependencies_parent_node_id_provider_nodes_id_fk",
           "tableFrom": "provider_dependencies",
-          "tableTo": "workspaces",
+          "tableTo": "provider_nodes",
           "columnsFrom": [
-            "parent_workspace_id"
+            "parent_node_id"
           ],
           "columnsTo": [
             "id"
@@ -1731,12 +1717,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "provider_dependencies_child_workspace_id_workspaces_id_fk": {
-          "name": "provider_dependencies_child_workspace_id_workspaces_id_fk",
+        "provider_dependencies_child_node_id_provider_nodes_id_fk": {
+          "name": "provider_dependencies_child_node_id_provider_nodes_id_fk",
           "tableFrom": "provider_dependencies",
-          "tableTo": "workspaces",
+          "tableTo": "provider_nodes",
           "columnsFrom": [
-            "child_workspace_id"
+            "child_node_id"
           ],
           "columnsTo": [
             "id"
@@ -1755,6 +1741,157 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.provider_nodes": {
+      "name": "provider_nodes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "provider_node_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canonical_name": {
+          "name": "canonical_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tier": {
+          "name": "tier",
+          "type": "tier",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "provider_nodes_org_canonical_uniq": {
+          "name": "provider_nodes_org_canonical_uniq",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "canonical_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "provider_nodes_org_idx": {
+          "name": "provider_nodes_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "provider_nodes_workspace_idx": {
+          "name": "provider_nodes_workspace_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "provider_nodes_organization_id_organizations_id_fk": {
+          "name": "provider_nodes_organization_id_organizations_id_fk",
+          "tableFrom": "provider_nodes",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "provider_nodes_workspace_id_workspaces_id_fk": {
+          "name": "provider_nodes_workspace_id_workspaces_id_fk",
+          "tableFrom": "provider_nodes",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -2115,17 +2252,6 @@
         "assistant"
       ]
     },
-    "public.org_industry": {
-      "name": "org_industry",
-      "schema": "public",
-      "values": [
-        "insurance",
-        "banking",
-        "investment",
-        "payments",
-        "other"
-      ]
-    },
     "public.org_member_role": {
       "name": "org_member_role",
       "schema": "public",
@@ -2133,16 +2259,6 @@
         "org_admin",
         "analyst",
         "viewer"
-      ]
-    },
-    "public.org_plan": {
-      "name": "org_plan",
-      "schema": "public",
-      "values": [
-        "starter",
-        "professional",
-        "business",
-        "enterprise"
       ]
     },
     "public.org_plan_status": {
@@ -2182,17 +2298,6 @@
         "complete",
         "expired",
         "failed"
-      ]
-    },
-    "public.service_type": {
-      "name": "service_type",
-      "schema": "public",
-      "values": [
-        "cloud",
-        "software",
-        "data",
-        "network",
-        "other"
       ]
     },
     "public.tier": {

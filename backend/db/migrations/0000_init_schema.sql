@@ -3,14 +3,11 @@ CREATE TYPE "public"."assessment_status" AS ENUM('pending', 'indexing', 'analyzi
 CREATE TYPE "public"."criticality" AS ENUM('critical', 'important');--> statement-breakpoint
 CREATE TYPE "public"."member_status" AS ENUM('pending', 'active', 'revoked');--> statement-breakpoint
 CREATE TYPE "public"."message_role" AS ENUM('user', 'assistant');--> statement-breakpoint
-CREATE TYPE "public"."org_industry" AS ENUM('insurance', 'banking', 'investment', 'payments', 'other');--> statement-breakpoint
 CREATE TYPE "public"."org_member_role" AS ENUM('org_admin', 'analyst', 'viewer');--> statement-breakpoint
-CREATE TYPE "public"."org_plan" AS ENUM('starter', 'professional', 'business', 'enterprise');--> statement-breakpoint
 CREATE TYPE "public"."org_plan_status" AS ENUM('trialing', 'active', 'past_due', 'canceled', 'paused');--> statement-breakpoint
 CREATE TYPE "public"."provider_node_kind" AS ENUM('workspace', 'external');--> statement-breakpoint
 CREATE TYPE "public"."provider_source" AS ENUM('manual', 'extracted');--> statement-breakpoint
 CREATE TYPE "public"."questionnaire_status" AS ENUM('draft', 'sent', 'partial', 'complete', 'expired', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."service_type" AS ENUM('cloud', 'software', 'data', 'network', 'other');--> statement-breakpoint
 CREATE TYPE "public"."tier" AS ENUM('critical', 'important', 'standard');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('user', 'admin');--> statement-breakpoint
 CREATE TYPE "public"."vendor_status" AS ENUM('active', 'under-review', 'exited');--> statement-breakpoint
@@ -63,16 +60,18 @@ CREATE TABLE "organization_members" (
 CREATE TABLE "organizations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
-	"industry" "org_industry" DEFAULT 'other' NOT NULL,
+	"industry" text DEFAULT 'other' NOT NULL,
 	"country" text DEFAULT '' NOT NULL,
 	"owner_id" uuid NOT NULL,
 	"stripe_customer_id" text,
 	"stripe_subscription_id" text,
-	"plan" "org_plan" DEFAULT 'starter' NOT NULL,
+	"plan" text DEFAULT 'starter' NOT NULL,
 	"plan_status" "org_plan_status" DEFAULT 'trialing' NOT NULL,
 	"trial_ends_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "organizations_industry_check" CHECK ("organizations"."industry" in ('insurance', 'banking', 'investment', 'payments', 'other')),
+	CONSTRAINT "organizations_plan_check" CHECK ("organizations"."plan" in ('starter', 'professional', 'business', 'enterprise'))
 );
 --> statement-breakpoint
 CREATE TABLE "workspace_members" (
@@ -96,7 +95,7 @@ CREATE TABLE "workspaces" (
 	"sync_status" "workspace_sync_status" DEFAULT 'idle' NOT NULL,
 	"vendor_tier" "tier",
 	"country" text DEFAULT '' NOT NULL,
-	"service_type" "service_type",
+	"service_type" text,
 	"contract_start" timestamp with time zone,
 	"contract_end" timestamp with time zone,
 	"next_review_date" timestamp with time zone,
@@ -107,7 +106,8 @@ CREATE TABLE "workspaces" (
 	"alerts_sent_at" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"organization_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "workspaces_service_type_check" CHECK ("workspaces"."service_type" is null or "workspaces"."service_type" in ('cloud', 'software', 'data', 'network', 'other'))
 );
 --> statement-breakpoint
 CREATE TABLE "conversations" (
@@ -171,20 +171,26 @@ CREATE TABLE "critical_functions" (
 CREATE TABLE "provider_dependencies" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
-	"parent_kind" "provider_node_kind" NOT NULL,
-	"parent_workspace_id" uuid,
-	"parent_name" text NOT NULL,
-	"parent_tier" "tier",
-	"child_kind" "provider_node_kind" NOT NULL,
-	"child_workspace_id" uuid,
-	"child_name" text NOT NULL,
-	"child_tier" "tier",
+	"parent_node_id" uuid NOT NULL,
+	"child_node_id" uuid NOT NULL,
 	"relationship" text DEFAULT 'sub_processes_via' NOT NULL,
 	"source" "provider_source" DEFAULT 'manual' NOT NULL,
 	"confidence" real DEFAULT 1 NOT NULL,
 	"confirmed" boolean DEFAULT true NOT NULL,
 	"last_verified_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "provider_nodes" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" uuid NOT NULL,
+	"kind" "provider_node_kind" NOT NULL,
+	"workspace_id" uuid,
+	"canonical_name" text NOT NULL,
+	"display_name" text NOT NULL,
+	"tier" "tier",
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -240,9 +246,11 @@ ALTER TABLE "critical_function_dependencies" ADD CONSTRAINT "critical_function_d
 ALTER TABLE "critical_functions" ADD CONSTRAINT "critical_functions_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "critical_functions" ADD CONSTRAINT "critical_functions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_parent_workspace_id_workspaces_id_fk" FOREIGN KEY ("parent_workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_child_workspace_id_workspaces_id_fk" FOREIGN KEY ("child_workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_parent_node_id_provider_nodes_id_fk" FOREIGN KEY ("parent_node_id") REFERENCES "public"."provider_nodes"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_child_node_id_provider_nodes_id_fk" FOREIGN KEY ("child_node_id") REFERENCES "public"."provider_nodes"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_dependencies" ADD CONSTRAINT "provider_dependencies_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "provider_nodes" ADD CONSTRAINT "provider_nodes_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "provider_nodes" ADD CONSTRAINT "provider_nodes_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_questionnaires" ADD CONSTRAINT "vendor_questionnaires_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_questionnaires" ADD CONSTRAINT "vendor_questionnaires_template_id_questionnaire_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."questionnaire_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "vendor_questionnaires" ADD CONSTRAINT "vendor_questionnaires_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -261,9 +269,13 @@ CREATE INDEX "messages_conversation_timestamp_idx" ON "messages" USING btree ("c
 CREATE INDEX "assessments_ws_created_idx" ON "assessments" USING btree ("workspace_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "assessments_createdby_status_idx" ON "assessments" USING btree ("created_by","status");--> statement-breakpoint
 CREATE UNIQUE INDEX "critical_functions_org_name_uniq" ON "critical_functions" USING btree ("organization_id","name");--> statement-breakpoint
+CREATE UNIQUE INDEX "provider_deps_edge_uniq" ON "provider_dependencies" USING btree ("parent_node_id","child_node_id","relationship");--> statement-breakpoint
 CREATE INDEX "provider_deps_org_idx" ON "provider_dependencies" USING btree ("organization_id");--> statement-breakpoint
-CREATE INDEX "provider_deps_org_parent_name_idx" ON "provider_dependencies" USING btree ("organization_id","parent_name");--> statement-breakpoint
-CREATE INDEX "provider_deps_org_child_name_idx" ON "provider_dependencies" USING btree ("organization_id","child_name");--> statement-breakpoint
+CREATE INDEX "provider_deps_parent_idx" ON "provider_dependencies" USING btree ("parent_node_id");--> statement-breakpoint
+CREATE INDEX "provider_deps_child_idx" ON "provider_dependencies" USING btree ("child_node_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "provider_nodes_org_canonical_uniq" ON "provider_nodes" USING btree ("organization_id","canonical_name");--> statement-breakpoint
+CREATE INDEX "provider_nodes_org_idx" ON "provider_nodes" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "provider_nodes_workspace_idx" ON "provider_nodes" USING btree ("workspace_id");--> statement-breakpoint
 CREATE INDEX "questionnaire_templates_is_default_idx" ON "questionnaire_templates" USING btree ("is_default");--> statement-breakpoint
 CREATE INDEX "vendor_questionnaires_ws_created_idx" ON "vendor_questionnaires" USING btree ("workspace_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "vendor_questionnaires_createdby_status_idx" ON "vendor_questionnaires" USING btree ("created_by","status");--> statement-breakpoint

@@ -13,6 +13,7 @@ import {
   assessments,
   criticalFunctions,
   criticalFunctionDependencies,
+  providerNodes,
   providerDependencies,
   questionnaireTemplates,
   vendorQuestionnaires,
@@ -45,6 +46,8 @@ export const criticalFunctionDependencyInsertSchema = createInsertSchema(
   criticalFunctionDependencies
 );
 
+export const providerNodeInsertSchema = createInsertSchema(providerNodes);
+export const providerNodeSelectSchema = createSelectSchema(providerNodes);
 export const providerDependencyInsertSchema = createInsertSchema(providerDependencies);
 export const providerDependencySelectSchema = createSelectSchema(providerDependencies);
 
