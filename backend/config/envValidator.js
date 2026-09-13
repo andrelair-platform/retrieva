@@ -21,7 +21,7 @@ const REQUIRED_ENV_VARS = {
   ],
 
   // Database - Required for data persistence
-  database: [{ name: 'MONGODB_URI', description: 'MongoDB connection string' }],
+  database: [{ name: 'DATABASE_URL', description: 'PostgreSQL connection string' }],
 
   // Infrastructure - Required in production for core functionality
   infrastructure: [
@@ -183,7 +183,7 @@ export function getEnvInfo() {
   return {
     nodeEnv: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000,
-    mongoConfigured: !!process.env.MONGODB_URI,
+    databaseConfigured: !!process.env.DATABASE_URL,
     redisConfigured: !!process.env.REDIS_URL,
     qdrantConfigured: !!process.env.QDRANT_URL,
     llmProvider: process.env.LLM_PROVIDER || 'not configured',

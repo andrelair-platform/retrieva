@@ -38,7 +38,9 @@ function makeLimiter({ name, windowMs, max, message }) {
     // Key by IP. We deliberately do NOT key by user — the point is to
     // protect endpoints that establish identity, before a user is known.
     keyGenerator: (req) => buildRateLimitKey(name, req.ip),
-    validate: { ip: false, trustProxy: false },
+    // We DO normalize IPv6 via ipKeyGenerator (inside buildRateLimitKey), but v8's
+    // heuristic can't see it through the helper → disable that specific check.
+    validate: { ip: false, trustProxy: false, keyGeneratorIpFallback: false },
     message: { status: 'fail', message },
     handler: (req, res, _next, options) => {
       logger.warn('Auth rate limit exceeded', {

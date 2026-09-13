@@ -15,7 +15,7 @@ describe('Environment Validator', () => {
     // Reset to known state before each test
     process.env.JWT_ACCESS_SECRET = 'test-access-secret-key-that-is-at-least-32-characters-long';
     process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key-that-is-at-least-32-characters-long';
-    process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
+    process.env.DATABASE_URL = 'postgresql://postgres:test@localhost:5432/test';
   });
 
   afterEach(() => {
@@ -54,13 +54,13 @@ describe('Environment Validator', () => {
       expect(result.errors.some((e) => e.includes('JWT_REFRESH_SECRET'))).toBe(true);
     });
 
-    it('should fail when MONGODB_URI is missing', () => {
-      delete process.env.MONGODB_URI;
+    it('should fail when DATABASE_URL is missing', () => {
+      delete process.env.DATABASE_URL;
 
       const result = validateEnv();
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('MONGODB_URI'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('DATABASE_URL'))).toBe(true);
     });
 
     it('should fail when JWT secret is too short', () => {
@@ -109,7 +109,7 @@ describe('Environment Validator', () => {
     it('should collect multiple errors', () => {
       delete process.env.JWT_ACCESS_SECRET;
       delete process.env.JWT_REFRESH_SECRET;
-      delete process.env.MONGODB_URI;
+      delete process.env.DATABASE_URL;
 
       const result = validateEnv();
 
@@ -128,7 +128,7 @@ describe('Environment Validator', () => {
 
       expect(info.nodeEnv).toBe('test');
       expect(info.port).toBe('4000');
-      expect(info.mongoConfigured).toBe(true);
+      expect(info.databaseConfigured).toBe(true);
       expect(info.emailConfigured).toBe(true);
     });
 
