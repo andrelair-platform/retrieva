@@ -5,8 +5,8 @@
  * SECURITY: Implements BOLA protection - verifies user has access to workspace
  */
 
-import { Workspace } from '../models/Workspace.js';
-import { WorkspaceMember } from '../models/WorkspaceMember.js';
+import { workspaceRepository } from '../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../repositories/drizzle/WorkspaceMemberRepository.js';
 import { sendError } from '../utils/index.js';
 import logger from '../config/logger.js';
 
@@ -33,7 +33,7 @@ export const loadWorkspace = async (req, res, next) => {
     return sendError(res, 401, 'Authentication required');
   }
 
-  const workspace = await Workspace.findById(id);
+  const workspace = await workspaceRepository.findById(id);
 
   if (!workspace) {
     return sendError(res, 404, 'Workspace not found');
@@ -41,13 +41,9 @@ export const loadWorkspace = async (req, res, next) => {
 
   // SECURITY FIX (BOLA): Verify user has access to this workspace
   // Check if user is workspace owner OR active member
-  const membership = await WorkspaceMember.findOne({
-    workspaceId: id,
-    userId,
-    status: 'active',
-  });
+  const membership = await workspaceMemberRepository.findMembership(id, userId);
 
-  const isOwner = workspace.userId && workspace.userId.toString() === userId.toString();
+  const isOwner = workspace.userId && String(workspace.userId) === String(userId);
 
   if (!membership && !isOwner) {
     logger.warn('Unauthorized workspace access attempt', {
@@ -88,18 +84,14 @@ export const loadWorkspaceSafe = async (req, res, next) => {
     return sendError(res, 401, 'Authentication required');
   }
 
-  const workspace = await Workspace.findById(id).select('-accessToken');
+  const workspace = await workspaceRepository.findById(id);
 
   if (!workspace) {
     return sendError(res, 404, 'Workspace not found');
   }
 
   // SECURITY FIX (BOLA): Verify user has access to this workspace
-  const membership = await WorkspaceMember.findOne({
-    workspaceId: id,
-    userId,
-    status: 'active',
-  });
+  const membership = await workspaceMemberRepository.findMembership(id, userId);
 
   const isOwner = workspace.userId && workspace.userId.toString() === userId.toString();
 

@@ -8,7 +8,7 @@ import {
   setTenantContext,
   getCurrentTenantId,
   getCurrentUserId,
-} from '../../services/tenantIsolation.js';
+} from '../../db/tenantContext.js';
 
 describe('setTenantContext (B2)', () => {
   it('reads the active workspace from the X-Workspace-Id header', () => {

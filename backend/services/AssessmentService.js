@@ -1,14 +1,17 @@
 import path from 'path';
-import mongoose from 'mongoose';
 import { AppError } from '../utils/index.js';
-import { assessmentRepository } from '../repositories/AssessmentRepository.js';
-import { workspaceRepository } from '../repositories/WorkspaceRepository.js';
-import { userRepository } from '../repositories/UserRepository.js';
+import { assessmentRepository } from '../repositories/drizzle/AssessmentRepository.js';
+import { workspaceRepository } from '../repositories/drizzle/WorkspaceRepository.js';
+import { userRepository } from '../repositories/drizzle/UserRepository.js';
 import { assessmentQueue, monitoringQueue } from '../config/queue.js';
 import * as storageModule from '../config/storage.js';
 import { generateReport } from './reportGenerator.js';
 import { deleteAssessmentCollection } from './fileIngestionService.js';
 import logger from '../config/logger.js';
+
+// Preserve the legacy `_id` field in API responses (value = the uuid `id`) so existing
+// frontend consumers keep working through the Postgres cutover (RTV-49).
+const withId = (a) => (a ? { ...a, _id: a.id } : a);
 
 class AssessmentService {
   constructor(deps = {}) {
@@ -20,8 +23,6 @@ class AssessmentService {
     this.storage = deps.storage || storageModule;
     this.generateReport = deps.generateReport || generateReport;
     this.deleteAssessmentCollection = deps.deleteAssessmentCollection || deleteAssessmentCollection;
-    // Lazy default: only pull in the heavy vectorStore module when actually
-    // deleting (keeps it out of the app's eager import graph).
     this.deleteAssessmentChunksFromWorkspace =
       deps.deleteAssessmentChunksFromWorkspace ||
       (async (assessmentId) => {
@@ -34,8 +35,6 @@ class AssessmentService {
   async createAssessment(userId, organizationId, data, files) {
     const { name, vendorName, framework = 'DORA', workspaceId } = data;
 
-    // Categories the uploader tagged, one per file in order (#395). Best-effort:
-    // bad/absent JSON just leaves documents untagged.
     let categories = [];
     if (data.categories) {
       try {
@@ -54,7 +53,9 @@ class AssessmentService {
       status: 'uploading',
     }));
 
-    const assessment = await this.assessmentRepo.create({
+    // Explicit workspaceId (authz'd upstream) + no reliable tenant context here
+    // (multipart body is parsed after setTenantContext) → unscoped create.
+    const assessment = await this.assessmentRepo.createUnscoped({
       workspaceId,
       name: name.trim(),
       vendorName: vendorName.trim(),
@@ -67,7 +68,7 @@ class AssessmentService {
 
     this.logger.info('Assessment created', {
       service: 'assessment',
-      assessmentId: assessment._id,
+      assessmentId: assessment.id,
       userId,
       fileCount: files.length,
     });
@@ -80,7 +81,7 @@ class AssessmentService {
           const key = this.storage.buildAssessmentFileKey(
             organizationId.toString(),
             workspaceId,
-            assessment._id.toString(),
+            assessment.id.toString(),
             i,
             file.originalname
           );
@@ -89,23 +90,25 @@ class AssessmentService {
             .catch((err) => {
               this.logger.warn('Assessment file upload to Spaces failed (non-critical)', {
                 service: 'assessment',
-                assessmentId: assessment._id,
+                assessmentId: assessment.id,
                 fileIndex: i,
                 error: err.message,
               });
               return null;
             });
-          if (storageKey) assessment.documents[i].storageKey = storageKey;
+          if (storageKey) documents[i].storageKey = storageKey;
         })
       );
-      if (assessment.documents.some((d) => d.storageKey)) await assessment.save();
+      if (documents.some((d) => d.storageKey)) {
+        await this.assessmentRepo.updateByIdUnscoped(assessment.id, { documents });
+      }
     }
 
     const fileJobs = files.map((file, i) =>
       this.assessmentQueue.add(
         'fileIndex',
         {
-          assessmentId: assessment._id.toString(),
+          assessmentId: assessment.id.toString(),
           documentIndex: i,
           buffer: { data: Array.from(file.buffer) },
           fileName: file.originalname,
@@ -113,76 +116,59 @@ class AssessmentService {
           vendorName: vendorName.trim(),
           userId,
         },
-        { jobId: `fileIndex-${assessment._id}-${i}`, priority: 1 }
+        { jobId: `fileIndex-${assessment.id}-${i}`, priority: 1 }
       )
     );
     await Promise.all(fileJobs);
 
     await this.assessmentQueue.add(
       'gapAnalysis',
-      { assessmentId: assessment._id.toString(), userId },
-      { jobId: `gapAnalysis-${assessment._id}`, delay: files.length * 5000, priority: 2 }
+      { assessmentId: assessment.id.toString(), userId },
+      { jobId: `gapAnalysis-${assessment.id}`, delay: files.length * 5000, priority: 2 }
     );
 
     this.logger.info('Assessment jobs enqueued', {
       service: 'assessment',
-      assessmentId: assessment._id,
+      assessmentId: assessment.id,
       jobCount: files.length + 1,
     });
 
     return {
-      _id: assessment._id,
+      _id: assessment.id,
+      id: assessment.id,
       name: assessment.name,
       vendorName: assessment.vendorName,
       framework: assessment.framework,
       status: assessment.status,
       statusMessage: assessment.statusMessage,
-      documents: assessment.documents,
+      documents,
       createdAt: assessment.createdAt,
     };
   }
 
   async listAssessments(authorizedWorkspaceIds, query = {}) {
     const { workspaceId, status, page = 1, limit = 20 } = query;
-
-    const filter = { workspaceId: { $in: authorizedWorkspaceIds } };
-    if (workspaceId) filter.workspaceId = workspaceId;
-    if (status) filter.status = status;
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [assessments, total] = await Promise.all([
-      this.assessmentRepo.find(filter, {
-        select: '-results.gaps',
-        sort: { createdAt: -1 },
-        skip,
-        limit: parseInt(limit),
-        lean: true,
-      }),
-      this.assessmentRepo.count(filter),
-    ]);
-
-    return {
-      assessments,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit)),
-      },
-    };
+    // Explicit cross-workspace org query (unscoped by design — see AssessmentRepository).
+    const res = await this.assessmentRepo.findByWorkspaces(authorizedWorkspaceIds, {
+      workspaceId,
+      status,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
+    return { assessments: res.assessments.map(withId), pagination: res.pagination };
   }
 
   async getAssessment(id, authorizedWorkspaceIds) {
-    const assessment = await this.assessmentRepo.findById(id, { lean: true });
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
     }
-    return assessment;
+    return withId(assessment);
   }
 
   async getReportBuffer(id, userId, authorizedWorkspaceIds) {
-    const assessment = await this.assessmentRepo.findById(id, { lean: true });
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
@@ -213,38 +199,25 @@ class AssessmentService {
   }
 
   async setRiskDecision(id, userId, authorizedWorkspaceIds, { decision, rationale }) {
-    const assessment = await this.assessmentRepo.findById(id);
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
     }
 
-    // Atomically persist the risk decision and the workspace review date together.
-    // Mirrors the _saveMessages transaction pattern from rag.js.
-    let nextReviewDate;
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        assessment.riskDecision = {
-          decision,
-          setBy: userId,
-          setByName: '',
-          rationale: rationale?.trim() || '',
-          setAt: new Date(),
-        };
-        await assessment.save({ session });
+    const riskDecision = {
+      decision,
+      setBy: userId,
+      setByName: '',
+      rationale: rationale?.trim() || '',
+      setAt: new Date().toISOString(),
+    };
+    await this.assessmentRepo.updateByIdUnscoped(id, { riskDecision });
 
-        if (decision === 'proceed' || decision === 'conditional') {
-          nextReviewDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-          await this.workspaceRepo.updateById(
-            assessment.workspaceId,
-            { nextReviewDate },
-            { session }
-          );
-        }
-      });
-    } finally {
-      await session.endSession();
+    let nextReviewDate;
+    if (decision === 'proceed' || decision === 'conditional') {
+      nextReviewDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      await this.workspaceRepo.updateById(assessment.workspaceId, { nextReviewDate });
     }
 
     this.logger.info('Risk decision recorded', {
@@ -254,13 +227,9 @@ class AssessmentService {
       userId,
     });
 
-    // Schedule monitoring reminder outside transaction — non-critical
     if (nextReviewDate) {
       try {
-        const delayMs = Math.max(
-          0,
-          nextReviewDate.getTime() - 30 * 24 * 60 * 60 * 1000 - Date.now()
-        );
+        const delayMs = Math.max(0, nextReviewDate.getTime() - 30 * 24 * 60 * 60 * 1000 - Date.now());
         const jobId = `review-reminder-${assessment.workspaceId}`;
         const existing = await this.monitoringQueue.getJob(jobId);
         if (existing) await existing.remove();
@@ -285,11 +254,11 @@ class AssessmentService {
       }
     }
 
-    return assessment.riskDecision;
+    return riskDecision;
   }
 
   async setClauseSignoff(id, userId, authorizedWorkspaceIds, { clauseRef, status, note }) {
-    const assessment = await this.assessmentRepo.findById(id);
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
@@ -304,16 +273,14 @@ class AssessmentService {
       signedBy: userId,
       signedByName: '',
       note: note?.trim() || '',
-      signedAt: new Date(),
+      signedAt: new Date().toISOString(),
     };
 
-    const existingIdx = assessment.clauseSignoffs.findIndex((s) => s.clauseRef === clauseRef);
-    if (existingIdx >= 0) {
-      assessment.clauseSignoffs[existingIdx] = signoff;
-    } else {
-      assessment.clauseSignoffs.push(signoff);
-    }
-    await assessment.save();
+    const signoffs = [...(assessment.clauseSignoffs || [])];
+    const existingIdx = signoffs.findIndex((s) => s.clauseRef === clauseRef);
+    if (existingIdx >= 0) signoffs[existingIdx] = signoff;
+    else signoffs.push(signoff);
+    await this.assessmentRepo.updateByIdUnscoped(id, { clauseSignoffs: signoffs });
 
     this.logger.info('Clause sign-off recorded', {
       service: 'assessment',
@@ -323,11 +290,11 @@ class AssessmentService {
       userId,
     });
 
-    return assessment.clauseSignoffs;
+    return signoffs;
   }
 
   async getAssessmentFileDownload(id, docIndex, authorizedWorkspaceIds) {
-    const assessment = await this.assessmentRepo.findById(id, { lean: true });
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
@@ -345,12 +312,12 @@ class AssessmentService {
   }
 
   async deleteAssessment(id, userId, authorizedWorkspaceIds) {
-    const assessment = await this.assessmentRepo.findById(id);
+    const assessment = await this.assessmentRepo.findByIdUnscoped(id);
     if (!assessment) throw new AppError('Assessment not found', 404);
     if (!authorizedWorkspaceIds.includes(assessment.workspaceId.toString())) {
       throw new AppError('Access denied to this assessment', 403);
     }
-    if (assessment.createdBy !== userId.toString()) {
+    if (String(assessment.createdBy) !== String(userId)) {
       throw new AppError('Only the creator can delete an assessment', 403);
     }
 
@@ -360,9 +327,6 @@ class AssessmentService {
         error: err?.message,
       })
     );
-
-    // Also purge this assessment's chunks from the shared workspace collection
-    // (issue #394 dual-write) so the chat no longer retrieves deleted documents.
     Promise.resolve(this.deleteAssessmentChunksFromWorkspace(id)).catch((err) =>
       this.logger.warn('Failed to delete assessment chunks from workspace collection', {
         assessmentId: id,
@@ -370,7 +334,7 @@ class AssessmentService {
       })
     );
 
-    await this.assessmentRepo.deleteById(id);
+    await this.assessmentRepo.deleteByIdUnscoped(id);
 
     this.logger.info('Assessment deleted', { service: 'assessment', assessmentId: id, userId });
   }

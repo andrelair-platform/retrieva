@@ -12,10 +12,10 @@
  */
 
 import XLSX from 'xlsx';
-import { assessmentRepository } from '../repositories/AssessmentRepository.js';
-import { workspaceRepository } from '../repositories/WorkspaceRepository.js';
-import { workspaceMemberRepository } from '../repositories/WorkspaceMemberRepository.js';
-import { vendorQuestionnaireRepository } from '../repositories/VendorQuestionnaireRepository.js';
+import { assessmentRepository } from '../repositories/index.js';
+import { workspaceRepository } from '../repositories/index.js';
+import { workspaceMemberRepository } from '../repositories/index.js';
+import { vendorQuestionnaireRepository } from '../repositories/index.js';
 
 const INSTITUTION_NAME = process.env.INSTITUTION_NAME || 'Financial Entity';
 

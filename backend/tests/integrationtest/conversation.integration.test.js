@@ -11,8 +11,8 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import supertest from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
 
 // Set ALL required environment variables BEFORE any imports
 process.env.NODE_ENV = 'test';
@@ -112,10 +112,15 @@ vi.mock('../../config/embeddings.js', () => ({
 }));
 
 import app from '../../app.js';
+import { setupTestDatabase, cleanupTestDatabase } from './setup.js';
+import { getDb } from '../../config/db.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
+import { conversations } from '../../db/schema/index.js';
 
 describe('Conversation API Integration Tests', () => {
   let request;
-  let mongoServer;
   const API_BASE = '/api/v1';
   const AUTH_BASE = '/api/v1/auth';
 
@@ -140,120 +145,85 @@ describe('Conversation API Integration Tests', () => {
   let foreignWorkspaceId; // a workspace user1 is NOT a member of
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create({
-      instance: { launchTimeout: 60000 },
-    });
-    const mongoUri = mongoServer.getUri();
-    process.env.MONGODB_URI = mongoUri;
-
-    await mongoose.connect(mongoUri);
+    await setupTestDatabase();
     request = supertest(app);
 
-    // Register and login user 1
+    // Register + verify + login user 1
     const reg1 = await request.post(`${AUTH_BASE}/register`).send(testUser);
     if (reg1.status !== 201) {
       throw new Error(`Failed to register user 1: ${JSON.stringify(reg1.body)}`);
     }
-
-    const User = mongoose.model('User');
-    const user1 = await User.findOneAndUpdate(
-      { email: testUser.email },
-      { $set: { isEmailVerified: true, isActive: true } },
-      { new: true }
-    );
-
-    if (!user1) {
-      throw new Error('User 1 not found after registration');
-    }
-    user1Id = user1._id;
+    const user1 = await userRepository.findByEmail(testUser.email);
+    if (!user1) throw new Error('User 1 not found after registration');
+    user1Id = user1.id;
+    await userRepository.markEmailVerified(user1Id);
 
     const login1 = await request
       .post(`${AUTH_BASE}/login`)
       .send({ email: testUser.email, password: testUser.password });
-
     if (login1.status !== 200) {
       throw new Error(`Failed to login user 1: ${JSON.stringify(login1.body)}`);
     }
     user1Token = login1.body.data.accessToken;
 
-    // Register and login user 2
+    // Register + verify + login user 2
     await request.post(`${AUTH_BASE}/register`).send(testUser2);
-    const user2 = await User.findOneAndUpdate(
-      { email: testUser2.email },
-      { $set: { isEmailVerified: true, isActive: true } },
-      { new: true }
-    );
-    user2Id = user2._id;
+    const user2 = await userRepository.findByEmail(testUser2.email);
+    user2Id = user2.id;
+    await userRepository.markEmailVerified(user2Id);
 
     const login2 = await request
       .post(`${AUTH_BASE}/login`)
       .send({ email: testUser2.email, password: testUser2.password });
     user2Token = login2.body.data.accessToken;
 
-    // Create a workspace for user 1 using Workspace
-    const Workspace = mongoose.model('Workspace');
-    const workspace = await Workspace.create({
+    // Workspace for user 1 + members for both users.
+    const workspace = await workspaceRepository.create({
       name: 'Test Workspace',
       userId: user1Id,
       syncStatus: 'synced',
     });
-    workspaceId = workspace._id.toString();
+    workspaceId = workspace.id.toString();
 
-    // Create workspace members for both users
-    const WorkspaceMember = mongoose.model('WorkspaceMember');
-    await WorkspaceMember.create({
-      workspaceId: workspace._id,
+    await workspaceMemberRepository.create({
+      workspaceId: workspace.id,
       userId: user1Id,
       role: 'owner',
       status: 'active',
-      permissions: {
-        canQuery: true,
-        canManageMembers: true,
-        canManageSettings: true,
-      },
+      permissions: { canQuery: true, canViewSources: true, canInvite: true },
     });
-
-    await WorkspaceMember.create({
-      workspaceId: workspace._id,
+    await workspaceMemberRepository.create({
+      workspaceId: workspace.id,
       userId: user2Id,
       role: 'member',
       status: 'active',
-      permissions: {
-        canQuery: true,
-        canManageMembers: false,
-        canManageSettings: false,
-      },
+      permissions: { canQuery: true, canViewSources: true, canInvite: false },
     });
 
-    // A second workspace that user1 is NOT a member of (owned by user2) — used
-    // to prove the active X-Workspace-Id is validated against membership.
-    const foreignWorkspace = await Workspace.create({
+    // A second workspace user1 is NOT a member of (owned by user2) — proves the
+    // active X-Workspace-Id is validated against membership.
+    const foreignWorkspace = await workspaceRepository.create({
       name: 'Foreign Workspace',
       userId: user2Id,
       syncStatus: 'synced',
     });
-    foreignWorkspaceId = foreignWorkspace._id.toString();
-    await WorkspaceMember.create({
-      workspaceId: foreignWorkspace._id,
+    foreignWorkspaceId = foreignWorkspace.id.toString();
+    await workspaceMemberRepository.create({
+      workspaceId: foreignWorkspace.id,
       userId: user2Id,
       role: 'owner',
       status: 'active',
-      permissions: { canQuery: true, canManageMembers: true, canManageSettings: true },
+      permissions: { canQuery: true, canViewSources: true, canInvite: true },
     });
-  }, 30000);
+  }, 60000);
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    await cleanupTestDatabase();
   });
 
   beforeEach(async () => {
-    // Clear only conversation and message collections between tests
-    // Keep users and workspace to avoid re-registration
-    const Conversation = mongoose.model('Conversation');
-    const Message = mongoose.model('Message');
-    await Conversation.deleteMany({});
-    await Message.deleteMany({});
+    // Clear only conversations + messages between tests (keep users/workspaces).
+    await getDb().execute(sql`truncate table messages, conversations restart identity cascade`);
   });
 
   // =============================================================================
@@ -310,16 +280,17 @@ describe('Conversation API Integration Tests', () => {
   // =============================================================================
   describe('GET /conversations', () => {
     beforeEach(async () => {
-      // Create conversations directly in DB to avoid flaky HTTP creation in CI
-      // Must provide unique idempotencyKey — sparse unique index treats null as a real value
-      const Conversation = mongoose.model('Conversation');
+      // Create conversations directly in DB to avoid flaky HTTP creation in CI.
+      // idempotencyKey is unique per (user, workspace) — give each a distinct value.
       for (let i = 1; i <= 3; i++) {
-        await Conversation.create({
-          userId: user1Id,
-          workspaceId,
-          title: `Conversation ${i}`,
-          metadata: { idempotencyKey: `test-list-${i}-${Date.now()}` },
-        });
+        await getDb()
+          .insert(conversations)
+          .values({
+            userId: user1Id,
+            workspaceId,
+            title: `Conversation ${i}`,
+            idempotencyKey: `test-list-${i}-${Date.now()}`,
+          });
       }
     });
 
@@ -387,7 +358,7 @@ describe('Conversation API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent conversation', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
+      const fakeId = randomUUID();
 
       const res = await request
         .get(`${API_BASE}/conversations/${fakeId}`)
@@ -465,7 +436,7 @@ describe('Conversation API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent conversation', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
+      const fakeId = randomUUID();
 
       const res = await request
         .patch(`${API_BASE}/conversations/${fakeId}`)
@@ -511,7 +482,7 @@ describe('Conversation API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent conversation', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
+      const fakeId = randomUUID();
 
       const res = await request
         .delete(`${API_BASE}/conversations/${fakeId}`)

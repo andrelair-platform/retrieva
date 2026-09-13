@@ -11,7 +11,7 @@
  * (canViewSources: true). Only an explicit `false` strips sources.
  */
 
-import { workspaceMemberRepository } from '../../repositories/WorkspaceMemberRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
 
 /**
  * @param {import('express').Request} req - request (may carry req.authorizedWorkspaces)

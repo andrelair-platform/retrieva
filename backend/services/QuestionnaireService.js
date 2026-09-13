@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { AppError } from '../utils/index.js';
-import { questionnaireTemplateRepository } from '../repositories/QuestionnaireTemplateRepository.js';
-import { vendorQuestionnaireRepository } from '../repositories/VendorQuestionnaireRepository.js';
+import { questionnaireTemplateRepository } from '../repositories/index.js';
+import { vendorQuestionnaireRepository } from '../repositories/index.js';
 import { questionnaireQueue } from '../config/queue.js';
 import { emailService } from './emailService.js';
 import logger from '../config/logger.js';

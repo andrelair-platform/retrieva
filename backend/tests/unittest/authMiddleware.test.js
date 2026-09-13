@@ -20,8 +20,8 @@ vi.mock('../../utils/security/jwt.js', () => ({
   verifyAccessToken: vi.fn(),
 }));
 
-vi.mock('../../models/User.js', () => ({
-  User: {
+vi.mock('../../repositories/drizzle/UserRepository.js', () => ({
+  userRepository: {
     findById: vi.fn(),
   },
 }));
@@ -32,7 +32,7 @@ vi.mock('../../utils/security/cookieConfig.js', () => ({
 
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js';
 import { verifyAccessToken } from '../../utils/security/jwt.js';
-import { User } from '../../models/User.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
 import { getAccessToken } from '../../utils/security/cookieConfig.js';
 
 describe('Auth Middleware', () => {
@@ -95,7 +95,7 @@ describe('Auth Middleware', () => {
     it('should return 401 when user not found', async () => {
       getAccessToken.mockReturnValue('valid-token');
       verifyAccessToken.mockReturnValue({ userId: 'user-123' });
-      User.findById.mockResolvedValue(null);
+      userRepository.findById.mockResolvedValue(null);
 
       await authenticate(mockReq, mockRes, mockNext);
 
@@ -111,8 +111,8 @@ describe('Auth Middleware', () => {
     it('should return 401 when user is inactive', async () => {
       getAccessToken.mockReturnValue('valid-token');
       verifyAccessToken.mockReturnValue({ userId: 'user-123' });
-      User.findById.mockResolvedValue({
-        _id: 'user-123',
+      userRepository.findById.mockResolvedValue({
+        id: 'user-123',
         email: 'test@example.com',
         isActive: false,
       });
@@ -130,7 +130,7 @@ describe('Auth Middleware', () => {
 
     it('should attach user to request and call next on success', async () => {
       const mockUser = {
-        _id: 'user-123',
+        id: 'user-123',
         email: 'test@example.com',
         role: 'user',
         name: 'Test User',
@@ -139,7 +139,7 @@ describe('Auth Middleware', () => {
 
       getAccessToken.mockReturnValue('valid-token');
       verifyAccessToken.mockReturnValue({ userId: 'user-123' });
-      User.findById.mockResolvedValue(mockUser);
+      userRepository.findById.mockResolvedValue(mockUser);
 
       await authenticate(mockReq, mockRes, mockNext);
 
@@ -247,7 +247,7 @@ describe('Auth Middleware', () => {
 
     it('should attach user when valid token', async () => {
       const mockUser = {
-        _id: 'user-123',
+        id: 'user-123',
         email: 'test@example.com',
         role: 'user',
         name: 'Test User',
@@ -256,7 +256,7 @@ describe('Auth Middleware', () => {
 
       getAccessToken.mockReturnValue('valid-token');
       verifyAccessToken.mockReturnValue({ userId: 'user-123' });
-      User.findById.mockResolvedValue(mockUser);
+      userRepository.findById.mockResolvedValue(mockUser);
 
       await optionalAuth(mockReq, mockRes, mockNext);
 
@@ -285,8 +285,8 @@ describe('Auth Middleware', () => {
     it('should continue without user when user is inactive', async () => {
       getAccessToken.mockReturnValue('valid-token');
       verifyAccessToken.mockReturnValue({ userId: 'user-123' });
-      User.findById.mockResolvedValue({
-        _id: 'user-123',
+      userRepository.findById.mockResolvedValue({
+        id: 'user-123',
         isActive: false,
       });
 

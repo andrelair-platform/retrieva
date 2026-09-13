@@ -1,6 +1,6 @@
 import { getStripe, PRICE_TO_PLAN, STRIPE_STATUS_MAP } from '../config/stripe.js';
 import { AppError } from '../utils/index.js';
-import { organizationRepository } from '../repositories/OrganizationRepository.js';
+import { organizationRepository } from '../repositories/index.js';
 import { emailService } from './emailService.js';
 import logger from '../config/logger.js';
 

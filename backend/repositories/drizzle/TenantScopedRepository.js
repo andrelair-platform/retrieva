@@ -60,6 +60,51 @@ export class TenantScopedRepository extends BaseDrizzleRepository {
     return row ?? null;
   }
 
+  /**
+   * EXPLICIT unscoped by-id lookup — bypasses tenant scoping. For trusted background
+   * paths (BullMQ workers) that operate on a specific entity id WITHOUT a request tenant
+   * context (the old Mongoose plugin didn't filter when no context was set). Named so the
+   * bypass is auditable; never use it on a request path.
+   */
+  async findByIdUnscoped(id) {
+    const [row] = await this.db.select().from(this.table).where(eq(this.table.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  /** EXPLICIT unscoped update/delete by id — same bypass contract as findByIdUnscoped
+   *  (trusted worker/manual-authz paths). Never use on an unauthenticated request path. */
+  async updateByIdUnscoped(id, values) {
+    const [row] = await this.db
+      .update(this.table)
+      .set(values)
+      .where(eq(this.table.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  async deleteByIdUnscoped(id) {
+    const [row] = await this.db
+      .delete(this.table)
+      .where(eq(this.table.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Unscoped create with an EXPLICIT tenant value in `values` (bypasses context
+   *  stamping) — for services that resolve the workspace themselves + do their own authz. */
+  async createUnscoped(values) {
+    const [row] = await this.db.insert(this.table).values(values).returning();
+    return row;
+  }
+
+  async findUnscoped(where, opts) {
+    return super.find(where, opts);
+  }
+
+  async countUnscoped(where) {
+    return super.count(where);
+  }
+
   async findOne(where) {
     return super.findOne(this._scoped(where));
   }

@@ -1,8 +1,8 @@
 import { AppError } from '../utils/index.js';
 import { safeDecrypt } from '../utils/security/fieldEncryption.js';
-import { organizationRepository } from '../repositories/OrganizationRepository.js';
-import { organizationMemberRepository } from '../repositories/OrganizationMemberRepository.js';
-import { userRepository } from '../repositories/UserRepository.js';
+import { organizationRepository } from '../repositories/index.js';
+import { organizationMemberRepository } from '../repositories/index.js';
+import { userRepository } from '../repositories/index.js';
 import { emailService } from './emailService.js';
 import { setupOrgBilling } from './stripeService.js';
 import logger from '../config/logger.js';

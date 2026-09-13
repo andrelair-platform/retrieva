@@ -29,14 +29,14 @@ export const createConversation = catchAsync(async (req, res) => {
 
   logger.info(wasCreated ? 'Created new conversation' : 'Retrieved existing conversation', {
     service: 'conversation',
-    conversationId: conversation._id,
+    conversationId: conversation.id,
     workspaceId: conversation.workspaceId,
     wasCreated,
   });
 
   sendSuccess(res, wasCreated ? 201 : 200, 'Conversation created successfully', {
     conversation: {
-      id: conversation._id,
+      id: conversation.id,
       title: conversation.title,
       userId: conversation.userId,
       workspaceId: conversation.workspaceId,
@@ -62,7 +62,7 @@ export const getConversations = catchAsync(async (req, res) => {
 
   sendSuccess(res, 200, 'Conversations retrieved successfully', {
     conversations: conversations.map((c) => ({
-      id: c._id,
+      id: c.id,
       title: c.title,
       userId: c.userId,
       workspaceId: c.workspaceId,
@@ -100,7 +100,7 @@ export const getConversation = catchAsync(async (req, res) => {
 
   sendSuccess(res, 200, 'Conversation retrieved successfully', {
     conversation: {
-      id: conversation._id,
+      id: conversation.id,
       title: conversation.title,
       userId: conversation.userId,
       messageCount: conversation.messageCount,
@@ -109,7 +109,7 @@ export const getConversation = catchAsync(async (req, res) => {
       updatedAt: conversation.updatedAt,
     },
     messages: messages.map((m) => ({
-      id: m._id,
+      id: m.id,
       role: m.role,
       content: m.content,
       sources: allowSources ? m.sources || [] : [],
@@ -170,7 +170,7 @@ export const updateConversation = catchAsync(async (req, res) => {
 
   sendSuccess(res, 200, 'Conversation updated successfully', {
     conversation: {
-      id: conversation._id,
+      id: conversation.id,
       title: conversation.title,
       userId: conversation.userId,
       updatedAt: conversation.updatedAt,

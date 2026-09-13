@@ -10,7 +10,8 @@ validateEnvOrExit();
 import http from 'http';
 import app from './app.js';
 import logger from './config/logger.js';
-import { connectDB } from './config/database.js';
+import { connectPg } from './config/db.js';
+import { runMigrations } from './db/migrate.js';
 import { startupInitService } from './services/startupInit.js';
 import { ragService } from './services/rag.js';
 import { answerFormatter } from './services/answerFormatter.js';
@@ -30,7 +31,9 @@ const startServer = async () => {
     const envInfo = getEnvInfo();
     logger.info('Environment configuration:', { service: 'rag-backend', ...envInfo });
 
-    await connectDB();
+    await connectPg();
+    // Apply pending Drizzle migrations on boot (idempotent).
+    await runMigrations();
 
     // Seed default questionnaire template (idempotent)
     await seedDefaultTemplate();

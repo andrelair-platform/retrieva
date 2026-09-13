@@ -11,10 +11,10 @@
  *  DELETE /api/v1/assessments/:id
  */
 
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import supertest from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // ---------------------------------------------------------------------------
 // Environment must be set BEFORE any imports that read process.env
@@ -147,6 +147,12 @@ vi.mock('../../config/embeddings.js', () => ({
 // App import (AFTER all mocks)
 // ---------------------------------------------------------------------------
 import app from '../../app.js';
+import { setupTestDatabase, cleanupTestDatabase } from './setup.js';
+import { getDb } from '../../config/db.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
+import { assessmentRepository } from '../../repositories/drizzle/AssessmentRepository.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -163,47 +169,36 @@ const makePdfBuffer = () =>
 async function createAndLoginUser(request, userData) {
   await request.post(`${AUTH_BASE}/register`).send(userData);
 
-  const User = mongoose.model('User');
-  await User.updateOne(
-    { email: userData.email },
-    { $set: { isEmailVerified: true, isActive: true } }
-  );
+  const user = await userRepository.findByEmail(userData.email);
+  await userRepository.markEmailVerified(user.id);
 
   const loginRes = await request
     .post(`${AUTH_BASE}/login`)
     .send({ email: userData.email, password: userData.password });
 
-  const userDoc = await User.findOne({ email: userData.email });
   return {
     token: loginRes.body.data.accessToken,
-    userId: userDoc._id.toString(),
+    userId: user.id.toString(),
   };
 }
 
 /** Create a WorkspaceMember + Workspace for a user, return workspaceId */
 async function createWorkspaceForUser(userId) {
-  const Workspace = mongoose.model('Workspace');
-  const WorkspaceMember = mongoose.model('WorkspaceMember');
-
-  const workspace = await Workspace.create({
+  const workspace = await workspaceRepository.create({
     name: 'Test Workspace',
     syncStatus: 'synced',
     userId,
   });
 
-  await WorkspaceMember.create({
-    workspaceId: workspace._id,
+  await workspaceMemberRepository.create({
+    workspaceId: workspace.id,
     userId,
     role: 'owner',
     status: 'active',
-    permissions: {
-      canQuery: true,
-      canManage: true,
-      canInvite: true,
-    },
+    permissions: { canQuery: true, canViewSources: true, canInvite: true },
   });
 
-  return workspace._id.toString();
+  return workspace.id.toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +207,6 @@ async function createWorkspaceForUser(userId) {
 
 describe('Assessment API Integration Tests', () => {
   let request;
-  let mongoServer;
   let user1Token;
   let user1Id;
   let user2Token;
@@ -232,11 +226,7 @@ describe('Assessment API Integration Tests', () => {
   };
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
-    const mongoUri = mongoServer.getUri();
-    process.env.MONGODB_URI = mongoUri;
-    await mongoose.connect(mongoUri);
-
+    await setupTestDatabase();
     request = supertest(app);
 
     // Create users
@@ -253,14 +243,12 @@ describe('Assessment API Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    await cleanupTestDatabase();
   });
 
   beforeEach(async () => {
     // Clear assessments between tests to keep them isolated
-    const Assessment = mongoose.model('Assessment');
-    await Assessment.deleteMany({});
+    await getDb().execute(sql`truncate table assessments restart identity cascade`);
     vi.clearAllMocks();
   });
 
@@ -431,8 +419,7 @@ describe('Assessment API Integration Tests', () => {
 
     beforeEach(async () => {
       // Seed one assessment directly in the DB
-      const Assessment = mongoose.model('Assessment');
-      const doc = await Assessment.create({
+        const doc = await assessmentRepository.createUnscoped({
         workspaceId,
         name: 'Seeded Assessment',
         vendorName: 'Seed Vendor',
@@ -441,7 +428,7 @@ describe('Assessment API Integration Tests', () => {
         createdBy: user1Id,
         documents: [],
       });
-      createdAssessmentId = doc._id.toString();
+      createdAssessmentId = doc.id.toString();
     });
 
     it('returns 200 with assessments list for authorized user', async () => {
@@ -470,8 +457,7 @@ describe('Assessment API Integration Tests', () => {
     });
 
     it('filters by status', async () => {
-      const Assessment = mongoose.model('Assessment');
-      await Assessment.create({
+        await assessmentRepository.createUnscoped({
         workspaceId,
         name: 'Complete Assessment',
         vendorName: 'Done Vendor',
@@ -510,8 +496,7 @@ describe('Assessment API Integration Tests', () => {
     let assessmentId;
 
     beforeEach(async () => {
-      const Assessment = mongoose.model('Assessment');
-      const doc = await Assessment.create({
+        const doc = await assessmentRepository.createUnscoped({
         workspaceId,
         name: 'Detail Assessment',
         vendorName: 'Detail Vendor',
@@ -537,7 +522,7 @@ describe('Assessment API Integration Tests', () => {
           ],
         },
       });
-      assessmentId = doc._id.toString();
+      assessmentId = doc.id.toString();
     });
 
     it('returns 200 with full assessment detail including gaps', async () => {
@@ -553,7 +538,7 @@ describe('Assessment API Integration Tests', () => {
     });
 
     it('returns 404 for non-existent assessment ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
+      const fakeId = randomUUID();
       const res = await request
         .get(`${ASSESSMENT_BASE}/${fakeId}`)
         .set('Authorization', `Bearer ${user1Token}`);
@@ -581,8 +566,7 @@ describe('Assessment API Integration Tests', () => {
     let assessmentId;
 
     beforeEach(async () => {
-      const Assessment = mongoose.model('Assessment');
-      const doc = await Assessment.create({
+        const doc = await assessmentRepository.createUnscoped({
         workspaceId,
         name: 'To Delete',
         vendorName: 'Delete Vendor',
@@ -591,7 +575,7 @@ describe('Assessment API Integration Tests', () => {
         createdBy: user1Id,
         documents: [],
       });
-      assessmentId = doc._id.toString();
+      assessmentId = doc.id.toString();
     });
 
     it('deletes the assessment and returns 200', async () => {
@@ -603,13 +587,12 @@ describe('Assessment API Integration Tests', () => {
       expect(res.body.status).toBe('success');
 
       // Verify it's actually deleted in the DB
-      const Assessment = mongoose.model('Assessment');
-      const doc = await Assessment.findById(assessmentId);
+        const doc = await assessmentRepository.findByIdUnscoped(assessmentId);
       expect(doc).toBeNull();
     });
 
     it('returns 404 for non-existent assessment', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
+      const fakeId = randomUUID();
       const res = await request
         .delete(`${ASSESSMENT_BASE}/${fakeId}`)
         .set('Authorization', `Bearer ${user1Token}`);
@@ -619,13 +602,12 @@ describe('Assessment API Integration Tests', () => {
 
     it('returns 403 when user is not the creator', async () => {
       // Give user2 access to user1's workspace so they pass workspace auth
-      const WorkspaceMember = mongoose.model('WorkspaceMember');
-      await WorkspaceMember.create({
+      await workspaceMemberRepository.create({
         workspaceId,
         userId: user2Id,
         role: 'member',
         status: 'active',
-        permissions: { canQuery: true, canManage: false, canInvite: false },
+        permissions: { canQuery: true, canViewSources: true, canInvite: false },
       });
 
       const res = await request

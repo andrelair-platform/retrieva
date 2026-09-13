@@ -7,7 +7,7 @@
 
 import { Worker } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
-import { vendorQuestionnaireRepository } from '../repositories/VendorQuestionnaireRepository.js';
+import { vendorQuestionnaireRepository } from '../repositories/index.js';
 import { runScoring } from '../services/questionnaireScorer.js';
 import { withTenantContext } from '../services/tenantIsolation.js';
 import logger from '../config/logger.js';

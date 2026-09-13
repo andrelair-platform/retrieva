@@ -10,8 +10,8 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import supertest from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-key-that-is-at-least-32-characters-long';
@@ -136,6 +136,11 @@ vi.mock('../../config/embeddings.js', () => ({
 // ---------------------------------------------------------------------------
 
 import app from '../../app.js';
+import { setupTestDatabase, cleanupTestDatabase } from './setup.js';
+import { getDb } from '../../config/db.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
 
 const AUTH_BASE = '/api/v1/auth';
 const ASSESSMENT_BASE = '/api/v1/assessments';
@@ -145,30 +150,28 @@ const makePdfBuffer = () =>
 
 async function createAndLoginUser(request, userData) {
   await request.post(`${AUTH_BASE}/register`).send(userData);
-  const User = mongoose.model('User');
-  await User.updateOne(
-    { email: userData.email },
-    { $set: { isEmailVerified: true, isActive: true } }
-  );
+  const user = await userRepository.findByEmail(userData.email);
+  await userRepository.markEmailVerified(user.id);
   const loginRes = await request
     .post(`${AUTH_BASE}/login`)
     .send({ email: userData.email, password: userData.password });
-  const userDoc = await User.findOne({ email: userData.email });
-  return { token: loginRes.body.data.accessToken, userId: userDoc._id.toString() };
+  return { token: loginRes.body.data.accessToken, userId: user.id.toString() };
 }
 
 async function createWorkspaceForUser(userId) {
-  const Workspace = mongoose.model('Workspace');
-  const WorkspaceMember = mongoose.model('WorkspaceMember');
-  const workspace = await Workspace.create({ name: 'Risk WS', syncStatus: 'synced', userId });
-  await WorkspaceMember.create({
-    workspaceId: workspace._id,
+  const workspace = await workspaceRepository.create({
+    name: 'Risk WS',
+    syncStatus: 'synced',
+    userId,
+  });
+  await workspaceMemberRepository.create({
+    workspaceId: workspace.id,
     userId,
     role: 'owner',
     status: 'active',
-    permissions: { canQuery: true, canManage: true, canInvite: true },
+    permissions: { canQuery: true, canViewSources: true, canInvite: true },
   });
-  return workspace._id.toString();
+  return workspace.id.toString();
 }
 
 async function createCompleteAssessment(request, token, workspaceId, framework = 'DORA') {
@@ -189,7 +192,6 @@ async function createCompleteAssessment(request, token, workspaceId, framework =
 
 describe('Risk Decision & Clause Sign-off Integration Tests', () => {
   let request;
-  let mongoServer;
   let user1Token;
   let user1Id;
   let user2Token;
@@ -199,14 +201,7 @@ describe('Risk Decision & Clause Sign-off Integration Tests', () => {
   const user2 = { email: 'rd-user2@example.com', password: 'ValidPassword123!', name: 'RD User2' };
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryReplSet.create({
-      replSet: { count: 1 },
-      instanceOpts: [{ launchTimeout: 60000 }],
-    });
-    const mongoUri = mongoServer.getUri();
-    process.env.MONGODB_URI = mongoUri;
-    await mongoose.connect(mongoUri);
-
+    await setupTestDatabase();
     request = supertest(app);
     const u1 = await createAndLoginUser(request, user1);
     user1Token = u1.token;
@@ -216,15 +211,14 @@ describe('Risk Decision & Clause Sign-off Integration Tests', () => {
     user2Token = u2.token;
 
     workspaceId = await createWorkspaceForUser(user1Id);
-  });
+  }, 60000);
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    await cleanupTestDatabase();
   });
 
   beforeEach(async () => {
-    await mongoose.model('Assessment').deleteMany({});
+    await getDb().execute(sql`truncate table assessments restart identity cascade`);
     vi.clearAllMocks();
   });
 
@@ -250,7 +244,7 @@ describe('Risk Decision & Clause Sign-off Integration Tests', () => {
     });
 
     it('returns 404 for non-existent assessment', async () => {
-      const fakeId = new mongoose.Types.ObjectId().toString();
+      const fakeId = randomUUID();
       const res = await request
         .patch(`${ASSESSMENT_BASE}/${fakeId}/risk-decision`)
         .set('Authorization', `Bearer ${user1Token}`)
@@ -356,7 +350,7 @@ describe('Risk Decision & Clause Sign-off Integration Tests', () => {
         .set('Authorization', `Bearer ${user1Token}`)
         .send({ decision: 'proceed' });
 
-      const ws = await mongoose.model('Workspace').findById(workspaceId);
+      const ws = await workspaceRepository.findById(workspaceId);
       expect(ws.nextReviewDate).not.toBeNull();
       const diffDays = (ws.nextReviewDate.getTime() - before) / 86_400_000;
       expect(diffDays).toBeGreaterThan(364);

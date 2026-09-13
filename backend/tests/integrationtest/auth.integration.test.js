@@ -15,8 +15,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import supertest from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 
 // ── Env must be set before any app import ─────────────────────────────────────
@@ -112,10 +111,22 @@ vi.mock('../../config/embeddings.js', () => ({
 }));
 
 import app from '../../app.js';
+import {
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearCollections,
+} from './setup.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const BASE = '/api/v1/auth';
+
+/** Mark a registered user's email verified (Drizzle repo). */
+async function markVerified(email) {
+  const u = await userRepository.findByEmail(email);
+  if (u) await userRepository.markEmailVerified(u.id);
+}
 
 const VALID_USER = {
   email: 'auth-test@example.com',
@@ -126,8 +137,7 @@ const VALID_USER = {
 /** Register + mark email verified + login; returns { accessToken, refreshToken } */
 async function registerAndLogin(request, user = VALID_USER) {
   await request.post(`${BASE}/register`).send(user);
-  const User = mongoose.model('User');
-  await User.updateOne({ email: user.email }, { $set: { isEmailVerified: true, isActive: true } });
+  await markVerified(user.email);
   const res = await request.post(`${BASE}/login`).send({
     email: user.email,
     password: user.password,
@@ -140,32 +150,26 @@ async function registerAndLogin(request, user = VALID_USER) {
 
 /** Build a JWT that is already expired (exp in the past) */
 function makeExpiredToken(secret, payload = {}) {
-  return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'x@x.com', ...payload },
-    secret,
-    { expiresIn: -60 } // expired 60 s ago
-  );
+  return jwt.sign({ userId: randomUUID(), email: 'x@x.com', ...payload }, secret, {
+    expiresIn: -60,
+  }); // expired 60 s ago
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-let mongoServer;
 let request;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
-  process.env.MONGODB_URI = mongoServer.getUri();
-  await mongoose.connect(mongoServer.getUri());
+  await setupTestDatabase();
   request = supertest(app);
-}, 30000);
+}, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await cleanupTestDatabase();
 });
 
 beforeEach(async () => {
-  await mongoose.model('User').deleteMany({});
+  await clearCollections();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -266,9 +270,7 @@ describe('POST /auth/register', () => {
 describe('POST /auth/login', () => {
   beforeEach(async () => {
     await request.post(`${BASE}/register`).send(VALID_USER);
-    await mongoose
-      .model('User')
-      .updateOne({ email: VALID_USER.email }, { $set: { isEmailVerified: true, isActive: true } });
+    await markVerified(VALID_USER.email);
   });
 
   it('returns 200 with accessToken and refreshToken', async () => {
@@ -310,9 +312,8 @@ describe('POST /auth/login', () => {
   });
 
   it('returns 401 for inactive account', async () => {
-    await mongoose
-      .model('User')
-      .updateOne({ email: VALID_USER.email }, { $set: { isActive: false } });
+    const u = await userRepository.findByEmail(VALID_USER.email);
+    await userRepository.setActive(u.id, false);
     const res = await request
       .post(`${BASE}/login`)
       .send({ email: VALID_USER.email, password: VALID_USER.password });
@@ -502,7 +503,7 @@ describe('Token expiry edge cases', () => {
 
   it('access token signed with wrong secret is rejected', async () => {
     const wrongSecret = jwt.sign(
-      { userId: new mongoose.Types.ObjectId().toString(), email: 'x@x.com', role: 'user' },
+      { userId: randomUUID(), email: 'x@x.com', role: 'user' },
       'completely-wrong-secret-key-32chars+!'
     );
 
@@ -513,7 +514,7 @@ describe('Token expiry edge cases', () => {
 
   it('refresh token signed with wrong secret is rejected', async () => {
     const wrongSecret = jwt.sign(
-      { userId: new mongoose.Types.ObjectId().toString(), email: 'x@x.com' },
+      { userId: randomUUID(), email: 'x@x.com' },
       'completely-wrong-secret-key-32chars+!'
     );
 
@@ -533,9 +534,7 @@ describe('Full auth cycle', () => {
     expect(reg.status).toBe(201);
 
     // 2. Verify email (simulate server-side)
-    await mongoose
-      .model('User')
-      .updateOne({ email: VALID_USER.email }, { $set: { isEmailVerified: true, isActive: true } });
+    await markVerified(VALID_USER.email);
 
     // 3. Login
     const login = await request

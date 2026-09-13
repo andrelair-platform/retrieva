@@ -18,35 +18,40 @@ vi.mock('../../config/logger.js', () => ({
   },
 }));
 
-const { mockWorkspaceRepo, mockAssessmentRepo } = vi.hoisted(() => ({
-  mockWorkspaceRepo: {
-    findWithCertifications: vi.fn(),
-    findByContractEndingSoon: vi.fn(),
-    findDueForReview: vi.fn(),
-    find: vi.fn(),
-    findById: vi.fn(),
-    updateMany: vi.fn(),
-  },
-  mockAssessmentRepo: {
-    findLatestByWorkspace: vi.fn(),
-  },
-}));
+const { mockWorkspaceRepo, mockAssessmentRepo, mockMemberRepo, mockOrgRepo, mockUserRepo } =
+  vi.hoisted(() => ({
+    mockWorkspaceRepo: {
+      findWithCertifications: vi.fn(),
+      findByContractEndingSoon: vi.fn(),
+      findDueForReview: vi.fn(),
+      find: vi.fn(),
+      findById: vi.fn(),
+      findByIds: vi.fn(),
+      findByOrgAndName: vi.fn(),
+      setAlertSentAt: vi.fn(),
+    },
+    mockAssessmentRepo: {
+      findLatestByWorkspace: vi.fn(),
+      getComplianceScore: vi.fn(),
+    },
+    mockMemberRepo: {
+      findOwnersWithUser: vi.fn(),
+      groupOwnerWorkspaces: vi.fn(),
+    },
+    mockOrgRepo: {
+      find: vi.fn(),
+    },
+    mockUserRepo: {
+      findById: vi.fn(),
+    },
+  }));
 
 vi.mock('../../repositories/index.js', () => ({
   workspaceRepository: mockWorkspaceRepo,
   assessmentRepository: mockAssessmentRepo,
-}));
-
-vi.mock('../../models/WorkspaceMember.js', () => ({
-  WorkspaceMember: {
-    find: vi.fn(),
-  },
-}));
-
-vi.mock('../../models/User.js', () => ({
-  User: {
-    findById: vi.fn(),
-  },
+  workspaceMemberRepository: mockMemberRepo,
+  organizationRepository: mockOrgRepo,
+  userRepository: mockUserRepo,
 }));
 
 vi.mock('../../services/emailService.js', () => ({
@@ -61,8 +66,6 @@ import {
   sendReviewReminderAlert,
   runWeeklyDigest,
 } from '../../services/alertMonitorService.js';
-import { WorkspaceMember } from '../../models/WorkspaceMember.js';
-import { User } from '../../models/User.js';
 import emailService from '../../services/emailService.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,7 +75,7 @@ const NINETEEN_HOURS_MS = 19 * 60 * 60 * 1000;
 
 function makeWorkspace(overrides = {}) {
   return {
-    _id: 'ws-1',
+    id: 'ws-1',
     name: 'Test Vendor',
     certifications: [],
     contractEnd: null,
@@ -82,10 +85,11 @@ function makeWorkspace(overrides = {}) {
   };
 }
 
+// findOwnersWithUser returns rows shaped { user: { id, email, name, notificationPreferences } }
 function makeOwner(overrides = {}) {
   return {
-    userId: {
-      _id: 'user-1',
+    user: {
+      id: 'user-1',
       email: 'owner@example.com',
       name: 'Alice',
       notificationPreferences: {},
@@ -100,7 +104,9 @@ function setupEmptyChecks() {
   mockWorkspaceRepo.findDueForReview.mockResolvedValue([]);
   mockWorkspaceRepo.find.mockResolvedValue([]);
   mockAssessmentRepo.findLatestByWorkspace.mockResolvedValue(null);
-  mockWorkspaceRepo.updateMany.mockResolvedValue({});
+  mockWorkspaceRepo.setAlertSentAt.mockResolvedValue({});
+  mockOrgRepo.find.mockResolvedValue([]);
+  mockMemberRepo.findOwnersWithUser.mockResolvedValue([]);
 }
 
 // ─── runMonitoringAlerts ──────────────────────────────────────────────────────
@@ -109,7 +115,7 @@ describe('runMonitoringAlerts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupEmptyChecks();
-    WorkspaceMember.find.mockReturnValue({ populate: vi.fn().mockResolvedValue([]) });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([]);
   });
 
   it('completes without throwing even when all checks succeed with no data', async () => {
@@ -128,9 +134,7 @@ describe('Certification expiry alerts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupEmptyChecks();
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
     emailService.sendMonitoringAlert.mockResolvedValue({});
   });
 
@@ -234,9 +238,7 @@ describe('Contract renewal alerts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupEmptyChecks();
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
     emailService.sendMonitoringAlert.mockResolvedValue({});
   });
 
@@ -272,9 +274,7 @@ describe('Annual review overdue alerts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupEmptyChecks();
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
     emailService.sendMonitoringAlert.mockResolvedValue({});
   });
 
@@ -310,9 +310,7 @@ describe('Assessment overdue alerts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupEmptyChecks();
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
     emailService.sendMonitoringAlert.mockResolvedValue({});
   });
 
@@ -366,11 +364,9 @@ describe('sendAlertToOwners email logic', () => {
     const workspace = makeWorkspace();
     mockWorkspaceRepo.find.mockResolvedValue([workspace]);
     mockAssessmentRepo.findLatestByWorkspace.mockResolvedValue(null);
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi
-        .fn()
-        .mockResolvedValue([{ userId: { _id: 'u1', email: null, name: 'No Email' } }]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([
+      { user: { id: 'u1', email: null, name: 'No Email' } },
+    ]);
 
     await runMonitoringAlerts();
 
@@ -381,13 +377,9 @@ describe('sendAlertToOwners email logic', () => {
     const workspace = makeWorkspace();
     mockWorkspaceRepo.find.mockResolvedValue([workspace]);
     mockAssessmentRepo.findLatestByWorkspace.mockResolvedValue(null);
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi
-        .fn()
-        .mockResolvedValue([
-          makeOwner({ notificationPreferences: { email: { system_alert: false } } }),
-        ]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([
+      makeOwner({ notificationPreferences: { email: { system_alert: false } } }),
+    ]);
 
     await runMonitoringAlerts();
 
@@ -400,14 +392,10 @@ describe('sendAlertToOwners email logic', () => {
       certifications: [{ type: 'ISO27001', validUntil: expiry }],
     });
     mockWorkspaceRepo.findWithCertifications.mockResolvedValue([workspace]);
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi
-        .fn()
-        .mockResolvedValue([
-          makeOwner({ email: 'fail@example.com' }),
-          makeOwner({ email: 'success@example.com' }),
-        ]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([
+      makeOwner({ email: 'fail@example.com' }),
+      makeOwner({ email: 'success@example.com' }),
+    ]);
 
     emailService.sendMonitoringAlert
       .mockRejectedValueOnce(new Error('SMTP error'))
@@ -440,9 +428,7 @@ describe('sendReviewReminderAlert', () => {
       nextReviewDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
     mockWorkspaceRepo.findById.mockResolvedValue(workspace);
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
 
     await sendReviewReminderAlert('ws-1');
 
@@ -458,9 +444,7 @@ describe('sendReviewReminderAlert', () => {
   it('uses "soon" as reviewDate when nextReviewDate is not set', async () => {
     const workspace = makeWorkspace({ nextReviewDate: null });
     mockWorkspaceRepo.findById.mockResolvedValue(workspace);
-    WorkspaceMember.find.mockReturnValue({
-      populate: vi.fn().mockResolvedValue([makeOwner()]),
-    });
+    mockMemberRepo.findOwnersWithUser.mockResolvedValue([makeOwner()]);
 
     await sendReviewReminderAlert('ws-1');
 
@@ -479,23 +463,18 @@ describe('runWeeklyDigest', () => {
   const wsId = 'ws-1';
 
   beforeEach(() => {
-    WorkspaceMember.aggregate = vi.fn();
-    mockAssessmentRepo.getComplianceScore = vi.fn();
+    vi.clearAllMocks();
   });
 
   it('sends weekly digest to each owner with workspace scores', async () => {
-    WorkspaceMember.aggregate.mockResolvedValue([{ _id: userId, workspaceIds: [wsId] }]);
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          email: 'owner@example.com',
-          name: 'Owner',
-          notificationPreferences: {},
-        }),
-      }),
+    mockMemberRepo.groupOwnerWorkspaces.mockResolvedValue([{ userId, workspaceIds: [wsId] }]);
+    mockUserRepo.findById.mockResolvedValue({
+      email: 'owner@example.com',
+      name: 'Owner',
+      notificationPreferences: {},
     });
-    mockWorkspaceRepo.find.mockResolvedValue([
-      { _id: wsId, workspaceName: 'Test Vendor', nextReviewDate: null },
+    mockWorkspaceRepo.findByIds.mockResolvedValue([
+      { id: wsId, name: 'Test Vendor', nextReviewDate: null },
     ]);
     mockAssessmentRepo.getComplianceScore.mockResolvedValue({
       score: 80,
@@ -516,15 +495,11 @@ describe('runWeeklyDigest', () => {
   });
 
   it('skips owner who opted out of weekly digest', async () => {
-    WorkspaceMember.aggregate.mockResolvedValue([{ _id: userId, workspaceIds: [wsId] }]);
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          email: 'owner@example.com',
-          name: 'Owner',
-          notificationPreferences: { email: { weekly_digest: false } },
-        }),
-      }),
+    mockMemberRepo.groupOwnerWorkspaces.mockResolvedValue([{ userId, workspaceIds: [wsId] }]);
+    mockUserRepo.findById.mockResolvedValue({
+      email: 'owner@example.com',
+      name: 'Owner',
+      notificationPreferences: { email: { weekly_digest: false } },
     });
 
     await runWeeklyDigest();
@@ -533,12 +508,8 @@ describe('runWeeklyDigest', () => {
   });
 
   it('skips owner when user not found', async () => {
-    WorkspaceMember.aggregate.mockResolvedValue([{ _id: userId, workspaceIds: [wsId] }]);
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue(null),
-      }),
-    });
+    mockMemberRepo.groupOwnerWorkspaces.mockResolvedValue([{ userId, workspaceIds: [wsId] }]);
+    mockUserRepo.findById.mockResolvedValue(null);
 
     await runWeeklyDigest();
 
@@ -546,13 +517,9 @@ describe('runWeeklyDigest', () => {
   });
 
   it('skips owner when no workspaces found', async () => {
-    WorkspaceMember.aggregate.mockResolvedValue([{ _id: userId, workspaceIds: [wsId] }]);
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ email: 'owner@example.com', name: 'Owner' }),
-      }),
-    });
-    mockWorkspaceRepo.find.mockResolvedValue([]);
+    mockMemberRepo.groupOwnerWorkspaces.mockResolvedValue([{ userId, workspaceIds: [wsId] }]);
+    mockUserRepo.findById.mockResolvedValue({ email: 'owner@example.com', name: 'Owner' });
+    mockWorkspaceRepo.findByIds.mockResolvedValue([]);
 
     await runWeeklyDigest();
 

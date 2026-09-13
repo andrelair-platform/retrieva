@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { sql } from 'drizzle-orm';
+import { getDb } from '../config/db.js';
 import { redisConnection } from '../config/redis.js';
 import { getVectorStore } from '../config/vectorStore.js';
 import { getDefaultLLM, getCurrentProvider } from '../config/llm.js';
@@ -43,17 +44,12 @@ export const detailedHealth = async (req, res) => {
 
   let allHealthy = true;
 
-  // Check MongoDB
+  // Check PostgreSQL
   try {
-    const mongoState = mongoose.connection.readyState;
-    health.services.mongodb = {
-      status: mongoState === 1 ? 'up' : 'down',
-      state: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoState],
-      database: mongoose.connection.name,
-    };
-    if (mongoState !== 1) allHealthy = false;
+    await getDb().execute(sql`select 1`);
+    health.services.postgres = { status: 'up' };
   } catch (error) {
-    health.services.mongodb = {
+    health.services.postgres = {
       status: 'down',
       error: error.message,
     };
@@ -200,14 +196,20 @@ export const detailedHealth = async (req, res) => {
 export const readinessCheck = async (req, res) => {
   try {
     // Check critical services
-    const mongoReady = mongoose.connection.readyState === 1;
+    let postgresReady = false;
+    try {
+      await getDb().execute(sql`select 1`);
+      postgresReady = true;
+    } catch {
+      postgresReady = false;
+    }
     const redisPing = await redisConnection.ping();
     const redisReady = redisPing === 'PONG';
 
-    if (mongoReady && redisReady) {
+    if (postgresReady && redisReady) {
       return sendSuccess(res, 200, 'Service is ready', {
         ready: true,
-        mongodb: mongoReady,
+        postgres: postgresReady,
         redis: redisReady,
       });
     }
@@ -217,7 +219,7 @@ export const readinessCheck = async (req, res) => {
       message: 'Service not ready',
       data: {
         ready: false,
-        mongodb: mongoReady,
+        postgres: postgresReady,
         redis: redisReady,
       },
     });

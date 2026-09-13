@@ -3,30 +3,27 @@
  *
  * Runs compliance checks across all workspaces and sends email alerts to
  * workspace owners when thresholds are breached. Deduplication via the
- * Workspace.alertsSentAt map prevents repeated alerts within 20 hours.
+ * workspace alertsSentAt JSONB map prevents repeated alerts within 20 hours.
  *
- * Checks:
- *  - Certification expiry (90 / 30 / 7 day warnings)
- *  - Contract renewal (60 days before contractEnd)
- *  - Annual review overdue (nextReviewDate < now)
- *  - Assessment overdue (no complete assessment in 12 months)
+ * RTV-49: migrated off Mongoose — all data access via the Drizzle repos. Runs in the
+ * monitoring worker (no request tenant context); the workspace/assessment queries here
+ * are explicit cross-workspace/org (unscoped) reads.
  */
 
-import { WorkspaceMember } from '../models/WorkspaceMember.js';
-import { User } from '../models/User.js';
-import { workspaceRepository, assessmentRepository } from '../repositories/index.js';
+import {
+  workspaceRepository,
+  assessmentRepository,
+  workspaceMemberRepository,
+  organizationRepository,
+  userRepository,
+} from '../repositories/index.js';
+import { safeDecrypt } from '../utils/security/fieldEncryption.js';
 import emailService from './emailService.js';
 import logger from '../config/logger.js';
 
 const DEDUP_WINDOW_MS = 20 * 60 * 60 * 1000; // 20 hours
-// DORA Art 28(4)/29 concentration alert threshold: a provider supporting this many
-// critical/important functions (weighted) is flagged. Tunable per deployment.
 const CONCENTRATION_FN_THRESHOLD = Number(process.env.CONCENTRATION_ALERT_THRESHOLD || 3);
 
-/**
- * Orchestrator — runs all 4 checks in parallel (allSettled so one failure
- * does not block the others).
- */
 export async function runMonitoringAlerts() {
   logger.info('Starting monitoring alert checks', { service: 'alertMonitor' });
 
@@ -37,41 +34,17 @@ export async function runMonitoringAlerts() {
     checkAssessmentOverdue(),
     checkConcentrationRisk(),
   ]);
-  if (results[4]?.status === 'rejected')
-    logger.error('Concentration risk check failed', {
-      error: results[4].reason?.message,
-      service: 'alertMonitor',
-    });
-
-  const [certs, contracts, reviews, assessments] = results;
-  if (certs.status === 'rejected')
-    logger.error('Cert expiry check failed', {
-      error: certs.reason?.message,
-      service: 'alertMonitor',
-    });
-  if (contracts.status === 'rejected')
-    logger.error('Contract renewal check failed', {
-      error: contracts.reason?.message,
-      service: 'alertMonitor',
-    });
-  if (reviews.status === 'rejected')
-    logger.error('Annual review check failed', {
-      error: reviews.reason?.message,
-      service: 'alertMonitor',
-    });
-  if (assessments.status === 'rejected')
-    logger.error('Assessment overdue check failed', {
-      error: assessments.reason?.message,
-      service: 'alertMonitor',
-    });
+  const labels = ['Cert expiry', 'Contract renewal', 'Annual review', 'Assessment overdue', 'Concentration risk'];
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      logger.error(`${labels[i]} check failed`, { error: r.reason?.message, service: 'alertMonitor' });
+    }
+  });
 
   logger.info('Monitoring alert checks complete', { service: 'alertMonitor' });
 }
 
-// ---------------------------------------------------------------------------
 // Check 1 — Certification expiry (90 / 30 / 7 day windows)
-// ---------------------------------------------------------------------------
-
 async function checkCertificationExpiry() {
   const workspaces = await workspaceRepository.findWithCertifications();
   const now = new Date();
@@ -80,10 +53,8 @@ async function checkCertificationExpiry() {
     for (const cert of workspace.certifications) {
       if (!cert.validUntil) continue;
 
-      const msUntilExpiry = new Date(cert.validUntil) - now;
-      const daysUntilExpiry = msUntilExpiry / (24 * 60 * 60 * 1000);
+      const daysUntilExpiry = (new Date(cert.validUntil) - now) / (24 * 60 * 60 * 1000);
 
-      // Determine which threshold applies (most urgent wins)
       let threshold = null;
       if (daysUntilExpiry > 0 && daysUntilExpiry <= 7) threshold = 7;
       else if (daysUntilExpiry > 7 && daysUntilExpiry <= 30) threshold = 30;
@@ -94,25 +65,17 @@ async function checkCertificationExpiry() {
       const alertKey = `cert-expiry-${threshold}-${cert.type}`;
       if (isWithinDedupWindow(workspace, alertKey)) continue;
 
-      const alertType = `cert-expiry-${threshold}`;
       const details = {
         certType: cert.type,
-        expiryDate: new Date(cert.validUntil).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        }),
+        expiryDate: formatDate(cert.validUntil),
       };
 
-      await sendAlertToOwners(workspace, alertType, details);
-      await workspaceRepository.updateMany(
-        { _id: workspace._id },
-        { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-      );
+      await sendAlertToOwners(workspace, `cert-expiry-${threshold}`, details);
+      await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
 
       logger.info('Cert expiry alert sent', {
         service: 'alertMonitor',
-        workspaceId: workspace._id,
+        workspaceId: workspace.id,
         certType: cert.type,
         threshold,
       });
@@ -120,10 +83,7 @@ async function checkCertificationExpiry() {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Check 2 — Contract renewal (60 days before contractEnd)
-// ---------------------------------------------------------------------------
-
 async function checkContractRenewal() {
   const now = new Date();
   const in60Days = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
@@ -134,71 +94,42 @@ async function checkContractRenewal() {
     const alertKey = 'contract-renewal-60';
     if (isWithinDedupWindow(workspace, alertKey)) continue;
 
-    const details = {
-      contractEnd: new Date(workspace.contractEnd).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    };
-
-    await sendAlertToOwners(workspace, 'contract-renewal-60', details);
-    await workspaceRepository.updateMany(
-      { _id: workspace._id },
-      { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-    );
-
-    logger.info('Contract renewal alert sent', {
-      service: 'alertMonitor',
-      workspaceId: workspace._id,
+    await sendAlertToOwners(workspace, 'contract-renewal-60', {
+      contractEnd: formatDate(workspace.contractEnd),
     });
+    await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
+
+    logger.info('Contract renewal alert sent', { service: 'alertMonitor', workspaceId: workspace.id });
   }
 }
 
-// ---------------------------------------------------------------------------
 // Check 3 — Annual review overdue (nextReviewDate < now)
-// ---------------------------------------------------------------------------
-
 async function checkAnnualReviewOverdue() {
-  const now = new Date();
-
-  const workspaces = await workspaceRepository.findDueForReview(now);
+  const workspaces = await workspaceRepository.findDueForReview(new Date());
 
   for (const workspace of workspaces) {
     const alertKey = 'annual-review-overdue';
     if (isWithinDedupWindow(workspace, alertKey)) continue;
 
-    const details = {
-      reviewDate: new Date(workspace.nextReviewDate).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    };
-
-    await sendAlertToOwners(workspace, 'annual-review-overdue', details);
-    await workspaceRepository.updateMany(
-      { _id: workspace._id },
-      { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-    );
+    await sendAlertToOwners(workspace, 'annual-review-overdue', {
+      reviewDate: formatDate(workspace.nextReviewDate),
+    });
+    await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
 
     logger.info('Annual review overdue alert sent', {
       service: 'alertMonitor',
-      workspaceId: workspace._id,
+      workspaceId: workspace.id,
     });
   }
 }
 
-// ---------------------------------------------------------------------------
 // Check 4 — Assessment overdue (no complete assessment in 12 months)
-// ---------------------------------------------------------------------------
-
 async function checkAssessmentOverdue() {
-  const workspaces = await workspaceRepository.find({});
+  const workspaces = await workspaceRepository.find();
   const twelveMonthsAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
   const perWorkspace = workspaces.map(async (workspace) => {
-    const latest = await assessmentRepository.findLatestByWorkspace(workspace._id);
+    const latest = await assessmentRepository.findLatestByWorkspace(workspace.id);
 
     const isOverdue = !latest || new Date(latest.createdAt) < twelveMonthsAgo;
     if (!isOverdue) return;
@@ -206,46 +137,29 @@ async function checkAssessmentOverdue() {
     const alertKey = 'assessment-overdue-12mo';
     if (isWithinDedupWindow(workspace, alertKey)) return;
 
-    const details = {
-      lastAssessmentDate: latest
-        ? new Date(latest.createdAt).toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })
-        : null,
-    };
-
-    await sendAlertToOwners(workspace, 'assessment-overdue-12mo', details);
-    await workspaceRepository.updateMany(
-      { _id: workspace._id },
-      { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-    );
+    await sendAlertToOwners(workspace, 'assessment-overdue-12mo', {
+      lastAssessmentDate: latest ? formatDate(latest.createdAt) : null,
+    });
+    await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
 
     logger.info('Assessment overdue alert sent', {
       service: 'alertMonitor',
-      workspaceId: workspace._id,
+      workspaceId: workspace.id,
     });
   });
 
   await Promise.allSettled(perWorkspace);
 }
 
-// ---------------------------------------------------------------------------
 // Check 5 — Concentration risk (RTV-15 P3, DORA Art 28(4)/29)
-// ---------------------------------------------------------------------------
-
 async function checkConcentrationRisk() {
-  const [{ Organization }, { analyzeOrganization }] = await Promise.all([
-    import('../models/Organization.js'),
-    import('./concentrationService.js'),
-  ]);
-  const orgs = await Organization.find({}).select('_id').lean();
+  const { analyzeOrganization } = await import('./concentrationService.js');
+  const orgs = await organizationRepository.find();
 
   const perOrg = orgs.map(async (org) => {
     let analysis;
     try {
-      analysis = await analyzeOrganization(org._id);
+      analysis = await analyzeOrganization(org.id);
     } catch {
       return; // best-effort per org
     }
@@ -259,41 +173,35 @@ async function checkConcentrationRisk() {
       const alertKey = 'concentration-risk';
       if (isWithinDedupWindow(workspace, alertKey)) continue;
       await sendAlertToOwners(workspace, alertKey, { supportedFunctions: p.supportedFunctions });
-      await workspaceRepository.updateMany(
-        { _id: workspace._id },
-        { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-      );
+      await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
       logger.info('Concentration risk alert sent', {
-        service: 'alertMonitor', workspaceId, supportedFunctions: p.supportedFunctions,
+        service: 'alertMonitor',
+        workspaceId,
+        supportedFunctions: p.supportedFunctions,
       });
     }
 
     // (b) single points of failure on a CRITICAL function → alert the sole provider's owners
     for (const spof of analysis.singlePointsOfFailure || []) {
       if (spof.criticality !== 'critical') continue;
-      const workspace = await workspaceRepository.findOne({
-        organizationId: org._id, name: spof.soleProvider,
-      });
+      const workspace = await workspaceRepository.findByOrgAndName(org.id, spof.soleProvider);
       if (!workspace) continue;
       const alertKey = `spof:${spof.functionId}`;
       if (isWithinDedupWindow(workspace, alertKey)) continue;
-      await sendAlertToOwners(workspace, 'single-point-of-failure', { functionName: spof.functionName });
-      await workspaceRepository.updateMany(
-        { _id: workspace._id },
-        { $set: { [`alertsSentAt.${alertKey}`]: new Date() } }
-      );
+      await sendAlertToOwners(workspace, 'single-point-of-failure', {
+        functionName: spof.functionName,
+      });
+      await workspaceRepository.setAlertSentAt(workspace.id, alertKey);
       logger.info('SPOF alert sent', {
-        service: 'alertMonitor', workspaceId: workspace._id, functionName: spof.functionName,
+        service: 'alertMonitor',
+        workspaceId: workspace.id,
+        functionName: spof.functionName,
       });
     }
   });
 
   await Promise.allSettled(perOrg);
 }
-
-// ---------------------------------------------------------------------------
-// Exported function — called by monitoringWorker for delayed review-reminder jobs
-// ---------------------------------------------------------------------------
 
 /**
  * Sends a 30-day review reminder to all workspace owners.
@@ -306,49 +214,35 @@ export async function sendReviewReminderAlert(workspaceId) {
     return;
   }
 
-  const details = {
-    reviewDate: workspace.nextReviewDate
-      ? new Date(workspace.nextReviewDate).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })
-      : 'soon',
-  };
-
-  await sendAlertToOwners(workspace, 'review-due-30', details);
+  await sendAlertToOwners(workspace, 'review-due-30', {
+    reviewDate: workspace.nextReviewDate ? formatDate(workspace.nextReviewDate) : 'soon',
+  });
   logger.info('Review reminder sent', { service: 'alertMonitor', workspaceId });
 }
 
-// ---------------------------------------------------------------------------
 // Shared helpers
-// ---------------------------------------------------------------------------
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 function isWithinDedupWindow(workspace, alertKey) {
-  const alertsSentAt = workspace.alertsSentAt;
-  // alertsSentAt may be a Mongoose Map (has .get()) or a plain object (lean result)
-  const lastSent =
-    alertsSentAt instanceof Map ? alertsSentAt.get(alertKey) : alertsSentAt?.[alertKey];
+  const lastSent = workspace.alertsSentAt?.[alertKey];
   if (!lastSent) return false;
   return Date.now() - new Date(lastSent).getTime() < DEDUP_WINDOW_MS;
 }
 
 async function sendAlertToOwners(workspace, alertType, details) {
-  const members = await WorkspaceMember.find({
-    workspaceId: workspace._id,
-    role: 'owner',
-    status: 'active',
-  }).populate('userId', 'email name notificationPreferences');
+  const members = await workspaceMemberRepository.findOwnersWithUser(workspace.id);
 
   for (const member of members) {
-    const user = member.userId;
+    const user = member.user;
     if (!user?.email) continue;
     if (user.notificationPreferences?.email?.system_alert === false) continue;
 
     try {
       await emailService.sendMonitoringAlert({
         toEmail: user.email,
-        toName: user.name,
+        toName: safeDecrypt(user.name),
         workspaceName: workspace.name,
         alertType,
         details,
@@ -356,8 +250,8 @@ async function sendAlertToOwners(workspace, alertType, details) {
     } catch (err) {
       logger.error('Failed to send monitoring alert email', {
         service: 'alertMonitor',
-        userId: user._id,
-        workspaceId: workspace._id,
+        userId: user.id,
+        workspaceId: workspace.id,
         alertType,
         error: err.message,
       });
@@ -365,37 +259,27 @@ async function sendAlertToOwners(workspace, alertType, details) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Weekly Digest — summary email sent once per week to workspace owners
-// ---------------------------------------------------------------------------
-
 export async function runWeeklyDigest() {
   logger.info('Starting weekly digest run', { service: 'alertMonitor' });
 
-  const ownerGroups = await WorkspaceMember.aggregate([
-    { $match: { role: 'owner', status: 'active' } },
-    { $group: { _id: '$userId', workspaceIds: { $push: '$workspaceId' } } },
-  ]);
+  const ownerGroups = await workspaceMemberRepository.groupOwnerWorkspaces();
 
   let sent = 0;
-  for (const { _id: userId, workspaceIds } of ownerGroups) {
+  for (const { userId, workspaceIds } of ownerGroups) {
     try {
-      const user = await User.findById(userId).select('email name notificationPreferences').lean();
-
+      const user = await userRepository.findById(userId); // sanitized: email, decrypted name, prefs
       if (!user) continue;
       if (user.notificationPreferences?.email?.weekly_digest === false) continue;
 
-      const workspaces = await workspaceRepository.find(
-        { _id: { $in: workspaceIds } },
-        { select: 'workspaceName name nextReviewDate _id' }
-      );
+      const workspaces = await workspaceRepository.findByIds(workspaceIds);
       if (!workspaces.length) continue;
 
       const cutoff30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
       const items = await Promise.all(
         workspaces.map(async (ws) => {
-          const score = await assessmentRepository.getComplianceScore(ws._id);
+          const score = await assessmentRepository.getComplianceScore(ws.id);
           const reviewDue =
             ws.nextReviewDate && new Date(ws.nextReviewDate) < cutoff30
               ? new Date(ws.nextReviewDate).toLocaleDateString('en-GB', {
@@ -405,8 +289,8 @@ export async function runWeeklyDigest() {
                 })
               : null;
           return {
-            workspaceId: ws._id.toString(),
-            workspaceName: ws.workspaceName || ws.name,
+            workspaceId: ws.id.toString(),
+            workspaceName: ws.name,
             score: score?.score ?? null,
             trend: score?.trend ?? 0,
             status: score?.status ?? null,

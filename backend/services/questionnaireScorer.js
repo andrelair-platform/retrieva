@@ -8,7 +8,7 @@
  */
 
 import { createLLM } from '../config/llmProvider.js';
-import { VendorQuestionnaire } from '../models/VendorQuestionnaire.js';
+import { vendorQuestionnaireRepository } from '../repositories/drizzle/VendorQuestionnaireRepository.js';
 import logger from '../config/logger.js';
 
 const SYSTEM_PROMPT = `You are a DORA (Digital Operational Resilience Act) compliance expert assessing vendor questionnaire responses on behalf of a financial entity. Your role is to score each vendor answer objectively and identify compliance gaps.`;
@@ -116,7 +116,8 @@ Write a 3-5 sentence executive summary of this vendor's DORA compliance posture.
  * @param {object} [job] - BullMQ job (optional, for progress updates)
  */
 export async function runScoring(questionnaireId, job) {
-  const questionnaire = await VendorQuestionnaire.findById(questionnaireId);
+  // Worker path (no request tenant context) → explicit unscoped by-id lookup.
+  const questionnaire = await vendorQuestionnaireRepository.findByIdUnscoped(questionnaireId);
 
   if (!questionnaire) {
     throw new Error(`VendorQuestionnaire not found: ${questionnaireId}`);
@@ -179,16 +180,18 @@ export async function runScoring(questionnaireId, job) {
 
   const categories = [...new Set(questionnaire.questions.map((q) => q.category))];
 
-  questionnaire.results = {
-    summary,
-    domainsAnalyzed: categories,
-    generatedAt: new Date(),
-  };
-
-  questionnaire.status = 'complete';
-  questionnaire.statusMessage = 'Scoring complete';
-
-  await questionnaire.save();
+  // Persist the mutated questions + score + results (unscoped — worker path).
+  await vendorQuestionnaireRepository.updateByIdUnscoped(questionnaireId, {
+    questions: questionnaire.questions,
+    overallScore,
+    results: {
+      summary,
+      domainsAnalyzed: categories,
+      generatedAt: new Date().toISOString(),
+    },
+    status: 'complete',
+    statusMessage: 'Scoring complete',
+  });
 
   if (job) await job.updateProgress(95);
 

@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
 
 process.env.NODE_ENV = 'test';
 
@@ -47,8 +46,8 @@ import { setRiskDecision, setClauseSignoff } from '../../controllers/assessmentC
 // Helpers
 // ---------------------------------------------------------------------------
 
-const WORKSPACE_OID = new mongoose.Types.ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb');
-const ASSESSMENT_OID = new mongoose.Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
+const WORKSPACE_OID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const ASSESSMENT_OID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function makeReqRes(bodyOverrides = {}, paramOverrides = {}) {
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };

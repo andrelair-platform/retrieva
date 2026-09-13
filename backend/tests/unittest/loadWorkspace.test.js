@@ -17,16 +17,12 @@ vi.mock('../../config/logger.js', () => ({
   },
 }));
 
-vi.mock('../../models/Workspace.js', () => ({
-  Workspace: {
-    findById: vi.fn(),
-  },
+vi.mock('../../repositories/drizzle/WorkspaceRepository.js', () => ({
+  workspaceRepository: { findById: vi.fn() },
 }));
 
-vi.mock('../../models/WorkspaceMember.js', () => ({
-  WorkspaceMember: {
-    findOne: vi.fn(),
-  },
+vi.mock('../../repositories/drizzle/WorkspaceMemberRepository.js', () => ({
+  workspaceMemberRepository: { findMembership: vi.fn() },
 }));
 
 vi.mock('../../utils/index.js', () => ({
@@ -36,8 +32,8 @@ vi.mock('../../utils/index.js', () => ({
 }));
 
 import { loadWorkspace, loadWorkspaceSafe } from '../../middleware/loadWorkspace.js';
-import { Workspace } from '../../models/Workspace.js';
-import { WorkspaceMember } from '../../models/WorkspaceMember.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,7 +50,7 @@ const OTHER_USER_ID = 'user-other-456';
 const WORKSPACE_ID = 'workspace-abc';
 
 const mockWorkspace = {
-  _id: WORKSPACE_ID,
+  id: WORKSPACE_ID,
   userId: { toString: () => OWNER_ID },
   name: 'Test Workspace',
 };
@@ -99,7 +95,7 @@ describe('loadWorkspace middleware', () => {
   });
 
   it('returns 404 when workspace does not exist', async () => {
-    Workspace.findById.mockResolvedValue(null);
+    workspaceRepository.findById.mockResolvedValue(null);
     await loadWorkspace(req, res, next);
     expect(res.status).toHaveBeenCalledWith(404);
     expect(next).not.toHaveBeenCalled();
@@ -107,8 +103,8 @@ describe('loadWorkspace middleware', () => {
 
   it('returns 403 when user is neither owner nor active member', async () => {
     req.user = { userId: OTHER_USER_ID };
-    Workspace.findById.mockResolvedValue(mockWorkspace);
-    WorkspaceMember.findOne.mockResolvedValue(null);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(null);
 
     await loadWorkspace(req, res, next);
 
@@ -117,8 +113,8 @@ describe('loadWorkspace middleware', () => {
   });
 
   it('calls next and sets req.workspace when user is workspace owner', async () => {
-    Workspace.findById.mockResolvedValue(mockWorkspace);
-    WorkspaceMember.findOne.mockResolvedValue(null);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(null);
 
     await loadWorkspace(req, res, next);
 
@@ -130,8 +126,8 @@ describe('loadWorkspace middleware', () => {
 
   it('calls next and sets req.workspace when user is an active member', async () => {
     req.user = { userId: OTHER_USER_ID };
-    Workspace.findById.mockResolvedValue(mockWorkspace);
-    WorkspaceMember.findOne.mockResolvedValue(mockMembership);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(mockMembership);
 
     await loadWorkspace(req, res, next);
 
@@ -143,8 +139,8 @@ describe('loadWorkspace middleware', () => {
 
   it('calls next when user is both owner and member', async () => {
     const ownerMembership = { ...mockMembership, userId: OWNER_ID };
-    Workspace.findById.mockResolvedValue(mockWorkspace);
-    WorkspaceMember.findOne.mockResolvedValue(ownerMembership);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(ownerMembership);
 
     await loadWorkspace(req, res, next);
 
@@ -153,16 +149,12 @@ describe('loadWorkspace middleware', () => {
   });
 
   it('queries WorkspaceMember with correct filter', async () => {
-    Workspace.findById.mockResolvedValue(mockWorkspace);
-    WorkspaceMember.findOne.mockResolvedValue(mockMembership);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(mockMembership);
 
     await loadWorkspace(req, res, next);
 
-    expect(WorkspaceMember.findOne).toHaveBeenCalledWith({
-      workspaceId: WORKSPACE_ID,
-      userId: OWNER_ID,
-      status: 'active',
-    });
+    expect(workspaceMemberRepository.findMembership).toHaveBeenCalledWith(WORKSPACE_ID, OWNER_ID);
   });
 });
 
@@ -191,28 +183,17 @@ describe('loadWorkspaceSafe middleware', () => {
   });
 
   it('returns 404 when workspace does not exist', async () => {
-    const selectMock = vi.fn().mockResolvedValue(null);
-    Workspace.findById.mockReturnValue({ select: selectMock });
+    workspaceRepository.findById.mockResolvedValue(null);
 
     await loadWorkspaceSafe(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  it('queries workspace with select("-accessToken")', async () => {
-    const selectMock = vi.fn().mockResolvedValue(null);
-    Workspace.findById.mockReturnValue({ select: selectMock });
-
-    await loadWorkspaceSafe(req, res, next);
-
-    expect(selectMock).toHaveBeenCalledWith('-accessToken');
-  });
-
   it('returns 403 when user has no access', async () => {
-    const selectMock = vi.fn().mockResolvedValue(mockWorkspace);
-    Workspace.findById.mockReturnValue({ select: selectMock });
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
     req.user = { userId: OTHER_USER_ID };
-    WorkspaceMember.findOne.mockResolvedValue(null);
+    workspaceMemberRepository.findMembership.mockResolvedValue(null);
 
     await loadWorkspaceSafe(req, res, next);
 
@@ -220,9 +201,8 @@ describe('loadWorkspaceSafe middleware', () => {
   });
 
   it('calls next and attaches workspace when owner accesses', async () => {
-    const selectMock = vi.fn().mockResolvedValue(mockWorkspace);
-    Workspace.findById.mockReturnValue({ select: selectMock });
-    WorkspaceMember.findOne.mockResolvedValue(null);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(null);
 
     await loadWorkspaceSafe(req, res, next);
 
@@ -233,9 +213,8 @@ describe('loadWorkspaceSafe middleware', () => {
 
   it('calls next when user is an active member', async () => {
     req.user = { userId: OTHER_USER_ID };
-    const selectMock = vi.fn().mockResolvedValue(mockWorkspace);
-    Workspace.findById.mockReturnValue({ select: selectMock });
-    WorkspaceMember.findOne.mockResolvedValue(mockMembership);
+    workspaceRepository.findById.mockResolvedValue(mockWorkspace);
+    workspaceMemberRepository.findMembership.mockResolvedValue(mockMembership);
 
     await loadWorkspaceSafe(req, res, next);
 

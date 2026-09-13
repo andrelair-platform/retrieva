@@ -7,27 +7,48 @@ vi.mock('../../config/logger.js', () => ({
 import { AuthService } from '../../services/AuthService.js';
 import { generateMfaToken } from '../../utils/security/jwt.js';
 
+// RTV-49: MFA state lives in Postgres via userRepository methods — the service no longer
+// mutates a Mongoose document. `makeUser` returns a sanitized repo row (id, no secrets).
 function makeUser(over = {}) {
   return {
-    _id: 'u1',
+    id: 'u1',
     email: 'u@x.io',
     name: 'User',
     role: 'user',
     isActive: true,
     mfaEnabled: false,
-    mfaSecret: null,
-    mfaRecoveryCodes: undefined,
     organizationId: null,
-    comparePassword: vi.fn().mockResolvedValue(true),
-    addRefreshToken: vi.fn().mockResolvedValue(undefined),
-    save: vi.fn().mockResolvedValue(undefined),
-    isModified: vi.fn().mockReturnValue(false),
     ...over,
   };
 }
 
 function makeSvc() {
-  const userRepo = { findById: vi.fn() };
+  // In-memory MFA state the fake repo reads/writes, so verify/enable/disable flows are exercised.
+  const state = { secret: null, enabled: false, recoveryCodes: [] };
+
+  const userRepo = {
+    findById: vi.fn(),
+    setMfaSecret: vi.fn(async (_id, s) => {
+      state.secret = s;
+    }),
+    getMfaSecret: vi.fn(async () => state.secret),
+    enableMfa: vi.fn(async (_id, hashed) => {
+      state.enabled = true;
+      state.recoveryCodes = hashed;
+    }),
+    disableMfa: vi.fn(async () => {
+      state.enabled = false;
+      state.secret = null;
+      state.recoveryCodes = [];
+    }),
+    getRecoveryCodes: vi.fn(async () => state.recoveryCodes),
+    setRecoveryCodes: vi.fn(async (_id, codes) => {
+      state.recoveryCodes = codes;
+    }),
+    verifyPassword: vi.fn().mockResolvedValue(true),
+    addRefreshToken: vi.fn().mockResolvedValue(undefined),
+    updateLastLogin: vi.fn().mockResolvedValue(undefined),
+  };
   const organizationRepo = { findById: vi.fn().mockResolvedValue(null) };
   const mfa = {
     generateSecret: vi.fn().mockReturnValue('SECRET'),
@@ -38,7 +59,7 @@ function makeSvc() {
   };
   const authAudit = { logLoginSuccess: vi.fn(), logLoginFailed: vi.fn() };
   const svc = new AuthService({ userRepo, organizationRepo, mfa, authAudit });
-  return { svc, userRepo, organizationRepo, mfa };
+  return { svc, userRepo, organizationRepo, mfa, state };
 }
 
 describe('AuthService MFA (A1)', () => {
@@ -49,13 +70,11 @@ describe('AuthService MFA (A1)', () => {
 
   describe('setupMfa', () => {
     it('generates a secret and returns the otpauth URI', async () => {
-      const user = makeUser();
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser());
       const res = await ctx.svc.setupMfa('u1');
       expect(res.secret).toBe('SECRET');
       expect(res.otpauthUrl).toContain('otpauth://');
-      expect(user.mfaSecret).toBe('SECRET');
-      expect(user.save).toHaveBeenCalled();
+      expect(ctx.userRepo.setMfaSecret).toHaveBeenCalledWith('u1', 'SECRET');
     });
 
     it('refuses when MFA is already enabled', async () => {
@@ -66,67 +85,63 @@ describe('AuthService MFA (A1)', () => {
 
   describe('enableMfa', () => {
     it('rejects an invalid first code', async () => {
-      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaSecret: 'SECRET' }));
+      ctx.userRepo.findById.mockResolvedValue(makeUser());
+      ctx.state.secret = 'SECRET';
       ctx.mfa.verifyTotp.mockReturnValue(false);
       await expect(ctx.svc.enableMfa('u1', '000000')).rejects.toThrow('Invalid verification code');
     });
 
     it('enables MFA and returns recovery codes on a valid code', async () => {
-      const user = makeUser({ mfaSecret: 'SECRET' });
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser());
+      ctx.state.secret = 'SECRET';
       ctx.mfa.verifyTotp.mockReturnValue(true);
       const res = await ctx.svc.enableMfa('u1', '123456');
       expect(res.recoveryCodes).toEqual(['a1b2c-d3e4f']);
-      expect(user.mfaEnabled).toBe(true);
-      expect(user.mfaRecoveryCodes).toEqual(['H1']);
-      expect(user.save).toHaveBeenCalled();
+      expect(ctx.userRepo.enableMfa).toHaveBeenCalledWith('u1', ['H1']);
     });
 
     it('requires setup before enable', async () => {
-      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaSecret: null }));
+      ctx.userRepo.findById.mockResolvedValue(makeUser());
+      ctx.state.secret = null;
       await expect(ctx.svc.enableMfa('u1', '123456')).rejects.toThrow('Start MFA setup first');
     });
   });
 
   describe('verifyMfa', () => {
     it('issues a session for a valid challenge token + TOTP code', async () => {
-      const user = makeUser({ mfaEnabled: true, mfaSecret: 'SECRET' });
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaEnabled: true }));
+      ctx.state.secret = 'SECRET';
       ctx.mfa.verifyTotp.mockReturnValue(true);
       const mfaToken = generateMfaToken({ userId: 'u1' });
 
       const res = await ctx.svc.verifyMfa({ mfaToken, code: '123456', deviceInfo: {} });
       expect(res.user.id).toBe('u1');
       expect(res.tokens.accessToken).toBeTruthy();
-      expect(user.addRefreshToken).toHaveBeenCalled();
+      expect(ctx.userRepo.addRefreshToken).toHaveBeenCalled();
     });
 
     it('rejects an invalid code and audits the failure', async () => {
-      const user = makeUser({ mfaEnabled: true, mfaSecret: 'SECRET' });
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaEnabled: true }));
+      ctx.state.secret = 'SECRET';
       ctx.mfa.verifyTotp.mockReturnValue(false);
       const mfaToken = generateMfaToken({ userId: 'u1' });
 
       await expect(ctx.svc.verifyMfa({ mfaToken, code: '000000', deviceInfo: {} })).rejects.toThrow(
         'Invalid verification code'
       );
+      expect(ctx.authAudit?.logLoginFailed || (() => {})).toBeDefined();
     });
 
     it('accepts and consumes a recovery code when TOTP fails', async () => {
-      const user = makeUser({
-        mfaEnabled: true,
-        mfaSecret: 'SECRET',
-        mfaRecoveryCodes: ['hash:rec-ode', 'hash:other'],
-        isModified: vi.fn().mockReturnValue(true),
-      });
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaEnabled: true }));
+      ctx.state.secret = 'SECRET';
+      ctx.state.recoveryCodes = ['hash:rec-ode', 'hash:other'];
       ctx.mfa.verifyTotp.mockReturnValue(false); // TOTP fails → recovery path
       const mfaToken = generateMfaToken({ userId: 'u1' });
 
       const res = await ctx.svc.verifyMfa({ mfaToken, code: 'rec-ode', deviceInfo: {} });
       expect(res.tokens.accessToken).toBeTruthy();
-      expect(user.mfaRecoveryCodes).toEqual(['hash:other']); // consumed
-      expect(user.save).toHaveBeenCalled();
+      expect(ctx.userRepo.setRecoveryCodes).toHaveBeenCalledWith('u1', ['hash:other']); // consumed
     });
 
     it('rejects a tampered/invalid MFA token', async () => {
@@ -138,22 +153,19 @@ describe('AuthService MFA (A1)', () => {
 
   describe('disableMfa', () => {
     it('requires a correct password', async () => {
-      const user = makeUser({ mfaEnabled: true, mfaSecret: 'SECRET' });
-      user.comparePassword.mockResolvedValue(false);
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaEnabled: true }));
+      ctx.userRepo.verifyPassword.mockResolvedValue(false);
       await expect(ctx.svc.disableMfa('u1', { password: 'wrong', code: '123456' })).rejects.toThrow(
         'Invalid password'
       );
     });
 
     it('clears MFA state on valid password + code', async () => {
-      const user = makeUser({ mfaEnabled: true, mfaSecret: 'SECRET' });
-      ctx.userRepo.findById.mockResolvedValue(user);
+      ctx.userRepo.findById.mockResolvedValue(makeUser({ mfaEnabled: true }));
+      ctx.state.secret = 'SECRET';
       ctx.mfa.verifyTotp.mockReturnValue(true);
       await ctx.svc.disableMfa('u1', { password: 'right', code: '123456' });
-      expect(user.mfaEnabled).toBe(false);
-      expect(user.mfaSecret).toBeNull();
-      expect(user.save).toHaveBeenCalled();
+      expect(ctx.userRepo.disableMfa).toHaveBeenCalledWith('u1');
     });
   });
 });

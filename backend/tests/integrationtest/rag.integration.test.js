@@ -9,10 +9,10 @@
  * - Authorization
  */
 
+import { randomUUID } from 'crypto';
+import { sql } from 'drizzle-orm';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import supertest from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Set test environment - ALL required environment variables BEFORE any imports
 process.env.NODE_ENV = 'test';
@@ -112,10 +112,21 @@ vi.mock('../../services/authAuditService.js', () => ({
 }));
 
 import app from '../../app.js';
+import { setupTestDatabase, cleanupTestDatabase } from './setup.js';
+import { getDb } from '../../config/db.js';
+import { userRepository } from '../../repositories/drizzle/UserRepository.js';
+import { workspaceRepository } from '../../repositories/drizzle/WorkspaceRepository.js';
+import { workspaceMemberRepository } from '../../repositories/drizzle/WorkspaceMemberRepository.js';
+
+/** Register-flow helper: mark a user's email verified via the repo. */
+async function markVerified(email) {
+  const u = await userRepository.findByEmail(email);
+  if (u) await userRepository.markEmailVerified(u.id);
+  return u;
+}
 
 describe('RAG API Integration Tests', () => {
   let request;
-  let mongoServer;
   const API_BASE = '/api/v1';
   const AUTH_BASE = '/api/v1/auth';
 
@@ -132,65 +143,42 @@ describe('RAG API Integration Tests', () => {
   let conversationId;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create({
-      instance: { launchTimeout: 60000 },
-    });
-    const mongoUri = mongoServer.getUri();
-    process.env.MONGODB_URI = mongoUri;
-
-    await mongoose.connect(mongoUri);
+    await setupTestDatabase();
     request = supertest(app);
 
-    // Register and login user
+    // Register + verify + login user
     await request.post(`${AUTH_BASE}/register`).send(testUser);
-    const User = mongoose.model('User');
-    const user = await User.findOneAndUpdate(
-      { email: testUser.email },
-      { $set: { isEmailVerified: true, isActive: true } },
-      { new: true }
-    );
-    userId = user._id;
+    const user = await markVerified(testUser.email);
+    userId = user.id;
 
     const loginRes = await request
       .post(`${AUTH_BASE}/login`)
       .send({ email: testUser.email, password: testUser.password });
     userToken = loginRes.body.data.accessToken;
 
-    // Create workspace
-    const Workspace = mongoose.model('Workspace');
-    const workspace = await Workspace.create({
+    // Create workspace + owner membership
+    const workspace = await workspaceRepository.create({
       name: 'RAG Test Workspace',
-      userId: userId,
+      userId,
       syncStatus: 'synced',
     });
-    workspaceId = workspace._id.toString();
+    workspaceId = workspace.id.toString();
 
-    // Create workspace member
-    const WorkspaceMember = mongoose.model('WorkspaceMember');
-    await WorkspaceMember.create({
-      workspaceId: workspace._id,
-      userId: userId,
+    await workspaceMemberRepository.create({
+      workspaceId: workspace.id,
+      userId,
       role: 'owner',
       status: 'active',
-      permissions: {
-        canQuery: true,
-        canManageMembers: true,
-        canManageSettings: true,
-      },
+      permissions: { canQuery: true, canViewSources: true, canInvite: true },
     });
-  }, 30000);
+  }, 60000);
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    await cleanupTestDatabase();
   });
 
   beforeEach(async () => {
-    // Clear only conversation and message collections
-    const Conversation = mongoose.model('Conversation');
-    const Message = mongoose.model('Message');
-    await Conversation.deleteMany({});
-    await Message.deleteMany({});
+    await getDb().execute(sql`truncate table messages, conversations restart identity cascade`);
 
     // Create a fresh conversation for each test
     const createConvRes = await request
@@ -200,7 +188,7 @@ describe('RAG API Integration Tests', () => {
       .send({ title: 'Test Conversation' });
 
     if (createConvRes.status === 201 && createConvRes.body.data) {
-      conversationId = createConvRes.body.data.conversation._id;
+      conversationId = createConvRes.body.data.conversation.id;
     }
   });
 
@@ -252,11 +240,7 @@ describe('RAG API Integration Tests', () => {
         name: 'No Access',
       };
       await request.post(`${AUTH_BASE}/register`).send(newUser);
-      const User = mongoose.model('User');
-      await User.updateOne(
-        { email: newUser.email },
-        { $set: { isEmailVerified: true, isActive: true } }
-      );
+      await markVerified(newUser.email);
       const loginRes = await request
         .post(`${AUTH_BASE}/login`)
         .send({ email: newUser.email, password: newUser.password });
@@ -420,7 +404,7 @@ describe('RAG API Integration Tests', () => {
         .set('X-Workspace-Id', workspaceId.toString())
         .send({
           question: 'What is this?',
-          conversationId: new mongoose.Types.ObjectId().toString(), // Non-existent
+          conversationId: randomUUID(), // Non-existent
         });
 
       // Should return error without exposing internals
@@ -443,22 +427,14 @@ describe('RAG API Integration Tests', () => {
         name: 'Other User',
       };
       await request.post(`${AUTH_BASE}/register`).send(otherUser);
-      const User = mongoose.model('User');
-      const otherUserDoc = await User.findOneAndUpdate(
-        { email: otherUser.email },
-        { $set: { isEmailVerified: true, isActive: true } },
-        { new: true }
-      );
+      const otherUserDoc = await markVerified(otherUser.email);
 
-      // Add to workspace using WorkspaceMember (correct model)
-      const WorkspaceMember = mongoose.model('WorkspaceMember');
-
-      await WorkspaceMember.create({
-        workspaceId: workspaceId,
-        userId: otherUserDoc._id,
+      await workspaceMemberRepository.create({
+        workspaceId,
+        userId: otherUserDoc.id,
         role: 'member',
         status: 'active',
-        permissions: { canQuery: true, canManageMembers: false, canManageSettings: false },
+        permissions: { canQuery: true, canViewSources: true, canInvite: false },
       });
 
       const loginRes = await request
@@ -515,7 +491,7 @@ describe('RAG API Integration Tests', () => {
     });
 
     it('should reject for non-existent conversation', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
+      const fakeId = randomUUID();
 
       const res = await request
         .post(`${API_BASE}/conversations/${fakeId}/ask`)

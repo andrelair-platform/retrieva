@@ -4,7 +4,7 @@
  * membership at the service layer. `certifications` is a JSONB array → the cert queries
  * use jsonb operators. Additive; not wired yet.
  */
-import { and, eq, gte, lte, isNotNull, sql, desc } from 'drizzle-orm';
+import { and, eq, gte, lte, isNotNull, inArray, sql, desc } from 'drizzle-orm';
 import { BaseDrizzleRepository } from './BaseDrizzleRepository.js';
 import { workspaces } from '../../db/schema/index.js';
 
@@ -53,6 +53,24 @@ export class WorkspaceRepository extends BaseDrizzleRepository {
 
   async setNextReviewDate(id, nextReviewDate) {
     return this.updateById(id, { nextReviewDate });
+  }
+
+  async findByOrgAndName(organizationId, name) {
+    return this.findOne(
+      and(eq(workspaces.organizationId, organizationId), eq(workspaces.name, name))
+    );
+  }
+
+  async findByIds(ids) {
+    if (!ids || ids.length === 0) return [];
+    return this.find(inArray(workspaces.id, ids.map(String)));
+  }
+
+  /** Merge one key into the alertsSentAt JSONB map (dedup bookkeeping). */
+  async setAlertSentAt(workspaceId, alertKey, date = new Date()) {
+    return this.updateById(workspaceId, {
+      alertsSentAt: sql`coalesce(${workspaces.alertsSentAt}, '{}'::jsonb) || jsonb_build_object(${alertKey}::text, to_jsonb(${date.toISOString()}::text))`,
+    });
   }
 }
 
