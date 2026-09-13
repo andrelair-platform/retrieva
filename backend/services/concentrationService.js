@@ -9,6 +9,10 @@
  * without a DB; analyzeOrganization is the thin data-loading wrapper.
  */
 
+import { workspaceRepository } from '../repositories/drizzle/WorkspaceRepository.js';
+import { criticalFunctionRepository } from '../repositories/drizzle/CriticalFunctionRepository.js';
+import { providerGraphRepository } from '../repositories/drizzle/ProviderGraphRepository.js';
+import { assessmentRepository } from '../repositories/drizzle/AssessmentRepository.js';
 import logger from '../config/logger.js';
 
 const CRITICALITY_WEIGHT = { critical: 2, important: 1 };
@@ -150,33 +154,32 @@ export function computeConcentration({ providers = [], criticalFunctions = [], e
  * is in computeConcentration (pure). Injectable deps for testing.
  */
 export async function analyzeOrganization(organizationId, deps = {}) {
-  const { Workspace, CriticalFunction, ProviderDependency } = deps.models || (await loadModels());
+  const wsRepo = deps.workspaceRepo || workspaceRepository;
+  const cfRepo = deps.criticalFunctionRepo || criticalFunctionRepository;
+  const graphRepo = deps.providerGraphRepo || providerGraphRepository;
+
   const [workspaces, cfs, edges] = await Promise.all([
-    Workspace.find({ organizationId }).lean(),
-    CriticalFunction.find({ organizationId }).lean(),
-    ProviderDependency.find({ organizationId, confirmed: true }).lean(),
+    wsRepo.findByOrganization(organizationId),
+    cfRepo.listByOrg(organizationId),
+    graphRepo.loadConfirmedEdges(organizationId),
   ]);
   logger.info('Concentration analysis', {
-    service: 'concentration', organizationId,
-    providers: workspaces.length, criticalFunctions: cfs.length, edges: edges.length,
+    service: 'concentration',
+    organizationId,
+    providers: workspaces.length,
+    criticalFunctions: cfs.length,
+    edges: edges.length,
   });
   return computeConcentration({
-    providers: workspaces.map((w) => ({ id: String(w._id), name: w.name, tier: w.vendorTier })),
+    providers: workspaces.map((w) => ({ id: String(w.id), name: w.name, tier: w.vendorTier })),
     criticalFunctions: cfs.map((c) => ({
-      id: String(c._id), name: c.name, criticality: c.criticality,
+      id: String(c.id),
+      name: c.name,
+      criticality: c.criticality,
       dependsOn: (c.dependsOn || []).map(String),
     })),
     edges,
   });
-}
-
-async function loadModels() {
-  const [{ Workspace }, { CriticalFunction }, { ProviderDependency }] = await Promise.all([
-    import('../models/Workspace.js'),
-    import('../models/CriticalFunction.js'),
-    import('../models/ProviderDependency.js'),
-  ]);
-  return { Workspace, CriticalFunction, ProviderDependency };
 }
 
 /**
@@ -185,16 +188,22 @@ async function loadModels() {
  * dependencies + provider→sub-provider nth-party links.
  */
 export async function getGraph(organizationId, deps = {}) {
-  const { Workspace, CriticalFunction, ProviderDependency } = deps.models || (await loadModels());
+  const wsRepo = deps.workspaceRepo || workspaceRepository;
+  const cfRepo = deps.criticalFunctionRepo || criticalFunctionRepository;
+  const graphRepo = deps.providerGraphRepo || providerGraphRepository;
+
   const [workspaces, cfs, edges] = await Promise.all([
-    Workspace.find({ organizationId }).lean(),
-    CriticalFunction.find({ organizationId }).lean(),
-    ProviderDependency.find({ organizationId }).lean(),
+    wsRepo.findByOrganization(organizationId),
+    cfRepo.listByOrg(organizationId),
+    graphRepo.listDependencies(organizationId),
   ]);
   const analysis = computeConcentration({
-    providers: workspaces.map((w) => ({ id: String(w._id), name: w.name, tier: w.vendorTier })),
+    providers: workspaces.map((w) => ({ id: String(w.id), name: w.name, tier: w.vendorTier })),
     criticalFunctions: cfs.map((c) => ({
-      id: String(c._id), name: c.name, criticality: c.criticality, dependsOn: (c.dependsOn || []).map(String),
+      id: String(c.id),
+      name: c.name,
+      criticality: c.criticality,
+      dependsOn: (c.dependsOn || []).map(String),
     })),
     edges: edges.filter((e) => e.confirmed),
   });
@@ -204,20 +213,33 @@ export async function getGraph(organizationId, deps = {}) {
 
   const nodes = [
     ...cfs.map((c) => ({
-      id: `cf:${c._id}`, type: 'function', label: c.name, criticality: c.criticality,
+      id: `cf:${c.id}`,
+      type: 'function',
+      label: c.name,
+      criticality: c.criticality,
     })),
     ...workspaces.map((w) => ({
-      id: `w:${w._id}`, type: 'provider', label: w.name, tier: w.vendorTier || null,
-      concentrationScore: scoreByWs[String(w._id)] || 0,
+      id: `w:${w.id}`,
+      type: 'provider',
+      label: w.name,
+      tier: w.vendorTier || null,
+      concentrationScore: scoreByWs[String(w.id)] || 0,
     })),
   ];
   const graphEdges = [];
-  for (const c of cfs) for (const pid of c.dependsOn || []) {
-    graphEdges.push({ from: `cf:${c._id}`, to: `w:${pid}`, kind: 'depends_on' });
-  }
+  for (const c of cfs)
+    for (const pid of c.dependsOn || []) {
+      graphEdges.push({ from: `cf:${c.id}`, to: `w:${pid}`, kind: 'depends_on' });
+    }
   for (const e of edges) {
-    const from = e.parent?.kind === 'workspace' && e.parent.workspaceId ? `w:${e.parent.workspaceId}` : `x:${norm(e.parent?.name)}`;
-    const to = e.child?.kind === 'workspace' && e.child.workspaceId ? `w:${e.child.workspaceId}` : `x:${norm(e.child?.name)}`;
+    const from =
+      e.parent?.kind === 'workspace' && e.parent.workspaceId
+        ? `w:${e.parent.workspaceId}`
+        : `x:${norm(e.parent?.name)}`;
+    const to =
+      e.child?.kind === 'workspace' && e.child.workspaceId
+        ? `w:${e.child.workspaceId}`
+        : `x:${norm(e.child?.name)}`;
     if (e.child?.kind === 'external') nodes.push({ id: to, type: 'subprovider', label: e.child.name });
     graphEdges.push({ from, to, kind: 'sub_processes_via', source: e.source, confirmed: e.confirmed });
   }
@@ -230,42 +252,31 @@ export async function getGraph(organizationId, deps = {}) {
 // ── Critical Function CRUD (firm-owned governance) ───────────────────────────
 
 export async function listCriticalFunctions(organizationId, deps = {}) {
-  const { CriticalFunction } = deps.models || (await loadModels());
-  return CriticalFunction.find({ organizationId }).sort({ criticality: 1, name: 1 }).lean();
+  const cfRepo = deps.criticalFunctionRepo || criticalFunctionRepository;
+  return cfRepo.listByOrg(organizationId);
 }
 
-export async function upsertCriticalFunction(organizationId, { id, name, criticality, description, dependsOn, userId }, deps = {}) {
-  const { CriticalFunction } = deps.models || (await loadModels());
-  const doc = { organizationId, name, criticality, description: description || '', dependsOn: dependsOn || [] };
-  if (id) {
-    return CriticalFunction.findOneAndUpdate({ _id: id, organizationId }, doc, { new: true }).lean();
-  }
-  return (await CriticalFunction.create({ ...doc, createdBy: userId || '' })).toObject();
+export async function upsertCriticalFunction(organizationId, payload, deps = {}) {
+  const cfRepo = deps.criticalFunctionRepo || criticalFunctionRepository;
+  return cfRepo.upsert(organizationId, payload);
 }
 
 export async function deleteCriticalFunction(organizationId, id, deps = {}) {
-  const { CriticalFunction } = deps.models || (await loadModels());
-  return CriticalFunction.findOneAndDelete({ _id: id, organizationId }).lean();
+  const cfRepo = deps.criticalFunctionRepo || criticalFunctionRepository;
+  return cfRepo.deleteByIdAndOrg(organizationId, id);
 }
 
 // ── nth-party dependency edges ───────────────────────────────────────────────
 
 export async function listDependencies(organizationId, deps = {}) {
-  const { ProviderDependency } = deps.models || (await loadModels());
-  return ProviderDependency.find({ organizationId }).sort({ confirmed: 1, createdAt: -1 }).lean();
+  const graphRepo = deps.providerGraphRepo || providerGraphRepository;
+  return graphRepo.listDependencies(organizationId);
 }
 
 /** Confirm (or reject) an AI-extracted edge — the human-in-the-loop gate. */
 export async function setDependencyConfirmed(organizationId, id, confirmed, deps = {}) {
-  const { ProviderDependency } = deps.models || (await loadModels());
-  if (confirmed === false) {
-    return ProviderDependency.findOneAndDelete({ _id: id, organizationId }).lean();
-  }
-  return ProviderDependency.findOneAndUpdate(
-    { _id: id, organizationId },
-    { confirmed: true, lastVerifiedAt: new Date() },
-    { new: true }
-  ).lean();
+  const graphRepo = deps.providerGraphRepo || providerGraphRepository;
+  return graphRepo.setConfirmed(organizationId, id, confirmed);
 }
 
 // ── Sub-provider auto-extraction (P2) ────────────────────────────────────────
@@ -312,17 +323,24 @@ export function parseSubproviderExtraction(raw, parentName = '') {
  * @returns {Promise<{ created:number, candidates:Array }>}
  */
 export async function extractSubProvidersForWorkspace(organizationId, workspaceId, deps = {}) {
-  const models = deps.models || (await loadModels());
-  const { Workspace, ProviderDependency } = models;
-  const ws = await Workspace.findOne({ _id: workspaceId, organizationId }).lean();
-  if (!ws) throw Object.assign(new Error('Workspace not found'), { statusCode: 404 });
+  const wsRepo = deps.workspaceRepo || workspaceRepository;
+  const graphRepo = deps.providerGraphRepo || providerGraphRepository;
+  const ws = await wsRepo.findById(workspaceId);
+  if (!ws || String(ws.organizationId) !== String(organizationId)) {
+    throw Object.assign(new Error('Workspace not found'), { statusCode: 404 });
+  }
 
-  const search = deps.searchVendorDocs || (await defaultSearch(workspaceId));
+  const search = deps.searchVendorDocs || (await defaultSearch(workspaceId, deps));
   const llm = deps.llm || (await defaultLLM());
 
-  const chunks = await search('subprocessors subcontractors third-party providers cloud infrastructure data processing locations');
+  const chunks = await search(
+    'subprocessors subcontractors third-party providers cloud infrastructure data processing locations'
+  );
   if (!chunks || !chunks.length) return { created: 0, candidates: [] };
-  const context = chunks.slice(0, 12).map((c, i) => `[${i + 1}] ${c}`).join('\n\n');
+  const context = chunks
+    .slice(0, 12)
+    .map((c, i) => `[${i + 1}] ${c}`)
+    .join('\n\n');
 
   let raw = '';
   try {
@@ -332,22 +350,35 @@ export async function extractSubProvidersForWorkspace(organizationId, workspaceI
     ]);
     raw = typeof res === 'string' ? res : res?.content || '';
   } catch (e) {
-    logger.warn('Sub-provider extraction LLM call failed', { service: 'concentration', workspaceId, error: e.message });
+    logger.warn('Sub-provider extraction LLM call failed', {
+      service: 'concentration',
+      workspaceId,
+      error: e.message,
+    });
     return { created: 0, candidates: [] };
   }
 
   const candidates = parseSubproviderExtraction(raw, ws.name);
+  // Parent = the assessed workspace (a provider node); children = extracted externals.
+  const parentNode = await graphRepo.findOrCreateNode(organizationId, {
+    kind: 'workspace',
+    workspaceId,
+    name: ws.name,
+    tier: ws.vendorTier || null,
+  });
   let created = 0;
   for (const c of candidates) {
-    // idempotent: skip if an edge parent(ws)→child(name) already exists
-    const exists = await ProviderDependency.findOne({
-      organizationId, 'parent.workspaceId': workspaceId, 'child.name': c.name,
-    }).lean();
-    if (exists) continue;
-    await ProviderDependency.create({
+    const childNode = await graphRepo.findOrCreateNode(organizationId, {
+      kind: 'external',
+      name: c.name,
+      tier: null,
+    });
+    // idempotent: skip if the parent→child edge already exists
+    if (await graphRepo.edgeExists(organizationId, parentNode.id, childNode.id)) continue;
+    await graphRepo.createEdge({
       organizationId,
-      parent: { kind: 'workspace', workspaceId, name: ws.name, tier: ws.vendorTier || null },
-      child: { kind: 'external', name: c.name, tier: null },
+      parentNodeId: parentNode.id,
+      childNodeId: childNode.id,
       relationship: c.service || 'sub_processes_via',
       source: 'extracted',
       confidence: 0.7,
@@ -356,21 +387,22 @@ export async function extractSubProvidersForWorkspace(organizationId, workspaceI
     created += 1;
   }
   logger.info('Sub-provider extraction complete', {
-    service: 'concentration', workspaceId, candidates: candidates.length, created,
+    service: 'concentration',
+    workspaceId,
+    candidates: candidates.length,
+    created,
   });
   return { created, candidates };
 }
 
-async function defaultSearch(workspaceId) {
+async function defaultSearch(workspaceId, deps = {}) {
   // Find the latest complete assessment for the workspace + reuse its chunk search.
-  const [{ Assessment }, ingest] = await Promise.all([
-    import('../models/Assessment.js'),
-    import('./fileIngestionService.js'),
-  ]);
-  const a = await Assessment.findOne({ workspaceId, status: 'complete' }).sort({ createdAt: -1 }).lean();
+  const asmtRepo = deps.assessmentRepo || assessmentRepository;
+  const ingest = await import('./fileIngestionService.js');
+  const a = await asmtRepo.findLatestByWorkspace(workspaceId);
   if (!a) return async () => [];
   return async (q) => {
-    const hits = await ingest.searchAssessmentChunks(String(a._id), q, 15);
+    const hits = await ingest.searchAssessmentChunks(String(a.id), q, 15);
     return hits.map((h) => h.content);
   };
 }
