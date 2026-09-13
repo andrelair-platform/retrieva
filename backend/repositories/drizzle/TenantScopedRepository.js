@@ -90,6 +90,21 @@ export class TenantScopedRepository extends BaseDrizzleRepository {
     return row ?? null;
   }
 
+  /** Unscoped create with an EXPLICIT tenant value in `values` (bypasses context
+   *  stamping) — for services that resolve the workspace themselves + do their own authz. */
+  async createUnscoped(values) {
+    const [row] = await this.db.insert(this.table).values(values).returning();
+    return row;
+  }
+
+  async findUnscoped(where, opts) {
+    return super.find(where, opts);
+  }
+
+  async countUnscoped(where) {
+    return super.count(where);
+  }
+
   async findOne(where) {
     return super.findOne(this._scoped(where));
   }

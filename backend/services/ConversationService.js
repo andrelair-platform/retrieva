@@ -1,11 +1,16 @@
+import { and, eq, inArray, isNull, desc } from 'drizzle-orm';
 import { AppError } from '../utils/index.js';
 import { verifyOwnership } from '../utils/index.js';
 import { conversationRepository } from '../repositories/index.js';
 import { messageRepository } from '../repositories/index.js';
 import { workspaceMemberRepository } from '../repositories/index.js';
+import { conversations, messages } from '../db/schema/index.js';
 import { ragService } from './rag.js';
 import logger from '../config/logger.js';
 
+// Conversations authorise by USER (verifyOwnership), not by the active workspace, so this
+// service uses the repo's explicit unscoped ops + userId filters (RTV-49). workspaceId is a
+// nullable uuid FK now — the legacy 'default' string maps to null.
 class ConversationService {
   constructor(deps = {}) {
     this.conversationRepo = deps.conversationRepo || conversationRepository;
@@ -16,11 +21,8 @@ class ConversationService {
   }
 
   async getUserPrimaryWorkspace(userId) {
-    const membership = await this.workspaceMemberRepo.findOne(
-      { userId, status: 'active' },
-      { populate: { path: 'workspaceId', select: '_id' } }
-    );
-    return membership?.workspaceId?._id?.toString() || null;
+    const membership = await this.workspaceMemberRepo.findActiveByUserId(userId);
+    return membership?.workspaceId?.toString() || null;
   }
 
   async createConversation({ userId, title, workspaceId, idempotencyKey }) {
@@ -36,65 +38,58 @@ class ConversationService {
       }
     }
 
-    const conversationData = {
+    const values = {
       title: title || 'New Conversation',
       userId,
-      workspaceId: resolvedWorkspaceId || 'default',
+      workspaceId: resolvedWorkspaceId || null, // 'default'/absent → NULL (nullable FK)
     };
 
     if (idempotencyKey) {
-      const result = await this.conversationRepo.updateOne(
-        {
-          userId,
-          workspaceId: conversationData.workspaceId,
-          'metadata.idempotencyKey': idempotencyKey,
-        },
-        {
-          $setOnInsert: {
-            ...conversationData,
-            metadata: { idempotencyKey },
-          },
-        },
-        { upsert: true, setDefaultsOnInsert: true, rawResult: true }
+      // Idempotent: return the existing conversation for (user, workspace, key) if present.
+      const existing = await this.conversationRepo.findUnscoped(
+        and(
+          eq(conversations.userId, userId),
+          resolvedWorkspaceId
+            ? eq(conversations.workspaceId, resolvedWorkspaceId)
+            : isNull(conversations.workspaceId),
+          eq(conversations.idempotencyKey, idempotencyKey)
+        )
       );
-
-      const conversation = result.value;
-      const wasCreated = result.lastErrorObject?.upserted !== undefined;
-
-      if (!wasCreated) {
+      if (existing[0]) {
         this.logger.info('Returning existing conversation (idempotent request)', {
           service: 'conversation',
-          conversationId: conversation._id,
+          conversationId: existing[0].id,
           idempotencyKey,
         });
+        return { conversation: existing[0], wasCreated: false };
       }
-      return { conversation, wasCreated };
+      const conversation = await this.conversationRepo.createUnscoped({ ...values, idempotencyKey });
+      return { conversation, wasCreated: true };
     }
 
-    const conversation = await this.conversationRepo.create(conversationData);
+    const conversation = await this.conversationRepo.createUnscoped(values);
     return { conversation, wasCreated: true };
   }
 
   async listConversations(userId, { workspaceId, limit, skip }) {
-    const query = { userId };
-    if (workspaceId) query.workspaceId = workspaceId;
+    const where = workspaceId
+      ? and(eq(conversations.userId, userId), eq(conversations.workspaceId, workspaceId))
+      : eq(conversations.userId, userId);
 
-    const [conversations, total] = await Promise.all([
-      this.conversationRepo.find(query, {
-        sort: { updatedAt: -1 },
+    const [rows, total] = await Promise.all([
+      this.conversationRepo.findUnscoped(where, {
+        orderBy: desc(conversations.updatedAt),
         limit,
-        skip,
-        select: 'title userId workspaceId messageCount lastMessageAt createdAt updatedAt',
-        lean: true,
+        offset: skip,
       }),
-      this.conversationRepo.count(query),
+      this.conversationRepo.countUnscoped(where),
     ]);
 
-    return { conversations, total };
+    return { conversations: rows, total };
   }
 
   async getConversation(id, userId, { limit, skip }) {
-    const conversation = await this.conversationRepo.findById(id, { lean: true });
+    const conversation = await this.conversationRepo.findByIdUnscoped(id);
     if (!conversation) throw new AppError('Conversation not found', 404);
 
     if (!verifyOwnership(conversation.userId, userId)) {
@@ -107,17 +102,12 @@ class ConversationService {
       throw new AppError('Access denied', 403);
     }
 
-    const [messages, totalMessages] = await Promise.all([
-      this.messageRepo.findByConversation(id, {
-        limit,
-        skip,
-        select: 'role content sources timestamp',
-        lean: true,
-      }),
-      this.messageRepo.count({ conversationId: id }),
+    const [msgs, totalMessages] = await Promise.all([
+      this.messageRepo.findByConversation(id, { limit, offset: skip }),
+      this.messageRepo.count(eq(messages.conversationId, id)),
     ]);
 
-    return { conversation, messages, totalMessages };
+    return { conversation, messages: msgs, totalMessages };
   }
 
   async askQuestion(id, userId, { question, filters, authorizedWorkspaceIds = null }) {
@@ -128,7 +118,7 @@ class ConversationService {
       throw new AppError('Question is too long (max 5000 characters)', 400);
     }
 
-    const conversation = await this.conversationRepo.findById(id);
+    const conversation = await this.conversationRepo.findByIdUnscoped(id);
     if (!conversation) throw new AppError('Conversation not found', 404);
     if (!verifyOwnership(conversation.userId, userId)) {
       throw new AppError('Access denied', 403);
@@ -154,26 +144,27 @@ class ConversationService {
       throw new AppError('Title is required', 400);
     }
 
-    const existing = await this.conversationRepo.findById(id);
+    const existing = await this.conversationRepo.findByIdUnscoped(id);
     if (!existing) throw new AppError('Conversation not found', 404);
     if (!verifyOwnership(existing.userId, userId)) {
       throw new AppError('Access denied', 403);
     }
 
-    const conversation = await this.conversationRepo.updateById(id, { title: title.trim() });
+    const conversation = await this.conversationRepo.updateByIdUnscoped(id, { title: title.trim() });
     if (!conversation) throw new AppError('Conversation not found', 404);
     return conversation;
   }
 
   async deleteConversation(id, userId) {
-    const conversation = await this.conversationRepo.findById(id);
+    const conversation = await this.conversationRepo.findByIdUnscoped(id);
     if (!conversation) throw new AppError('Conversation not found', 404);
     if (!verifyOwnership(conversation.userId, userId)) {
       throw new AppError('Access denied', 403);
     }
 
-    await this.messageRepo.deleteMany({ conversationId: id });
-    await this.conversationRepo.deleteById(id);
+    // messages cascade via FK, but delete explicitly for parity + clarity.
+    await this.messageRepo.deleteWhere(eq(messages.conversationId, id));
+    await this.conversationRepo.deleteByIdUnscoped(id);
 
     this.logger.info('Deleted conversation and all messages', {
       service: 'conversation',
@@ -189,31 +180,30 @@ class ConversationService {
       throw new AppError('Cannot delete more than 100 conversations at once', 400);
     }
 
-    const conversations = await this.conversationRepo.find(
-      { _id: { $in: ids }, userId },
-      { lean: true }
+    const rows = await this.conversationRepo.findUnscoped(
+      and(inArray(conversations.id, ids), eq(conversations.userId, userId))
     );
 
-    if (conversations.length === 0) {
+    if (rows.length === 0) {
       throw new AppError('No conversations found', 404);
     }
 
-    const validIds = conversations.map((c) => c._id);
+    const validIds = rows.map((c) => c.id);
     const invalidCount = ids.length - validIds.length;
 
-    await this.messageRepo.deleteMany({ conversationId: { $in: validIds } });
-    const deleteResult = await this.conversationRepo.deleteMany({ _id: { $in: validIds } });
+    await this.messageRepo.deleteWhere(inArray(messages.conversationId, validIds));
+    const deleted = await this.conversationRepo.deleteWhere(inArray(conversations.id, validIds));
 
     this.logger.info('Bulk deleted conversations', {
       service: 'conversation',
       requestedCount: ids.length,
-      deletedCount: deleteResult.deletedCount,
+      deletedCount: deleted.length,
       invalidCount,
       userId,
     });
 
     return {
-      deletedCount: deleteResult.deletedCount,
+      deletedCount: deleted.length,
       deletedIds: validIds,
       invalidCount,
     };

@@ -349,8 +349,9 @@ export const mfaDisableSchema = z
   })
   .strict();
 
-// MongoDB ID validation
-export const mongoIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format');
+// Entity ID validation. RTV-49: ids are now Postgres UUIDs (was Mongo 24-hex ObjectIds).
+// Name kept (`mongoIdSchema`) to avoid churn across the many importers; validates a UUID.
+export const mongoIdSchema = z.string().uuid('Invalid ID format');
 
 // Workspace Schemas
 export const createWorkspaceSchema = z
