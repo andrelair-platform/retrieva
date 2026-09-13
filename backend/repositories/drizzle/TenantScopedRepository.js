@@ -71,6 +71,25 @@ export class TenantScopedRepository extends BaseDrizzleRepository {
     return row ?? null;
   }
 
+  /** EXPLICIT unscoped update/delete by id — same bypass contract as findByIdUnscoped
+   *  (trusted worker/manual-authz paths). Never use on an unauthenticated request path. */
+  async updateByIdUnscoped(id, values) {
+    const [row] = await this.db
+      .update(this.table)
+      .set(values)
+      .where(eq(this.table.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  async deleteByIdUnscoped(id) {
+    const [row] = await this.db
+      .delete(this.table)
+      .where(eq(this.table.id, id))
+      .returning();
+    return row ?? null;
+  }
+
   async findOne(where) {
     return super.findOne(this._scoped(where));
   }

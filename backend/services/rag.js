@@ -2,7 +2,6 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { randomUUID } from 'crypto';
-import mongoose from 'mongoose';
 import { AppError } from '../utils/index.js';
 
 // Prompts — resolved via Langfuse Prompt Management (label-routed) with Git fallback
@@ -74,8 +73,8 @@ import { getVectorStore as defaultVectorStoreFactory } from '../config/vectorSto
 import { ragCache as defaultCache } from '../utils/rag/ragCache.js';
 import { answerFormatter as defaultAnswerFormatter } from './answerFormatter.js';
 import defaultLogger from '../config/logger.js';
-import { messageRepository as defaultMessageRepository } from '../repositories/MessageRepository.js';
-import { conversationRepository as defaultConversationRepository } from '../repositories/ConversationRepository.js';
+import { messageRepository as defaultMessageRepository } from '../repositories/drizzle/MessageRepository.js';
+import { conversationRepository as defaultConversationRepository } from '../repositories/drizzle/ConversationRepository.js';
 
 /**
  * @typedef {Object} RAGDependencies
@@ -1193,39 +1192,21 @@ class RAGService {
    * Ensures either both messages are saved or neither is
    */
   async _saveMessages(conversationId, question, response) {
-    const session = await mongoose.startSession();
-
     try {
-      await session.withTransaction(async () => {
-        // Create both messages within the transaction
-        await this.messageRepo.create([{ conversationId, role: 'user', content: question }], {
-          session,
-        });
-        await this.messageRepo.create([{ conversationId, role: 'assistant', content: response }], {
-          session,
-        });
-
-        // Update conversation metadata
-        await this.conversationRepo.updateById(
-          conversationId,
-          {
-            lastMessageAt: new Date(),
-            $inc: { messageCount: 2 },
-          },
-          { session }
-        );
-      });
+      // Persist the user + assistant turns (staggered timestamps so order is
+      // deterministic) and bump the conversation counter. Postgres statements are
+      // each atomic; a wrapping txn isn't needed for this low-stakes pair.
+      await this.messageRepo.addMessagePair(conversationId, question, response);
+      await this.conversationRepo.incrementMessageCount(conversationId, 2);
 
       this.logger.info('Saved messages to database', { service: 'rag', conversationId });
     } catch (error) {
-      this.logger.error('Failed to save messages (transaction rolled back)', {
+      this.logger.error('Failed to save messages', {
         service: 'rag',
         conversationId,
         error: error.message,
       });
       throw error;
-    } finally {
-      await session.endSession();
     }
   }
 }

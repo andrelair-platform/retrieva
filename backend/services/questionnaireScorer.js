@@ -181,7 +181,7 @@ export async function runScoring(questionnaireId, job) {
   const categories = [...new Set(questionnaire.questions.map((q) => q.category))];
 
   // Persist the mutated questions + score + results (unscoped — worker path).
-  await vendorQuestionnaireRepository.updateById(questionnaireId, {
+  await vendorQuestionnaireRepository.updateByIdUnscoped(questionnaireId, {
     questions: questionnaire.questions,
     overallScore,
     results: {
