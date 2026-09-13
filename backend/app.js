@@ -23,7 +23,7 @@ import billingRoutes from './routes/billingRoutes.js';
 import { handleStripeWebhook } from './controllers/billingController.js';
 import { requireActivePlan } from './middleware/requireActivePlan.js';
 import { optionalAuth } from './middleware/auth.js';
-import { setTenantContext } from './services/tenantIsolation.js';
+import { setTenantContext } from './db/tenantContext.js';
 import logger from './config/logger.js';
 import { globalErrorHandler } from './utils/index.js';
 

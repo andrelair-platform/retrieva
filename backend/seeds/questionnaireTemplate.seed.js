@@ -1,4 +1,4 @@
-import { QuestionnaireTemplate } from '../models/QuestionnaireTemplate.js';
+import { questionnaireTemplateRepository } from '../repositories/drizzle/QuestionnaireTemplateRepository.js';
 import logger from '../config/logger.js';
 
 const SEED_VERSION = '1.2';
@@ -261,33 +261,34 @@ export const DORA_QUESTIONS = [
  */
 export async function seedDefaultTemplate() {
   try {
-    const existing = await QuestionnaireTemplate.findOne({ isDefault: true });
+    const existing = await questionnaireTemplateRepository.findDefault();
 
     if (existing) {
       if (existing.version === SEED_VERSION) {
         logger.info('Default questionnaire template is up to date — skipping seed', {
           service: 'seed',
           version: SEED_VERSION,
-          templateId: existing._id,
+          templateId: existing.id,
         });
         return;
       }
 
       // Upgrade to new version
-      existing.questions = DORA_QUESTIONS;
-      existing.version = SEED_VERSION;
-      await existing.save();
+      await questionnaireTemplateRepository.updateById(existing.id, {
+        questions: DORA_QUESTIONS,
+        version: SEED_VERSION,
+      });
       logger.info(
         `Default questionnaire template upgraded to v${SEED_VERSION} (${DORA_QUESTIONS.length} questions)`,
         {
           service: 'seed',
-          templateId: existing._id,
+          templateId: existing.id,
         }
       );
       return;
     }
 
-    await QuestionnaireTemplate.create({
+    await questionnaireTemplateRepository.create({
       name: 'DORA Art.28/30 Due Diligence',
       version: SEED_VERSION,
       isDefault: true,
