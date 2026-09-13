@@ -92,3 +92,61 @@ that trade is correct.
 - One engine (Postgres + JSONB) covers relational + document; Qdrant/MinIO unchanged.
 - The RTV-19→27 TS migration targets Drizzle, not Mongoose; RTV-36 is authored in Postgres.
 - A new migration epic **RTV-45** tracks the Mongo→Postgres cutover.
+
+## RTV-48 — As-built schema (the 13 ported tables)
+
+The 12 Mongoose models were ported to **14 Drizzle tables** (a M2M join table + a provider-node
+identity table added). Schema lives in `backend/db/schema/*.js`; first migration
+`db/migrations/0000_init_schema.sql` applies clean on an empty DB (verified by
+`tests/integrationtest/schema.integration.test.js` — 8 tests: CRUD, FK-violation reject,
+invalid-enum reject, text+CHECK reject, relational-query, provider-graph nodes/edges +
+shared-substrate detection, partial-unique idempotency).
+
+| Table | From model | Key FKs | JSONB columns |
+|---|---|---|---|
+| `users` | User | `organization_id → organizations` (set null) | `refresh_tokens`, `notification_preferences`, `onboarding_checklist`, `mfa_recovery_codes` |
+| `organizations` | Organization | `owner_id → users` | — |
+| `organization_members` | OrganizationMember | `organization_id` (cascade), `user_id`, `invited_by` | — |
+| `workspaces` | Workspace | `user_id` (owner), `organization_id` | `certifications`, `vendor_functions`, `alerts_sent_at` |
+| `workspace_members` | WorkspaceMember | `workspace_id` (cascade), `user_id` (cascade), `invited_by` | `permissions` |
+| `conversations` | Conversation | `user_id` (set null), `workspace_id` (cascade) | — |
+| `messages` | Message | `conversation_id` (cascade) | `sources` |
+| `assessments` | Assessment | `workspace_id` (cascade), `created_by` | `documents`, `results`, `risk_decision`, `clause_signoffs` |
+| `critical_functions` | CriticalFunction | `organization_id` (cascade), `created_by` | — |
+| `critical_function_dependencies` | CriticalFunction.`dependsOn[]` | `critical_function_id` (cascade), `workspace_id` (cascade) | — |
+| `provider_nodes` | ProviderDependency (node identity) | `organization_id` (cascade), `workspace_id` | — |
+| `provider_dependencies` | ProviderDependency (edges) | `organization_id` (cascade), `parent_node_id → provider_nodes`, `child_node_id → provider_nodes`, `created_by` | — |
+| `questionnaire_templates` | QuestionnaireTemplate | — | `questions` |
+| `vendor_questionnaires` | VendorQuestionnaire | `workspace_id` (cascade), `template_id` (set null), `created_by` | `questions`, `results` |
+
+### Design decisions (for review)
+
+1. **UUID PKs** (`gen_random_uuid()`) replace ObjectIds; controllers keep normalising to `id`.
+2. **Provider graph = first-class nodes + edges** (chosen at the schema-review gate over a flattened
+   edge). `provider_nodes` is the node identity space, deduped per org by
+   `unique(organization_id, canonical_name)` — a real provider (assessed workspace *or* external
+   sub-provider) appears exactly once. `provider_dependencies` are directed `parent_node_id →
+   child_node_id` edges. This makes **shared-substrate detection correct** ("N vendors all on the
+   same Azure" = `GROUP BY child_node_id`, not fragile string-name matching), lets the RTV-50
+   `WITH RECURSIVE` traversal walk indexed uuid edges, and keeps node attributes (tier) in one place.
+   Rejected the denormalised `parent_*`/`child_*` columns because node identity would live in strings.
+3. **`CriticalFunction.dependsOn[]` → `critical_function_dependencies`** real M2M join table.
+4. **`conversations.user_id`**: was a loose `String` (`'anonymous'`) → nullable `uuid` FK; auth is now
+   required, so the legacy anonymous path maps to `NULL` at cutover (RTV-49).
+5. **Encrypted-at-rest** (`users.name`, `users.mfa_secret`, `messages.content`) → `text`; encryption
+   stays app-layer (`utils/security/fieldEncryption.js`, applied at the repository boundary in RTV-49).
+   Password stays bcrypt.
+6. **Hybrid enums** (chosen at the schema-review gate): `pgEnum` for stable identity/status/kind sets
+   (`user_role`, `*_status`, `member_status`, `criticality`, `tier`, `message_role`,
+   `assessment_framework`, `provider_node_kind`, `provider_source`) — DB-level integrity, a bad value
+   can't be inserted. **`text` + `CHECK`** for the growable business taxonomies (`org_industry`,
+   `org_plan`, `service_type`) so adding an industry/plan/service-type doesn't need an `ALTER TYPE`
+   migration; the allowed sets live as CHECK constraints (+ `enums.js` constants driving Zod).
+   `vendor_functions` is a JSONB tag array (Zod-validated). Doc-shaped nested payloads → JSONB (see table).
+7. **`created_by` / owner refs → nullable FK `on delete set null`** (robustness over the Mongoose
+   `required` string), except structural parents which `cascade`.
+8. **Language:** implemented in **ESM JavaScript** (the RTV-19→27 TS migration hasn't landed) — JS
+   schema + `drizzle-zod` runtime DTOs (`db/schema/zod.js`), no `tsc`. When TS arrives, types derive
+   from these tables.
+9. **Tenant isolation is NOT in the schema** — the Mongoose pre-hook plugin is replaced by an explicit
+   workspace-scoped repository layer in **RTV-49** (security-review gate).
