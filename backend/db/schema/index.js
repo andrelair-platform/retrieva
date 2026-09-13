@@ -1,4 +1,12 @@
-// Drizzle schema barrel. Tables are added in RTV-48 (Stage 2) — one file per
-// aggregate under db/schema/, re-exported here so config/db.js binds them and
-// drizzle-kit discovers them. Empty for RTV-47 (plumbing only).
-export {};
+// Drizzle schema barrel (RTV-48). config/db.js binds this as the schema; drizzle-kit
+// discovers tables + enums + relations from here.
+export * from './enums.js';
+export * from './users.js';
+export * from './organizations.js';
+export * from './workspaces.js';
+export * from './conversations.js';
+export * from './assessments.js';
+export * from './criticalFunctions.js';
+export * from './providerDependencies.js';
+export * from './questionnaires.js';
+export * from './relations.js';

@@ -1,7 +1,7 @@
 ---
 id: RTV-48-port-schema
 title: "Port existing collections to Drizzle tables (FKs + JSONB)"
-status: Ready
+status: In Progress
 type: Story
 epic: datastore-migration
 milestone: "RTV — Datastore migration (Postgres + Drizzle)"
