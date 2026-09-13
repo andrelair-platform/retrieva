@@ -1,7 +1,7 @@
 import { AppError } from '../utils/index.js';
-import { userRepository } from '../repositories/UserRepository.js';
-import { organizationRepository } from '../repositories/OrganizationRepository.js';
-import { organizationMemberRepository } from '../repositories/OrganizationMemberRepository.js';
+import { userRepository } from '../repositories/drizzle/UserRepository.js';
+import { organizationRepository } from '../repositories/drizzle/OrganizationRepository.js';
+import { organizationMemberRepository } from '../repositories/drizzle/OrganizationMemberRepository.js';
 import {
   generateTokenPair,
   verifyRefreshToken,
@@ -11,8 +11,6 @@ import {
   generateMfaToken,
   verifyMfaToken,
 } from '../utils/security/jwt.js';
-import { sha256 } from '../utils/security/crypto.js';
-import { safeDecrypt } from '../utils/security/fieldEncryption.js';
 import { emailService } from './emailService.js';
 import { authAuditService } from './authAuditService.js';
 import { mfaService } from './mfaService.js';
@@ -20,11 +18,13 @@ import logger from '../config/logger.js';
 
 const RESEND_VERIFICATION_COOLDOWN_MS = 60 * 1000;
 
+// RTV-49: users now come from the Drizzle userRepository, which returns a SANITIZED
+// row — `id` (uuid), `name` already decrypted, secrets stripped. No Mongoose documents.
 function toUserPayload(user, overrides = {}) {
   return {
-    id: user._id,
+    id: user.id,
     email: user.email,
-    name: safeDecrypt(user.name),
+    name: user.name,
     role: user.role,
     isEmailVerified: user.isEmailVerified,
     mfaEnabled: !!user.mfaEnabled,
@@ -46,21 +46,12 @@ class AuthService {
     this.logger = deps.logger || logger;
   }
 
-  /**
-   * Resolve an organization summary for inclusion in /me + login responses.
-   */
+  /** Resolve an organization summary for inclusion in /me + login responses. */
   async _resolveOrganizationSummary(organizationId) {
     if (!organizationId) return null;
-    const org = await this.organizationRepo.findById(organizationId, {
-      select: 'name industry country',
-    });
+    const org = await this.organizationRepo.findById(organizationId);
     if (!org) return null;
-    return {
-      id: org._id,
-      name: org.name,
-      industry: org.industry,
-      country: org.country,
-    };
+    return { id: org.id, name: org.name, industry: org.industry, country: org.country };
   }
 
   async register({ email, password, name, role, inviteToken, deviceInfo }) {
@@ -70,69 +61,53 @@ class AuthService {
       throw new AppError('Email already registered', 409);
     }
 
-    // Hand-build the doc so pre-save hooks (password hash, name encrypt) run.
-    const userDoc = new this.userRepo.model({
-      email,
-      password,
-      name,
-      role: role || 'user',
-    });
-    await userDoc.save();
+    // create() hashes the password + encrypts name at rest, returns a sanitized row.
+    const user = await this.userRepo.create({ email, password, name, role: role || 'user' });
 
-    const tokens = generateTokenPair({
-      userId: userDoc._id,
-      email: userDoc.email,
-      role: userDoc.role,
-    });
-
-    const tokenHash = hashRefreshToken(tokens.refreshToken);
-    await userDoc.addRefreshToken(tokenHash, deviceInfo);
+    const tokens = generateTokenPair({ userId: user.id, email: user.email, role: user.role });
+    await this.userRepo.addRefreshToken(user.id, hashRefreshToken(tokens.refreshToken), deviceInfo);
 
     let organizationId = null;
     if (inviteToken) {
       try {
         const member = await this.memberRepo.findByToken(inviteToken);
         if (member && member.email === email.toLowerCase()) {
-          await this.memberRepo.activate(member._id, userDoc._id);
-          await this.userRepo.updateById(userDoc._id, { organizationId: member.organizationId });
+          await this.memberRepo.activate(member.id, user.id);
+          await this.userRepo.setOrganization(user.id, member.organizationId);
           organizationId = member.organizationId;
         }
       } catch (err) {
         this.logger.warn('Invite token processing failed during registration', {
-          userId: userDoc._id,
+          userId: user.id,
           error: err.message,
         });
       }
     }
 
-    const verificationToken = await userDoc.createEmailVerificationToken();
+    const verificationToken = await this.userRepo.setEmailVerificationToken(user.id);
     this.emailService
-      .sendEmailVerification({
-        toEmail: userDoc.email,
-        toName: name, // original from request (user.name is encrypted post-save)
-        verificationToken,
-      })
+      .sendEmailVerification({ toEmail: user.email, toName: name, verificationToken })
       .catch((err) => {
         this.logger.warn('Failed to send verification email', {
-          userId: userDoc._id,
+          userId: user.id,
           error: err.message,
         });
       });
 
     this.logger.info('New user registered', {
-      userId: userDoc._id,
-      email: userDoc.email,
-      role: userDoc.role,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
       hasOrg: !!organizationId,
     });
-    this.authAudit.logRegisterSuccess?.({ userId: userDoc._id, email: userDoc.email });
+    this.authAudit.logRegisterSuccess?.({ userId: user.id, email: user.email });
 
     return {
       user: {
-        id: userDoc._id,
-        email: userDoc.email,
+        id: user.id,
+        email: user.email,
         name,
-        role: userDoc.role,
+        role: user.role,
         isEmailVerified: false,
         organizationId: organizationId ? organizationId.toString() : null,
       },
@@ -142,9 +117,8 @@ class AuthService {
   }
 
   /**
-   * A3: notify a user out-of-band that all their sessions were revoked because
-   * a refresh token was reused (a sign of theft). Best-effort and fully
-   * defensive — never throws into, or blocks, the auth flow.
+   * A3: notify a user out-of-band that all their sessions were revoked because a refresh
+   * token was reused (a sign of theft). Best-effort; never throws into the auth flow.
    */
   _sendTokenTheftAlert(user) {
     try {
@@ -163,20 +137,20 @@ class AuthService {
       });
       result?.catch?.((err) =>
         this.logger.warn('Failed to send token-theft alert email', {
-          userId: user._id,
+          userId: user.id,
           error: err.message,
         })
       );
     } catch (err) {
       this.logger.warn('Failed to send token-theft alert email', {
-        userId: user._id,
+        userId: user.id,
         error: err.message,
       });
     }
   }
 
   async login({ email, password, deviceInfo }) {
-    const user = await this.userRepo.model.findByCredentials(email);
+    const user = await this.userRepo.findByEmail(email);
 
     if (!user) {
       this.logger.warn('Login attempt with non-existent email', { email });
@@ -185,120 +159,90 @@ class AuthService {
 
     if (user.isLocked) {
       this.logger.warn('Login attempt on locked account', {
-        userId: user._id,
+        userId: user.id,
         lockUntil: user.lockUntil,
       });
-      this.authAudit.logLoginBlockedLocked?.({ userId: user._id, email });
+      this.authAudit.logLoginBlockedLocked?.({ userId: user.id, email });
       throw new AppError('Account is temporarily locked. Please try again later.', 423);
     }
 
     if (!user.isActive) {
-      this.logger.warn('Login attempt on inactive account', { userId: user._id });
+      this.logger.warn('Login attempt on inactive account', { userId: user.id });
       throw new AppError('Account is inactive', 401);
     }
 
-    const isPasswordValid = await user.comparePassword(password);
+    const isPasswordValid = await this.userRepo.verifyPassword(user.id, password);
     if (!isPasswordValid) {
       this.logger.warn('Failed login attempt', { email });
-      await user.incLoginAttempts();
-      this.authAudit.logLoginFailed?.({ userId: user._id, email });
-      if (user.isLocked) {
-        this.authAudit.logAccountLocked?.({ userId: user._id, email });
+      const after = await this.userRepo.incLoginAttempts(user.id);
+      this.authAudit.logLoginFailed?.({ userId: user.id, email });
+      if (after?.isLocked) {
+        this.authAudit.logAccountLocked?.({ userId: user.id, email });
       }
       throw new AppError('Invalid credentials', 401);
     }
 
-    await user.resetLoginAttempts();
+    await this.userRepo.resetLoginAttempts(user.id);
 
-    // A1: if MFA is enabled, password is only step 1. Return a short-lived
-    // challenge instead of tokens; step 2 is POST /auth/mfa/verify.
+    // A1: if MFA is enabled, password is only step 1 — return a short-lived challenge.
     if (user.mfaEnabled) {
-      this.logger.info('Login passed password, MFA required', { userId: user._id });
-      this.authAudit.logLoginSuccess?.({ userId: user._id, email: user.email, mfa: 'pending' });
-      return { mfaRequired: true, mfaToken: generateMfaToken({ userId: user._id }) };
+      this.logger.info('Login passed password, MFA required', { userId: user.id });
+      this.authAudit.logLoginSuccess?.({ userId: user.id, email: user.email, mfa: 'pending' });
+      return { mfaRequired: true, mfaToken: generateMfaToken({ userId: user.id }) };
     }
 
     return this._issueSession(user, deviceInfo);
   }
 
-  /**
-   * Issue tokens + a refresh session for an already-authenticated user, and
-   * return the standard login payload. Shared by password login and MFA verify.
-   */
+  /** Issue tokens + a refresh session for an already-authenticated user. */
   async _issueSession(user, deviceInfo) {
-    const tokens = generateTokenPair({
-      userId: user._id,
-      email: user.email,
-      role: user.role,
-    });
-
-    const tokenHash = hashRefreshToken(tokens.refreshToken);
-    await user.addRefreshToken(tokenHash, deviceInfo);
+    const tokens = generateTokenPair({ userId: user.id, email: user.email, role: user.role });
+    await this.userRepo.addRefreshToken(user.id, hashRefreshToken(tokens.refreshToken), deviceInfo);
 
     const organization = await this._resolveOrganizationSummary(user.organizationId);
 
-    this.logger.info('User logged in', {
-      userId: user._id,
-      email: user.email,
-    });
-    this.authAudit.logLoginSuccess?.({ userId: user._id, email: user.email });
+    this.logger.info('User logged in', { userId: user.id, email: user.email });
+    this.authAudit.logLoginSuccess?.({ userId: user.id, email: user.email });
 
-    return {
-      user: toUserPayload(user, { organization }),
-      tokens,
-    };
+    return { user: toUserPayload(user, { organization }), tokens };
   }
 
   // ---------------------------------------------------------------------------
   // MFA (TOTP) — audit gap A1
   // ---------------------------------------------------------------------------
 
-  /**
-   * Step 1 of enrollment: generate (but do not yet enable) a TOTP secret.
-   * Returns the secret + otpauth URI for the authenticator app / QR.
-   */
+  /** Step 1: generate (but don't yet enable) a TOTP secret; return secret + otpauth URI. */
   async setupMfa(userId) {
     const user = await this.userRepo.findById(userId);
     if (!user) throw new AppError('User not found', 404);
     if (user.mfaEnabled) throw new AppError('MFA is already enabled', 409);
 
     const secret = this.mfa.generateSecret();
-    user.mfaSecret = secret;
-    await user.save();
+    await this.userRepo.setMfaSecret(userId, secret);
 
-    return {
-      secret,
-      otpauthUrl: this.mfa.keyUri(user.email, secret),
-    };
+    return { secret, otpauthUrl: this.mfa.keyUri(user.email, secret) };
   }
 
-  /**
-   * Step 2 of enrollment: verify the first code, enable MFA, and return the
-   * one-time recovery codes (shown to the user exactly once).
-   */
+  /** Step 2: verify the first code, enable MFA, return the one-time recovery codes. */
   async enableMfa(userId, token) {
-    const user = await this.userRepo.findById(userId, { select: '+mfaSecret' });
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new AppError('User not found', 404);
     if (user.mfaEnabled) throw new AppError('MFA is already enabled', 409);
-    if (!user.mfaSecret) throw new AppError('Start MFA setup first', 400);
 
-    if (!this.mfa.verifyTotp(user.mfaSecret, token)) {
+    const secret = await this.userRepo.getMfaSecret(userId);
+    if (!secret) throw new AppError('Start MFA setup first', 400);
+    if (!this.mfa.verifyTotp(secret, token)) {
       throw new AppError('Invalid verification code', 400);
     }
 
     const { plain, hashed } = this.mfa.generateRecoveryCodes();
-    user.mfaEnabled = true;
-    user.mfaRecoveryCodes = hashed;
-    await user.save();
+    await this.userRepo.enableMfa(userId, hashed);
 
-    this.logger.info('MFA enabled', { userId: user._id });
+    this.logger.info('MFA enabled', { userId });
     return { recoveryCodes: plain };
   }
 
-  /**
-   * Step 2 of login: exchange a valid MFA challenge token + TOTP (or recovery)
-   * code for a real session.
-   */
+  /** Step 2 of login: exchange a valid MFA challenge + TOTP/recovery code for a session. */
   async verifyMfa({ mfaToken, code, deviceInfo }) {
     let decoded;
     try {
@@ -307,66 +251,53 @@ class AuthService {
       throw new AppError(error.message || 'Invalid MFA token', 401);
     }
 
-    const user = await this.userRepo.findById(decoded.userId, {
-      select: '+mfaSecret +mfaRecoveryCodes',
-    });
+    const user = await this.userRepo.findById(decoded.userId);
     if (!user || !user.mfaEnabled) {
       throw new AppError('MFA is not enabled for this account', 400);
     }
     if (!user.isActive) throw new AppError('Account is inactive', 401);
 
-    if (!this._consumeMfaCode(user, code)) {
-      this.authAudit.logLoginFailed?.({ userId: user._id, reason: 'mfa' });
+    if (!(await this._consumeMfaCode(user.id, code))) {
+      this.authAudit.logLoginFailed?.({ userId: user.id, reason: 'mfa' });
       throw new AppError('Invalid verification code', 401);
     }
-
-    // _consumeMfaCode may have spent a recovery code → persist before issuing.
-    if (user.isModified?.('mfaRecoveryCodes')) await user.save();
 
     return this._issueSession(user, deviceInfo);
   }
 
-  /**
-   * Disable MFA. Requires the current password AND a valid TOTP/recovery code
-   * so a hijacked session alone can't turn it off.
-   */
+  /** Disable MFA. Requires current password AND a valid TOTP/recovery code. */
   async disableMfa(userId, { password, code }) {
-    const user = await this.userRepo.findById(userId, {
-      select: '+password +mfaSecret +mfaRecoveryCodes',
-    });
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new AppError('User not found', 404);
     if (!user.mfaEnabled) throw new AppError('MFA is not enabled', 400);
 
-    if (!(await user.comparePassword(password))) {
+    if (!(await this.userRepo.verifyPassword(userId, password))) {
       throw new AppError('Invalid password', 401);
     }
-    if (!this._consumeMfaCode(user, code)) {
+    if (!(await this._consumeMfaCode(userId, code))) {
       throw new AppError('Invalid verification code', 401);
     }
 
-    user.mfaEnabled = false;
-    user.mfaSecret = null;
-    user.mfaRecoveryCodes = undefined;
-    await user.save();
-
-    this.logger.info('MFA disabled', { userId: user._id });
+    await this.userRepo.disableMfa(userId);
+    this.logger.info('MFA disabled', { userId });
     return { disabled: true };
   }
 
   /**
-   * Verify a code against the user's TOTP secret, falling back to single-use
-   * recovery codes (which are consumed in place). Returns true on success.
+   * Verify a code against the user's TOTP secret, falling back to single-use recovery
+   * codes (consumed in place). Returns true on success.
    */
-  _consumeMfaCode(user, code) {
-    if (this.mfa.verifyTotp(user.mfaSecret, code)) return true;
+  async _consumeMfaCode(userId, code) {
+    const secret = await this.userRepo.getMfaSecret(userId);
+    if (secret && this.mfa.verifyTotp(secret, code)) return true;
 
     const hash = this.mfa.hashRecoveryCode(code || '');
-    const codes = user.mfaRecoveryCodes || [];
+    const codes = await this.userRepo.getRecoveryCodes(userId);
     const idx = codes.indexOf(hash);
     if (idx === -1) return false;
 
     codes.splice(idx, 1); // consume
-    user.mfaRecoveryCodes = codes;
+    await this.userRepo.setRecoveryCodes(userId, codes);
     return true;
   }
 
@@ -388,71 +319,62 @@ class AuthService {
       throw new AppError(error.message || 'Invalid refresh token', 401);
     }
 
-    const user = await this.userRepo.findById(decoded.userId, { select: '+refreshTokens' });
-
+    const user = await this.userRepo.findById(decoded.userId);
     if (!user) {
       this.logger.warn('User not found for refresh token', { userId: decoded.userId });
       throw new AppError('Invalid refresh token', 401);
     }
-
     if (!user.isActive) {
       throw new AppError('Account is inactive', 401);
     }
 
-    const incomingTokenHash = hashRefreshToken(refreshTokenValue);
-    const tokenValid = await user.consumeRefreshToken(incomingTokenHash);
+    const tokenValid = await this.userRepo.consumeRefreshToken(
+      user.id,
+      hashRefreshToken(refreshTokenValue)
+    );
 
     if (!tokenValid) {
       // Possible theft — clear all refresh tokens
       this.logger.warn('Refresh token not found or already used - possible token theft', {
-        userId: user._id,
+        userId: user.id,
       });
-      await user.clearAllRefreshTokens();
-      this.authAudit.logTokenTheftDetected?.({ userId: user._id });
-      // A3: alert the user out-of-band that all sessions were revoked. Best-effort;
-      // never block the 401 on email delivery.
+      await this.userRepo.clearRefreshTokens(user.id);
+      this.authAudit.logTokenTheftDetected?.({ userId: user.id });
       this._sendTokenTheftAlert(user);
       throw new AppError('Invalid refresh token. Please login again.', 401);
     }
 
     const newAccessToken = generateAccessToken({
-      userId: user._id,
+      userId: user.id,
       email: user.email,
       role: user.role,
     });
-    const newRefreshToken = generateRefreshToken({
-      userId: user._id,
-      email: user.email,
-    });
+    const newRefreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+    await this.userRepo.addRefreshToken(user.id, hashRefreshToken(newRefreshToken), deviceInfo);
+    await this.userRepo.updateLastLogin(user.id);
 
-    const newTokenHash = hashRefreshToken(newRefreshToken);
-    await user.addRefreshToken(newTokenHash, deviceInfo);
-
-    await this.userRepo.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-
-    this.logger.info('Tokens rotated successfully', { userId: user._id });
-    this.authAudit.logTokenRefresh?.({ userId: user._id });
+    this.logger.info('Tokens rotated successfully', { userId: user.id });
+    this.authAudit.logTokenRefresh?.({ userId: user.id });
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
   async logout({ userId, refreshTokenValue, logoutAll }) {
-    const user = await this.userRepo.findById(userId, { select: '+refreshTokens' });
+    const user = await this.userRepo.findById(userId);
     if (!user) return;
 
     if (logoutAll) {
-      await user.clearAllRefreshTokens();
-      this.logger.info('User logged out from all devices', { userId: user._id });
-      this.authAudit.logLogout?.({ userId: user._id, allDevices: true });
+      await this.userRepo.clearRefreshTokens(user.id);
+      this.logger.info('User logged out from all devices', { userId: user.id });
+      this.authAudit.logLogout?.({ userId: user.id, allDevices: true });
       return;
     }
 
     if (refreshTokenValue) {
-      const tokenHash = hashRefreshToken(refreshTokenValue);
-      await user.consumeRefreshToken(tokenHash);
+      await this.userRepo.consumeRefreshToken(user.id, hashRefreshToken(refreshTokenValue));
     }
-    this.logger.info('User logged out', { userId: user._id });
-    this.authAudit.logLogout?.({ userId: user._id, allDevices: false });
+    this.logger.info('User logged out', { userId: user.id });
+    this.authAudit.logLogout?.({ userId: user.id, allDevices: false });
   }
 
   async getMe(userId) {
@@ -481,23 +403,19 @@ class AuthService {
       throw new AppError('Email cannot be changed via profile update', 400);
     }
 
-    if (name) user.name = name;
+    const updated = name ? await this.userRepo.setName(userId, name) : user;
 
-    await user.save();
-
-    this.logger.info('User profile updated', { userId: user._id });
-
-    const displayName = user.decryptField ? user.decryptField('name') : user.name;
+    this.logger.info('User profile updated', { userId });
 
     return {
       user: {
-        id: user._id,
-        email: user.email,
-        name: displayName,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        isEmailVerified: updated.isEmailVerified,
+        createdAt: updated.createdAt,
+        lastLogin: updated.lastLogin,
       },
     };
   }
@@ -511,7 +429,7 @@ class AuthService {
       return;
     }
 
-    const resetToken = await user.createPasswordResetToken();
+    const resetToken = await this.userRepo.setPasswordResetToken(user.id);
 
     const emailResult = await this.emailService.sendPasswordResetEmail({
       toEmail: user.email,
@@ -521,83 +439,56 @@ class AuthService {
 
     if (!emailResult.success) {
       this.logger.error('Failed to send password reset email', {
-        userId: user._id,
+        userId: user.id,
         error: emailResult.error || emailResult.reason,
         reason: emailResult.reason,
       });
-      await user.clearPasswordResetToken();
+      await this.userRepo.clearPasswordResetToken(user.id);
       throw new AppError(
         'Email service is temporarily unavailable. Please try again later or contact support.',
         503
       );
     }
 
-    this.logger.info('Password reset email sent', { userId: user._id, email: user.email });
-    this.authAudit.logPasswordResetRequest?.({ userId: user._id, email: user.email });
+    this.logger.info('Password reset email sent', { userId: user.id, email: user.email });
+    this.authAudit.logPasswordResetRequest?.({ userId: user.id, email: user.email });
   }
 
   async resetPassword({ token, password }) {
-    const hashedToken = sha256(token);
-
-    const user = await this.userRepo.findOne(
-      {
-        passwordResetToken: hashedToken,
-        passwordResetExpires: { $gt: Date.now() },
-      },
-      { select: '+passwordResetToken +passwordResetExpires +refreshTokens' }
-    );
-
-    if (!user) {
+    const found = await this.userRepo.findByValidPasswordResetToken(token);
+    if (!found) {
       this.logger.warn('Invalid or expired password reset token');
       throw new AppError('Invalid or expired reset token. Please request a new one.', 400);
     }
 
-    user.password = password;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
-    user.refreshTokens = []; // force re-login on all devices
+    // setPassword revokes all sessions (force re-login on all devices).
+    await this.userRepo.setPassword(found.safe.id, password, { revokeSessions: true });
+    await this.userRepo.clearPasswordResetToken(found.safe.id);
 
-    await user.save();
-
-    this.logger.info('Password reset successful', { userId: user._id });
-    this.authAudit.logPasswordResetSuccess?.({ userId: user._id });
+    this.logger.info('Password reset successful', { userId: found.safe.id });
+    this.authAudit.logPasswordResetSuccess?.({ userId: found.safe.id });
   }
 
   async verifyEmail({ token }) {
-    const hashedToken = sha256(token);
-
-    const user = await this.userRepo.findOne(
-      {
-        emailVerificationToken: hashedToken,
-        emailVerificationExpires: { $gt: Date.now() },
-      },
-      { select: '+emailVerificationToken +emailVerificationExpires' }
-    );
-
-    if (!user) {
+    const found = await this.userRepo.findByValidEmailVerificationToken(token);
+    if (!found) {
       this.logger.warn('Invalid or expired email verification token');
       throw new AppError('Invalid or expired verification token. Please request a new one.', 400);
     }
 
-    const userName = user.name; // capture before save() re-encrypts
+    const verified = await this.userRepo.markEmailVerified(found.id);
 
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save({ validateBeforeSave: false });
+    this.logger.info('Email verified successfully', { userId: verified.id, email: verified.email });
+    this.authAudit.logEmailVerified?.({ userId: verified.id, email: verified.email });
 
-    this.logger.info('Email verified successfully', {
-      userId: user._id,
-      email: user.email,
-    });
-    this.authAudit.logEmailVerified?.({ userId: user._id, email: user.email });
-
-    this.emailService.sendWelcomeEmail({ toEmail: user.email, toName: userName }).catch((err) => {
-      this.logger.warn('Failed to send welcome email after verification', {
-        userId: user._id,
-        error: err.message,
+    this.emailService
+      .sendWelcomeEmail({ toEmail: verified.email, toName: verified.name })
+      .catch((err) => {
+        this.logger.warn('Failed to send welcome email after verification', {
+          userId: verified.id,
+          error: err.message,
+        });
       });
-    });
   }
 
   async resendVerification(userId) {
@@ -609,9 +500,9 @@ class AuthService {
     }
 
     if (user.emailVerificationLastSentAt) {
-      const elapsedMs = Date.now() - user.emailVerificationLastSentAt.getTime();
+      const elapsedMs = Date.now() - new Date(user.emailVerificationLastSentAt).getTime();
       if (elapsedMs < RESEND_VERIFICATION_COOLDOWN_MS) {
-        this.logger.warn('Resend verification blocked due to cooldown', { userId: user._id });
+        this.logger.warn('Resend verification blocked due to cooldown', { userId: user.id });
         const waitSeconds = Math.ceil((RESEND_VERIFICATION_COOLDOWN_MS - elapsedMs) / 1000);
         throw new AppError(
           `Please wait ${waitSeconds}s before requesting another verification email.`,
@@ -620,7 +511,7 @@ class AuthService {
       }
     }
 
-    const verificationToken = await user.createEmailVerificationToken();
+    const verificationToken = await this.userRepo.setEmailVerificationToken(user.id);
 
     const emailResult = await this.emailService.sendEmailVerification({
       toEmail: user.email,
@@ -630,7 +521,7 @@ class AuthService {
 
     if (!emailResult.success) {
       this.logger.error('Failed to resend verification email', {
-        userId: user._id,
+        userId: user.id,
         error: emailResult.error || emailResult.reason,
         reason: emailResult.reason,
       });
@@ -640,61 +531,45 @@ class AuthService {
       );
     }
 
-    this.logger.info('Verification email resent', {
-      userId: user._id,
-      email: user.email,
-    });
+    this.logger.info('Verification email resent', { userId: user.id, email: user.email });
   }
 
   async changePassword(userId, { currentPassword, newPassword }) {
-    const user = await this.userRepo.findById(userId, { select: '+password +refreshTokens' });
+    const user = await this.userRepo.findById(userId);
     if (!user) throw new AppError('User not found', 404);
 
-    const isPasswordValid = await user.comparePassword(currentPassword);
+    const isPasswordValid = await this.userRepo.verifyPassword(userId, currentPassword);
     if (!isPasswordValid) {
-      this.logger.warn('Change password failed - incorrect current password', {
-        userId: user._id,
-      });
+      this.logger.warn('Change password failed - incorrect current password', { userId });
       throw new AppError('Current password is incorrect', 401);
     }
 
-    user.password = newPassword;
-    user.refreshTokens = []; // force re-login on all devices
+    // setPassword revokes all sessions (force re-login on all devices).
+    await this.userRepo.setPassword(userId, newPassword, { revokeSessions: true });
 
-    await user.save();
-
-    this.logger.info('Password changed successfully - all sessions invalidated', {
-      userId: user._id,
-    });
+    this.logger.info('Password changed successfully - all sessions invalidated', { userId });
   }
 
   async updateOnboarding(userId, { completed, checklist }) {
-    const update = {};
+    const allowed = [
+      'vendorCreated',
+      'assessmentCreated',
+      'memberInvited',
+      'monitoringSetup',
+      'dismissed',
+    ];
+    const filteredChecklist =
+      checklist && typeof checklist === 'object'
+        ? Object.fromEntries(
+            Object.entries(checklist).filter(([k]) => allowed.includes(k))
+          )
+        : undefined;
 
-    if (completed !== undefined) {
-      update.onboardingCompleted = completed;
-    }
-
-    if (checklist && typeof checklist === 'object') {
-      const allowed = [
-        'vendorCreated',
-        'assessmentCreated',
-        'memberInvited',
-        'monitoringSetup',
-        'dismissed',
-      ];
-      for (const key of allowed) {
-        if (checklist[key] !== undefined) {
-          update[`onboardingChecklist.${key}`] = checklist[key];
-        }
-      }
-    }
-
-    if (Object.keys(update).length === 0) {
+    if (completed === undefined && (!filteredChecklist || Object.keys(filteredChecklist).length === 0)) {
       throw new AppError('No valid fields to update', 400);
     }
 
-    await this.userRepo.updateOne({ _id: userId }, { $set: update });
+    await this.userRepo.updateOnboarding(userId, { completed, checklist: filteredChecklist });
   }
 }
 
