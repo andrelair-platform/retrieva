@@ -62,9 +62,21 @@ describe('Provider-graph recursive-CTE traversal (RTV-50)', () => {
   });
 
   beforeEach(async () => {
-    // Fresh org per test (cascades clear nodes/edges/functions).
-    await db.execute(sql`delete from organizations`);
-    await db.execute(sql`delete from users`);
+    // Full, order-independent reset. CI shares ONE Postgres DB across integration test
+    // files, so other suites may have left rows (e.g. a workspace owned by a user) that a
+    // plain `delete from users` can't remove (workspaces.user_id FK has no cascade).
+    // TRUNCATE … CASCADE clears everything regardless of FK order.
+    await db.execute(sql`
+      truncate table
+        provider_dependencies, provider_nodes,
+        critical_function_dependencies, critical_functions,
+        messages, conversations,
+        vendor_questionnaires, assessments,
+        workspace_members, organization_members,
+        workspaces, organizations, users,
+        questionnaire_templates
+      restart identity cascade
+    `);
     const [u] = await db
       .insert(users)
       .values({ email: `u-${Math.random().toString(36).slice(2)}@x.io`, password: 'h', name: 'n' })
