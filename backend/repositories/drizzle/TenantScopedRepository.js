@@ -60,6 +60,17 @@ export class TenantScopedRepository extends BaseDrizzleRepository {
     return row ?? null;
   }
 
+  /**
+   * EXPLICIT unscoped by-id lookup — bypasses tenant scoping. For trusted background
+   * paths (BullMQ workers) that operate on a specific entity id WITHOUT a request tenant
+   * context (the old Mongoose plugin didn't filter when no context was set). Named so the
+   * bypass is auditable; never use it on a request path.
+   */
+  async findByIdUnscoped(id) {
+    const [row] = await this.db.select().from(this.table).where(eq(this.table.id, id)).limit(1);
+    return row ?? null;
+  }
+
   async findOne(where) {
     return super.findOne(this._scoped(where));
   }

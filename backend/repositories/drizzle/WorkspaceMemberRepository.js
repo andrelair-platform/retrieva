@@ -124,6 +124,36 @@ export class WorkspaceMemberRepository extends BaseDrizzleRepository {
       with: { user: { columns: { id: true, name: true, email: true } } },
     });
   }
+
+  /** Active owners of a workspace WITH the user (email/name/notificationPreferences). */
+  async findOwnersWithUser(workspaceId) {
+    return this.db.query.workspaceMembers.findMany({
+      where: and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.role, 'owner'),
+        eq(workspaceMembers.status, 'active')
+      ),
+      with: {
+        user: { columns: { id: true, name: true, email: true, notificationPreferences: true } },
+      },
+    });
+  }
+
+  /**
+   * Group active owners by user → their workspace ids (replaces the $group aggregation
+   * in the weekly digest). Returns [{ userId, workspaceIds: [] }].
+   */
+  async groupOwnerWorkspaces() {
+    const rows = await this.db
+      .select({
+        userId: workspaceMembers.userId,
+        workspaceIds: sql`array_agg(${workspaceMembers.workspaceId})`,
+      })
+      .from(workspaceMembers)
+      .where(and(eq(workspaceMembers.role, 'owner'), eq(workspaceMembers.status, 'active')))
+      .groupBy(workspaceMembers.userId);
+    return rows.map((r) => ({ userId: r.userId, workspaceIds: r.workspaceIds || [] }));
+  }
 }
 
 export const workspaceMemberRepository = new WorkspaceMemberRepository();
