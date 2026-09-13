@@ -1,8 +1,8 @@
 import { AppError } from '../utils/index.js';
 import { verifyOwnership } from '../utils/index.js';
-import { conversationRepository } from '../repositories/ConversationRepository.js';
-import { messageRepository } from '../repositories/MessageRepository.js';
-import { workspaceMemberRepository } from '../repositories/WorkspaceMemberRepository.js';
+import { conversationRepository } from '../repositories/index.js';
+import { messageRepository } from '../repositories/index.js';
+import { workspaceMemberRepository } from '../repositories/index.js';
 import { ragService } from './rag.js';
 import logger from '../config/logger.js';
 
