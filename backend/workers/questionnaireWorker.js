@@ -9,11 +9,11 @@ import { Worker } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
 import { vendorQuestionnaireRepository } from '../repositories/index.js';
 import { runScoring } from '../services/questionnaireScorer.js';
-import { withTenantContext } from '../services/tenantIsolation.js';
+import { withTenantContext } from '../db/tenantContext.js';
 import logger from '../config/logger.js';
-import { connectDB } from '../config/database.js';
+import { connectPg } from '../config/db.js';
 
-connectDB().catch((err) =>
+connectPg().catch((err) =>
   logger.error('Questionnaire worker: DB connection failed', { error: err.message })
 );
 

@@ -4,7 +4,7 @@ import './monitoringWorker.js';
 import logger from '../config/logger.js';
 import { disconnectRedis } from '../config/redis.js';
 import { closeQueues } from '../config/queue.js';
-import { disconnectDB } from '../config/database.js';
+import { disconnectPg } from '../config/db.js';
 
 logger.info('='.repeat(60));
 logger.info('BullMQ Workers Started');
@@ -31,9 +31,9 @@ async function gracefulShutdown(signal) {
     logger.info('Disconnecting from Redis...');
     await disconnectRedis();
 
-    // Disconnect from MongoDB
-    logger.info('Disconnecting from MongoDB...');
-    await disconnectDB();
+    // Disconnect from Postgres
+    logger.info('Disconnecting from Postgres...');
+    await disconnectPg();
 
     logger.info('✅ Graceful shutdown complete');
     process.exit(0);

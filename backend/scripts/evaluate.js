@@ -15,7 +15,7 @@ import dotenv from 'dotenv';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { connectDB } from '../config/database.js';
+import { connectPg } from '../config/db.js';
 import { getVectorStore } from '../config/vectorStore.js';
 import { rerankDocuments } from '../services/rag/documentRanking.js';
 
@@ -85,7 +85,7 @@ async function main() {
   console.log(`Loaded ${goldenQueries.length} golden queries\n`);
 
   // Connect to DB + vector store
-  await connectDB();
+  await connectPg();
   const vectorStore = await getVectorStore([]);
 
   const results = [];
