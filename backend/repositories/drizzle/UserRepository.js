@@ -107,6 +107,11 @@ export class UserRepository extends BaseDrizzleRepository {
     return this._sanitize(await super.updateById(userId, { name: safeEncrypt(name) }));
   }
 
+  /** Activate/deactivate an account. */
+  async setActive(userId, isActive) {
+    return this._sanitize(await super.updateById(userId, { isActive }));
+  }
+
   // ── login attempts / lockout ────────────────────────────────────────────────
   async incLoginAttempts(userId) {
     const row = await this._rawById(userId);
