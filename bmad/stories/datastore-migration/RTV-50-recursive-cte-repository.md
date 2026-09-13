@@ -1,7 +1,7 @@
 ---
 id: RTV-50-recursive-cte-repository
 title: "Recursive-CTE traversal repository (the concentration/nth-party query pattern)"
-status: Ready
+status: In Progress
 type: Story
 epic: datastore-migration
 milestone: "RTV — Datastore migration (Postgres + Drizzle)"
