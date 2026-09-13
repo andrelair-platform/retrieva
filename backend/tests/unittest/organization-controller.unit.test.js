@@ -8,7 +8,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
 
 process.env.NODE_ENV = 'test';
 
@@ -53,9 +52,9 @@ vi.mock('../../services/stripeService.js', () => ({
   }),
 }));
 
-const ORG_OID = new mongoose.Types.ObjectId('cccccccccccccccccccccccc');
-const USER_OID = new mongoose.Types.ObjectId('dddddddddddddddddddddddd');
-const MBR_OID = new mongoose.Types.ObjectId('eeeeeeeeeeeeeeeeeeeeeeee');
+const ORG_OID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const USER_OID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const MBR_OID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 const mockOrg = {
   _id: ORG_OID,
@@ -84,7 +83,7 @@ const mockActiveMembership = {
 // OrganizationService (added in P3d) uses the repositories, not the models
 // directly. Mock the repository singletons that the service constructs at
 // import time.
-vi.mock('../../repositories/OrganizationRepository.js', () => ({
+vi.mock('../../repositories/drizzle/OrganizationRepository.js', () => ({
   organizationRepository: {
     create: vi.fn(),
     findById: vi.fn(),
@@ -92,7 +91,7 @@ vi.mock('../../repositories/OrganizationRepository.js', () => ({
   },
 }));
 
-vi.mock('../../repositories/OrganizationMemberRepository.js', () => ({
+vi.mock('../../repositories/drizzle/OrganizationMemberRepository.js', () => ({
   organizationMemberRepository: {
     findOne: vi.fn(),
     find: vi.fn(),
@@ -107,7 +106,7 @@ vi.mock('../../repositories/OrganizationMemberRepository.js', () => ({
   },
 }));
 
-vi.mock('../../repositories/UserRepository.js', () => ({
+vi.mock('../../repositories/drizzle/UserRepository.js', () => ({
   userRepository: {
     findById: vi.fn(),
     updateById: vi.fn(),
@@ -127,9 +126,9 @@ import {
   removeMember,
   getInviteInfo,
 } from '../../controllers/organizationController.js';
-import { organizationRepository as Organization } from '../../repositories/OrganizationRepository.js';
-import { organizationMemberRepository as OrganizationMember } from '../../repositories/OrganizationMemberRepository.js';
-import { userRepository as User } from '../../repositories/UserRepository.js';
+import { organizationRepository as Organization } from '../../repositories/drizzle/OrganizationRepository.js';
+import { organizationMemberRepository as OrganizationMember } from '../../repositories/drizzle/OrganizationMemberRepository.js';
+import { userRepository as User } from '../../repositories/drizzle/UserRepository.js';
 import { emailService } from '../../services/emailService.js';
 import { safeDecrypt } from '../../utils/security/fieldEncryption.js';
 
@@ -388,12 +387,12 @@ describe('removeMember', () => {
   });
 
   it('revokes membership and returns 200', async () => {
-    const targetOID = new mongoose.Types.ObjectId('ffffffffffffffffffffffff');
+    const targetOID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
     OrganizationMember.findActiveByUserId.mockResolvedValue(mockActiveMembership);
     OrganizationMember.findById.mockResolvedValue({
       _id: targetOID,
       organizationId: ORG_OID,
-      userId: new mongoose.Types.ObjectId('111111111111111111111111'),
+      userId: '11111111-1111-4111-8111-111111111111',
     });
     OrganizationMember.revokeMembership.mockResolvedValue({});
 

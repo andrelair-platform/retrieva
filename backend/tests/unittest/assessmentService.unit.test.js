@@ -7,7 +7,7 @@ import { AssessmentService } from '../../services/AssessmentService.js';
 // ---------------------------------------------------------------------------
 vi.mock('../../models/Assessment.js', () => ({ Assessment: {} }));
 vi.mock('../../models/Workspace.js', () => ({ Workspace: {} }));
-vi.mock('../../repositories/UserRepository.js', () => ({ userRepository: {} }));
+vi.mock('../../repositories/drizzle/UserRepository.js', () => ({ userRepository: {} }));
 vi.mock('../../config/queue.js', () => ({
   assessmentQueue: { add: vi.fn() },
   monitoringQueue: { getJob: vi.fn(), add: vi.fn() },

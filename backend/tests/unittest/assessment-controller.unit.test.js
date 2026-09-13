@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
 
 process.env.NODE_ENV = 'test';
 
@@ -58,7 +57,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const WORKSPACE_OID = new mongoose.Types.ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb');
+const WORKSPACE_OID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ASSESSMENT_ID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
 const mockAssessmentDoc = {

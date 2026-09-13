@@ -16,7 +16,7 @@ vi.mock('../../config/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('../../repositories/AssessmentRepository.js', () => ({
+vi.mock('../../repositories/drizzle/AssessmentRepository.js', () => ({
   assessmentRepository: {
     findById: vi.fn(),
     updateById: vi.fn(),
@@ -75,7 +75,7 @@ vi.mock('zod', () => ({
 }));
 
 import { runGapAnalysis } from '../../services/gapAnalysisAgent.js';
-import { assessmentRepository } from '../../repositories/AssessmentRepository.js';
+import { assessmentRepository } from '../../repositories/drizzle/AssessmentRepository.js';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { createLLM } from '../../config/llmProvider.js';
 

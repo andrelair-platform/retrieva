@@ -16,13 +16,13 @@ vi.mock('../../config/logger.js', () => ({
 
 // QuestionnaireService now uses the repositories, not the models directly.
 // Mock the repository singletons that the service constructs at import time.
-vi.mock('../../repositories/QuestionnaireTemplateRepository.js', () => ({
+vi.mock('../../repositories/drizzle/QuestionnaireTemplateRepository.js', () => ({
   questionnaireTemplateRepository: {
     findDefault: vi.fn(),
   },
 }));
 
-vi.mock('../../repositories/VendorQuestionnaireRepository.js', () => ({
+vi.mock('../../repositories/drizzle/VendorQuestionnaireRepository.js', () => ({
   vendorQuestionnaireRepository: {
     create: vi.fn(),
     findById: vi.fn(),
@@ -73,8 +73,8 @@ import {
   getPublicForm,
   submitResponse,
 } from '../../controllers/questionnaireController.js';
-import { questionnaireTemplateRepository as QuestionnaireTemplate } from '../../repositories/QuestionnaireTemplateRepository.js';
-import { vendorQuestionnaireRepository as VendorQuestionnaire } from '../../repositories/VendorQuestionnaireRepository.js';
+import { questionnaireTemplateRepository as QuestionnaireTemplate } from '../../repositories/drizzle/QuestionnaireTemplateRepository.js';
+import { vendorQuestionnaireRepository as VendorQuestionnaire } from '../../repositories/drizzle/VendorQuestionnaireRepository.js';
 import { questionnaireQueue } from '../../config/queue.js';
 import { emailService } from '../../services/emailService.js';
 
