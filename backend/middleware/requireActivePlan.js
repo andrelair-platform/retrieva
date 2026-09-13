@@ -12,7 +12,7 @@
  *  - anything else         → 402 with { planStatus }
  */
 
-import { Organization } from '../models/Organization.js';
+import { organizationRepository } from '../repositories/drizzle/OrganizationRepository.js';
 import { sendError } from '../utils/index.js';
 import logger from '../config/logger.js';
 
@@ -23,9 +23,9 @@ export async function requireActivePlan(req, res, next) {
   }
 
   try {
-    const org = await Organization.findById(req.user.organizationId).select(
-      'planStatus trialEndsAt'
-    );
+    const org = req.user.organizationId
+      ? await organizationRepository.findById(req.user.organizationId)
+      : null;
 
     // Org not found or billing not yet provisioned → fail-open
     if (!org || !org.planStatus) {

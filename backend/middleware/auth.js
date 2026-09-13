@@ -10,7 +10,7 @@
  */
 
 import { verifyAccessToken } from '../utils/security/jwt.js';
-import { User } from '../models/User.js';
+import { userRepository } from '../repositories/drizzle/UserRepository.js';
 import { sendError } from '../utils/core/responseFormatter.js';
 import { getAccessToken } from '../utils/security/cookieConfig.js';
 import { authAuditService } from '../services/authAuditService.js';
@@ -74,7 +74,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     // Get user from database
-    const user = await User.findById(decoded.userId);
+    const user = await userRepository.findById(decoded.userId);
 
     if (!user) {
       logger.warn('User not found for token', { userId: decoded.userId });
@@ -82,13 +82,13 @@ export const authenticate = async (req, res, next) => {
     }
 
     if (!user.isActive) {
-      logger.warn('Inactive user attempted access', { userId: user._id });
+      logger.warn('Inactive user attempted access', { userId: user.id });
       return sendError(res, 401, 'Account is inactive');
     }
 
-    // Attach user to request
+    // Attach user to request (repo returns a sanitized row: id, decrypted name)
     req.user = {
-      userId: user._id,
+      userId: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
@@ -96,7 +96,7 @@ export const authenticate = async (req, res, next) => {
     };
 
     logger.debug('User authenticated', {
-      userId: user._id,
+      userId: user.id,
       email: user.email,
       path: req.path,
     });
@@ -181,11 +181,11 @@ export const optionalAuth = async (req, res, next) => {
 
     try {
       const decoded = verifyAccessToken(token);
-      const user = await User.findById(decoded.userId);
+      const user = await userRepository.findById(decoded.userId);
 
       if (user && user.isActive) {
         req.user = {
-          userId: user._id,
+          userId: user.id,
           email: user.email,
           role: user.role,
           name: user.name,

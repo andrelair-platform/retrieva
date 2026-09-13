@@ -1,46 +1,35 @@
 /**
- * Repository Layer - Barrel Export
+ * Repository Layer — Barrel Export (RTV-49 pt5 — now Drizzle/Postgres).
  *
- * Implements the Repository Pattern for clean data access abstraction.
- *
- * Benefits:
- * - Decouples business logic from data access
- * - Centralizes complex queries
- * - Makes database switching easier
- * - Enables unit testing with mock repositories
- *
- * Usage:
- *   // Import specific repository
- *   import { analyticsRepository } from './repositories';
- *
- *   // Or import class for custom instances
- *   import { AnalyticsRepository } from './repositories';
- *   const repo = new AnalyticsRepository(mockModel);
+ * Re-exports the Drizzle repository singletons + classes. The Mongoose repos were removed
+ * in the cutover; these are the SQL-first repos (see repositories/drizzle/). Method shapes
+ * changed (Drizzle `where` conditions + intent-named methods, not Mongo criteria).
  */
+export { BaseDrizzleRepository } from './drizzle/BaseDrizzleRepository.js';
+export { TenantScopedRepository } from './drizzle/TenantScopedRepository.js';
 
-// Base class
-export { BaseRepository } from './BaseRepository.js';
-
-// Repository classes and singleton instances
-export { MessageRepository, messageRepository } from './MessageRepository.js';
-export { ConversationRepository, conversationRepository } from './ConversationRepository.js';
-export { AssessmentRepository, assessmentRepository } from './AssessmentRepository.js';
-export { WorkspaceRepository, workspaceRepository } from './WorkspaceRepository.js';
-export { UserRepository, userRepository } from './UserRepository.js';
-export { OrganizationRepository, organizationRepository } from './OrganizationRepository.js';
+export { UserRepository, userRepository } from './drizzle/UserRepository.js';
+export { OrganizationRepository, organizationRepository } from './drizzle/OrganizationRepository.js';
 export {
   OrganizationMemberRepository,
   organizationMemberRepository,
-} from './OrganizationMemberRepository.js';
+} from './drizzle/OrganizationMemberRepository.js';
+export { WorkspaceRepository, workspaceRepository } from './drizzle/WorkspaceRepository.js';
 export {
   WorkspaceMemberRepository,
   workspaceMemberRepository,
-} from './WorkspaceMemberRepository.js';
+} from './drizzle/WorkspaceMemberRepository.js';
+export {
+  ConversationRepository,
+  conversationRepository,
+} from './drizzle/ConversationRepository.js';
+export { MessageRepository, messageRepository } from './drizzle/MessageRepository.js';
+export { AssessmentRepository, assessmentRepository } from './drizzle/AssessmentRepository.js';
 export {
   QuestionnaireTemplateRepository,
   questionnaireTemplateRepository,
-} from './QuestionnaireTemplateRepository.js';
+} from './drizzle/QuestionnaireTemplateRepository.js';
 export {
   VendorQuestionnaireRepository,
   vendorQuestionnaireRepository,
-} from './VendorQuestionnaireRepository.js';
+} from './drizzle/VendorQuestionnaireRepository.js';

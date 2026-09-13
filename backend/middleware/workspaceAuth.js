@@ -3,10 +3,13 @@
  *
  * Ensures users can only access resources from workspaces they're members of.
  * No anonymous access - all users must be authenticated and authorized.
+ *
+ * RTV-49: migrated off Mongoose — membership via workspaceMemberRepository; the old
+ * `.populate('workspaceId', …)` is now `findActiveQueryableWithWorkspace` (Drizzle relation).
  */
 
-import { WorkspaceMember } from '../models/WorkspaceMember.js';
-import { Workspace } from '../models/Workspace.js';
+import { workspaceMemberRepository } from '../repositories/drizzle/WorkspaceMemberRepository.js';
+import { workspaceRepository } from '../repositories/drizzle/WorkspaceRepository.js';
 import { sendError } from '../utils/core/responseFormatter.js';
 import logger from '../config/logger.js';
 
@@ -28,12 +31,8 @@ export const requireWorkspaceAccess = async (req, res, next) => {
 
     const userId = req.user.userId;
 
-    // Get user's workspace memberships
-    const memberships = await WorkspaceMember.find({
-      userId,
-      status: 'active',
-      'permissions.canQuery': true,
-    }).populate('workspaceId', 'name syncStatus');
+    // Active, query-permitted memberships + their workspace (name, syncStatus).
+    const memberships = await workspaceMemberRepository.findActiveQueryableWithWorkspace(userId);
 
     if (memberships.length === 0) {
       logger.warn('User has no workspace access', {
@@ -50,11 +49,11 @@ export const requireWorkspaceAccess = async (req, res, next) => {
 
     // Filter to active workspaces only
     const activeWorkspaces = memberships
-      .filter((m) => m.workspaceId && m.workspaceId.syncStatus !== 'error')
+      .filter((m) => m.workspace && m.workspace.syncStatus !== 'error')
       .map((m) => ({
-        _id: m.workspaceId._id,
-        workspaceId: m.workspaceId._id.toString(),
-        workspaceName: m.workspaceId.name,
+        _id: m.workspace.id,
+        workspaceId: m.workspace.id.toString(),
+        workspaceName: m.workspace.name,
         role: m.role,
         permissions: m.permissions,
       }));
@@ -123,12 +122,7 @@ export const requireWorkspaceOwner = async (req, res, next) => {
     const userId = req.user.userId;
 
     // Check if user is owner of this workspace
-    const membership = await WorkspaceMember.findOne({
-      workspaceId,
-      userId,
-      status: 'active',
-      role: 'owner',
-    });
+    const membership = await workspaceMemberRepository.findOwnerMembership(workspaceId, userId);
 
     if (!membership) {
       logger.warn('Non-owner attempted workspace admin action', {
@@ -140,7 +134,7 @@ export const requireWorkspaceOwner = async (req, res, next) => {
       return sendError(res, 403, 'Only workspace owners can perform this action');
     }
 
-    req.workspace = await Workspace.findById(workspaceId);
+    req.workspace = await workspaceRepository.findById(workspaceId);
     next();
   } catch (error) {
     logger.error('Workspace owner check error', {
@@ -166,17 +160,13 @@ export const canInviteMembers = async (req, res, next) => {
       return sendError(res, 400, 'Workspace ID required');
     }
 
-    const membership = await WorkspaceMember.findOne({
-      workspaceId,
-      userId: req.user.userId,
-      status: 'active',
-    });
+    const membership = await workspaceMemberRepository.findMembership(workspaceId, req.user.userId);
 
     if (!membership) {
       return sendError(res, 403, 'You are not a member of this workspace');
     }
 
-    if (membership.role !== 'owner' && !membership.permissions.canInvite) {
+    if (membership.role !== 'owner' && !membership.permissions?.canInvite) {
       return sendError(res, 403, 'You do not have permission to invite members');
     }
 
@@ -195,11 +185,6 @@ export const canInviteMembers = async (req, res, next) => {
  * Get workspace IDs that user has access to (for filtering queries)
  */
 export async function getUserWorkspaceIds(userId) {
-  const memberships = await WorkspaceMember.find({
-    userId,
-    status: 'active',
-    'permissions.canQuery': true,
-  }).populate('workspaceId', '_id');
-
-  return memberships.filter((m) => m.workspaceId).map((m) => m.workspaceId._id.toString());
+  const memberships = await workspaceMemberRepository.findActiveQueryableWithWorkspace(userId);
+  return memberships.filter((m) => m.workspace).map((m) => m.workspace.id.toString());
 }
