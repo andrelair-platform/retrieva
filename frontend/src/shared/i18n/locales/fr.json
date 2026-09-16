@@ -436,7 +436,7 @@
       "subtitle": "La plupart des outils vous font remplir des registres à la main, ou donnent une réponse indéfendable.",
       "grc": {
         "title": "Suites GRC",
-        "desc": "Puissantes mais lourdes, chères, des mois à déployer — et vous remplissez quand même les registres et lisez les documents vous-même."
+        "desc": "Puissantes mais lourdes, chères, des mois à déployer — et c'est un SaaS de plus à faire confiance : un tiers critique ajouté rien que pour gérer votre risque de tiers."
       },
       "chatgpt": {
         "title": "ChatGPT & tableurs",
@@ -444,7 +444,7 @@
       },
       "retrieva": {
         "title": "Retrieva",
-        "desc": "Lit les preuves réelles — contrat, SOC 2, ISO — cite chaque constat, et laisse votre expert relire-et-signer, sur tout votre portefeuille fournisseurs."
+        "desc": "Lit les preuves réelles — contrat, SOC 2, ISO — cite chaque constat, et cartographie le graphe des sous-traitants pour révéler la concentration de nième rang. Auto-hébergé : aucun nouveau fournisseur ajouté."
       }
     },
     "credibility": {

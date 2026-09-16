@@ -436,7 +436,7 @@
       "subtitle": "Most tools make you fill in registers by hand, or give you an answer you can't defend.",
       "grc": {
         "title": "GRC suites",
-        "desc": "Powerful but heavy, expensive, and months to deploy — and you still fill the registers and read the documents yourself."
+        "desc": "Powerful but heavy, expensive, and months to deploy — and it's one more SaaS you must trust: a critical third-party added just to manage your third-party risk."
       },
       "chatgpt": {
         "title": "ChatGPT & spreadsheets",
@@ -444,7 +444,7 @@
       },
       "retrieva": {
         "title": "Retrieva",
-        "desc": "Reads the actual evidence — the contract, SOC 2, ISO — cites every finding, and lets your expert review-and-sign, across your entire vendor portfolio."
+        "desc": "Reads the actual evidence — contract, SOC 2, ISO — cites every finding, and maps the subcontractor graph to expose nth-party concentration. Self-hosted, so it adds no new vendor of its own."
       }
     },
     "credibility": {
