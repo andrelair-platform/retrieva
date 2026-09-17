@@ -22,8 +22,10 @@ import {
   ScrollText,
   Server,
   ShieldCheck,
-  Sparkles,
   Upload,
+  Check,
+  Minus,
+  X,
 } from 'lucide-react';
 
 import { PricingSection } from '@/components/marketing/pricing-section';
@@ -177,28 +179,7 @@ export function LandingPageContent() {
           </h2>
           <p className="text-muted-foreground text-lg">{t('landing.differentiation.subtitle')}</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {[
-            { k: 'grc', icon: <Database className="h-6 w-6" />, highlight: false },
-            { k: 'chatgpt', icon: <Bot className="h-6 w-6" />, highlight: false },
-            { k: 'retrieva', icon: <Sparkles className="h-6 w-6" />, highlight: true },
-          ].map(({ k, icon, highlight }) => (
-            <div
-              key={k}
-              className={
-                highlight
-                  ? 'rounded-2xl border border-primary/50 bg-primary/[0.07] p-6 ring-1 ring-primary/20'
-                  : 'rounded-2xl border border-border bg-card/50 p-6'
-              }
-            >
-              <div className={`mb-4 ${highlight ? 'text-primary' : 'text-muted-foreground'}`}>{icon}</div>
-              <h3 className="font-display text-lg font-semibold mb-2">{t(`landing.differentiation.${k}.title`)}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {t(`landing.differentiation.${k}.desc`)}
-              </p>
-            </div>
-          ))}
-        </div>
+        <ComparisonTable />
       </section>
 
       {/* Multi-source evidence */}
@@ -440,4 +421,74 @@ function StepCard({
       <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
+}
+
+type CellState = 'yes' | 'no' | 'partial';
+
+function ComparisonTable() {
+  const { t } = useTranslation();
+  // Capability rows chosen to be DORA-specific and complementary to the stats
+  // and feature sections — a scannable matrix, not a restatement of prose.
+  const rows: { k: string; s: CellState; g: CellState; r: CellState }[] = [
+    { k: 'relationalRoi', s: 'no', g: 'partial', r: 'yes' },
+    { k: 'nthParty', s: 'no', g: 'partial', r: 'yes' },
+    { k: 'concentration', s: 'no', g: 'partial', r: 'yes' },
+    { k: 'citedEvidence', s: 'no', g: 'no', r: 'yes' },
+    { k: 'signoff', s: 'partial', g: 'yes', r: 'yes' },
+    { k: 'portfolio', s: 'partial', g: 'yes', r: 'yes' },
+    { k: 'esaReady', s: 'no', g: 'partial', r: 'yes' },
+    { k: 'noNewVendor', s: 'partial', g: 'no', r: 'yes' },
+    { k: 'fastDeploy', s: 'yes', g: 'no', r: 'yes' },
+    { k: 'lowCost', s: 'yes', g: 'no', r: 'yes' },
+  ];
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-border">
+      <table className="w-full min-w-[640px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border bg-card/40">
+            <th className="p-4 text-left font-display font-semibold">
+              {t('landing.differentiation.table.cols.capability')}
+            </th>
+            <th className="p-4 text-center font-display font-medium text-muted-foreground">
+              {t('landing.differentiation.table.cols.spreadsheet')}
+            </th>
+            <th className="p-4 text-center font-display font-medium text-muted-foreground">
+              {t('landing.differentiation.table.cols.grc')}
+            </th>
+            <th className="p-4 text-center font-display font-semibold text-primary bg-primary/[0.06]">
+              {t('landing.differentiation.table.cols.retrieva')}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.k} className="border-b border-border/50 last:border-0">
+              <td className="p-4 text-muted-foreground leading-snug">
+                {t(`landing.differentiation.table.rows.${row.k}`)}
+              </td>
+              <td className="p-4 text-center">
+                <Cell state={row.s} />
+              </td>
+              <td className="p-4 text-center">
+                <Cell state={row.g} />
+              </td>
+              <td className="p-4 text-center bg-primary/[0.04]">
+                <Cell state={row.r} featured />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Cell({ state, featured = false }: { state: CellState; featured?: boolean }) {
+  if (state === 'yes') {
+    return <Check className={`inline h-5 w-5 ${featured ? 'text-primary' : 'text-foreground/60'}`} aria-label="yes" />;
+  }
+  if (state === 'partial') {
+    return <Minus className="inline h-5 w-5 text-muted-foreground/50" aria-label="partial" />;
+  }
+  return <X className="inline h-4 w-4 text-muted-foreground/30" aria-label="no" />;
 }

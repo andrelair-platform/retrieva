@@ -433,18 +433,26 @@
     },
     "differentiation": {
       "heading": "Not another GRC suite. Not ChatGPT.",
-      "subtitle": "Most tools make you fill in registers by hand, or give you an answer you can't defend.",
-      "grc": {
-        "title": "GRC suites",
-        "desc": "Powerful but heavy, expensive, and months to deploy — and it's one more SaaS you must trust: a critical third-party added just to manage your third-party risk."
-      },
-      "chatgpt": {
-        "title": "ChatGPT & spreadsheets",
-        "desc": "Fast, but a throwaway answer: no citations, no audit trail, no sign-off, no view of your whole portfolio."
-      },
-      "retrieva": {
-        "title": "Retrieva",
-        "desc": "Reads the actual evidence — contract, SOC 2, ISO — cites every finding, and maps the subcontractor graph to expose nth-party concentration. Self-hosted, so it adds no new vendor of its own."
+      "subtitle": "The DORA Register of Information is a graph, not a list — here's what that means, capability by capability.",
+      "table": {
+        "cols": {
+          "capability": "Capability",
+          "spreadsheet": "Spreadsheet",
+          "grc": "GRC suite",
+          "retrieva": "Retrieva"
+        },
+        "rows": {
+          "relationalRoi": "Relational Register of Information (entity → contract → function → subprocessor)",
+          "nthParty": "Nth-party / subcontractor chain mapping",
+          "concentration": "Concentration-risk analysis (shared substrate)",
+          "citedEvidence": "Reads & cites the real evidence (contracts, SOC 2, ISO)",
+          "signoff": "Expert review & sign-off audit trail",
+          "portfolio": "Whole-portfolio view",
+          "esaReady": "Survives the ESA register data-quality checks",
+          "noNewVendor": "Adds no new critical third-party of its own",
+          "fastDeploy": "Live in days, not months",
+          "lowCost": "No enterprise licence fee"
+        }
       }
     },
     "credibility": {
