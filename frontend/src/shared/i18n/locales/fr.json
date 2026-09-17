@@ -433,18 +433,26 @@
     },
     "differentiation": {
       "heading": "Ni une énième suite GRC. Ni ChatGPT.",
-      "subtitle": "La plupart des outils vous font remplir des registres à la main, ou donnent une réponse indéfendable.",
-      "grc": {
-        "title": "Suites GRC",
-        "desc": "Puissantes mais lourdes, chères, des mois à déployer — et c'est un SaaS de plus à faire confiance : un tiers critique ajouté rien que pour gérer votre risque de tiers."
-      },
-      "chatgpt": {
-        "title": "ChatGPT & tableurs",
-        "desc": "Rapide, mais une réponse jetable : pas de citations, pas de trace d'audit, pas de sign-off, aucune vue de votre portefeuille."
-      },
-      "retrieva": {
-        "title": "Retrieva",
-        "desc": "Lit les preuves réelles — contrat, SOC 2, ISO — cite chaque constat, et cartographie le graphe des sous-traitants pour révéler la concentration de nième rang. Auto-hébergé : aucun nouveau fournisseur ajouté."
+      "subtitle": "Le Registre d'Information DORA est un graphe, pas une liste — voici ce que ça change, capacité par capacité.",
+      "table": {
+        "cols": {
+          "capability": "Capacité",
+          "spreadsheet": "Tableur",
+          "grc": "Suite GRC",
+          "retrieva": "Retrieva"
+        },
+        "rows": {
+          "relationalRoi": "Registre d'Information relationnel (entité → contrat → fonction → sous-traitant)",
+          "nthParty": "Cartographie des chaînes de sous-traitance (nième rang)",
+          "concentration": "Analyse du risque de concentration (substrat partagé)",
+          "citedEvidence": "Lit et cite les preuves réelles (contrats, SOC 2, ISO)",
+          "signoff": "Revue expert & piste d'audit de validation",
+          "portfolio": "Vue portefeuille complète",
+          "esaReady": "Passe les contrôles qualité du registre (ESA)",
+          "noNewVendor": "N'ajoute aucun nouveau tiers critique",
+          "fastDeploy": "Opérationnel en jours, pas en mois",
+          "lowCost": "Sans licence entreprise"
+        }
       }
     },
     "credibility": {
