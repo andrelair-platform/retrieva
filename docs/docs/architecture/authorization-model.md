@@ -124,6 +124,32 @@ so a bad capability map can never lock users out of their workspaces:
 - Workspace-membership → role_assignments migration and the membership-table **collapse** stay open
   (RTV-54+).
 
+### Pass 2 delivered — RTV-54 (entity isolation + `can()` scope matching, flag-gated)
+Row-level isolation so one legal entity can't see another's rows (France ⊥ Belgium), rolled out
+**dark** to protect the live service:
+
+- **Scope resolver** (`services/security/entityScope.js`) — `resolveEntityScope(user)` derives the
+  accessible entities from `role_assignments`: `platform_admin`=unrestricted; any `group_*`
+  role=read-across; else the distinct `entity` scope ids **unioned with the user's home org**
+  (`users.organizationId`) as a lock-out guard (org membership ⟺ home org, so today's access is
+  preserved while every *other* entity is denied). Empty → default-deny.
+- **Query-layer wrapper** — an entity `AsyncLocalStorage` (`db/entityContext.js`) set once per request
+  by `middleware/setEntityContext.ts` (fail-closed on resolution error), + `entityScopeCondition(col)`
+  composed (AND-ed) into every org-scoped repo query (`CriticalFunction`, `ProviderGraph`,
+  `Workspace.findByOrganization`). Isolation is applied where the data is read, so it can't be forgotten
+  per-endpoint.
+- **`can()` scope matching** — when the resource names an entity, the granting role must be in that
+  scope; `can()` answers the *action*, the entity scope answers *which rows* — they compose.
+- **Flag-gated rollout** (`ENTITY_ISOLATION_MODE = off|shadow|enforce`): `shadow` computes the scope and
+  **logs** would-be denials without filtering, so impact is observed before `enforce`. Dev goes
+  off→shadow→enforce; prod (empty DB) goes straight to `enforce`. Flipped via GitOps values, not code.
+- **AC-3 reality:** the resources the ACs list (arrangements/evidence/findings/risks/register) are mostly
+  **future tables** — RTV-54 applies the mechanism to the **existing** entity-scoped tables and makes the
+  wrapper the mandatory path so new tables inherit isolation for free. Group read-across is coded + tested
+  but **dormant** until the Group tables (RTV-35/36).
+- Proven by an **IDOR integration test** (user of entity A cannot read/write entity B's rows by id;
+  `platform_admin` sees across; `shadow`/`off` don't filter).
+
 ## Consequences
 - One coherent, inspectable authz model; "who can approve a finding?" answerable from one place.
 - SoD + audit make the human-in-the-loop model (RTV-43) actually enforceable — the compliance story.
