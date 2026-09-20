@@ -60,16 +60,19 @@ services:
 
   # ===========================================================================
   # Backend Service (Node.js/Express)
+  # Post-split (RFC #474): the backend lives in andrelair-platform/retrieva-backend.
+  # This assumes it's checked out as a SIBLING (~/Developer/cloudplateform/retrieva-backend,
+  # the standard repo layout). For local full-stack dev, clone it alongside this repo.
   # ===========================================================================
   backend:
     build:
-      context: ./backend
+      context: ../retrieva-backend
       dockerfile: Dockerfile
     container_name: rag-backend
     ports:
       - "3007:3007"
     env_file:
-      - ./backend/.env
+      - ../retrieva-backend/.env
     environment:
       - NODE_ENV=development
       - DOCKER_ENV=true
@@ -95,7 +98,7 @@ services:
       ollama-pull:
         condition: service_completed_successfully
     volumes:
-      - ./backend:/app
+      - ../retrieva-backend:/app
       - /app/node_modules
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/health"]

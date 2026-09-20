@@ -173,16 +173,17 @@ services:
   # ---------------------------------------------------------------------------
   # Backend (Node.js/Express)
   # ---------------------------------------------------------------------------
-  # MongoDB connection string comes from backend/.env
-  # Redis and Qdrant run as sibling containers (see services above)
-  # (decrypted from backend/.env.production.enc at deploy time)
+  # Post-split (RFC #474): the backend image is built + published by
+  # andrelair-platform/retrieva-backend. Env comes from that repo's .env
+  # (decrypted from its .env.production.enc at deploy time). NB: production
+  # deployment is GitOps (ArgoCD + Kargo) — this compose is legacy/local-only.
   backend:
-    image: ghcr.io/andreliar/retrieva/backend:latest
+    image: ghcr.io/andrelair-platform/retrieva-backend:latest
     container_name: retrieva-backend
     ports:
       - "127.0.0.1:3007:3007"
     env_file:
-      - ./backend/.env
+      - ../retrieva-backend/.env
     depends_on:
       redis:
         condition: service_healthy

@@ -6,6 +6,13 @@ Retrieva automates third-party ICT risk assessments under DORA (Regulation EU 20
 
 **Live:** [retrieva.online](https://retrieva.online) · **Docs:** [andreliar.github.io/Retrieva](https://andreliar.github.io/Retrieva/)
 
+> **Repo layout (post-split, RFC #474):** this repository is the **frontend** (Next.js).
+> The **backend** (Express + Drizzle/Postgres + LangChain RAG API) lives in
+> **[andrelair-platform/retrieva-backend](https://github.com/andrelair-platform/retrieva-backend)**.
+> The architecture diagram below shows the full system across both repos. For local full-stack
+> dev, clone `retrieva-backend` as a sibling directory (the `docker-compose.yml` `backend` service
+> builds from `../retrieva-backend`).
+
 ---
 
 ## Features

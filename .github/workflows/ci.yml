@@ -1,27 +1,22 @@
 # =============================================================================
-# Continuous Integration Pipeline
+# Continuous Integration Pipeline — retrieva FRONTEND (Next.js)
 # =============================================================================
-# Runs on pushes to dev/staging, PRs to main/dev/staging, and called by CD
-# Tests backend (Node.js) and frontend (Next.js)
-
+# Post-split (RFC #474): this repo is frontend-only; backend CI lives in
+# andrelair-platform/retrieva-backend. Runs on PRs to main (+ dev pushes).
 name: CI
 
 on:
   push:
-    branches: [dev, staging]
+    branches: [dev]
   pull_request:
-    branches: [main, dev, staging]
+    branches: [main, dev]
   workflow_call:
 
 env:
   NODE_VERSION: '20.x'
 
 jobs:
-  # ===========================================================================
-  # Change detection — skip the heavy jobs when a PR only touches docs/bmad
-  # markdown. `CI Success` (the sole required check) still runs and passes, so
-  # docs-only PRs are not blocked. Heavy jobs run whenever real code changes.
-  # ===========================================================================
+  # Skip heavy jobs when a PR only touches docs/bmad markdown.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -34,7 +29,6 @@ jobs:
         with:
           filters: |
             code:
-              - 'backend/**'
               - 'frontend/**'
               - '**/Dockerfile'
               - 'Dockerfile*'
@@ -42,131 +36,26 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/**'
 
-  # ===========================================================================
-  # Backend (Node.js/Express) Tests
-  # ===========================================================================
-  backend-test:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-
-    defaults:
-      run:
-        working-directory: ./backend
-
-    services:
-      # MongoDB for integration tests
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.runCommand({ping:1})'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      # Redis for caching and BullMQ
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6378:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      # PostgreSQL for Drizzle integration tests (RTV-47 → RTV-45 migration).
-      # Runs alongside Mongo during the transition; Mongo is removed at RTV-49.
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: retrieva
-          POSTGRES_PASSWORD: retrieva
-          POSTGRES_DB: retrieva_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U retrieva"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: './backend/package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Run linting
-        run: npm run lint --if-present
-
-      - name: Run unit tests
-        run: npm run test:coverage
-        env:
-          NODE_ENV: test
-          MONGODB_URI: mongodb://localhost:27017/test_db
-          DATABASE_URL: postgresql://retrieva:retrieva@localhost:5432/retrieva_test
-          REDIS_URL: redis://localhost:6378
-          REDIS_HOST: localhost
-          REDIS_PORT: 6378
-          JWT_ACCESS_SECRET: test-access-secret-key-that-is-at-least-32-characters-long
-          JWT_REFRESH_SECRET: test-refresh-secret-key-that-is-at-least-32-characters-long
-          JWT_ACCESS_EXPIRY: 15m
-          JWT_REFRESH_EXPIRY: 7d
-          ENCRYPTION_KEY: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v6
-        if: always()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./backend/coverage
-          flags: backend
-          fail_ci_if_error: true
-
-  # ===========================================================================
-  # Frontend (Next.js/React) Tests
-  # ===========================================================================
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: './package-lock.json'
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --ignore-scripts
-        working-directory: .
-
       - name: Run linting
         run: npm run lint --if-present
         working-directory: ./frontend
-
       - name: Run tests
         run: npm run test:coverage
         working-directory: ./frontend
-
       - name: Upload coverage report
         uses: codecov/codecov-action@v6
         if: always()
@@ -176,35 +65,23 @@ jobs:
           flags: frontend
           fail_ci_if_error: true
 
-  # ===========================================================================
-  # Frontend E2E Tests (Playwright)
-  # ===========================================================================
   frontend-e2e:
     name: Frontend E2E Tests
     runs-on: ubuntu-latest
-    # Run after unit tests pass, only on PRs, and only when code actually changed
     needs: [changes, frontend-test]
     if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: './package-lock.json'
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --ignore-scripts
-        working-directory: .
-
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
         working-directory: ./frontend
-
       - name: Run E2E tests
         run: npm run test:e2e
         working-directory: ./frontend
@@ -212,7 +89,6 @@ jobs:
           CI: true
           NEXT_PUBLIC_API_URL: http://localhost:3007/api/v1
           NEXT_PUBLIC_APP_NAME: Retrieva
-
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
         if: always()
@@ -221,130 +97,62 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
-  # ===========================================================================
-  # Backend Security Audit
-  # ===========================================================================
-  backend-security:
-    name: Backend Security Audit
-    runs-on: ubuntu-latest
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-
-    defaults:
-      run:
-        working-directory: ./backend
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: './backend/package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Run npm audit
-        run: npm audit --audit-level=high || true
-        continue-on-error: true
-
-  # ===========================================================================
-  # Docker Build Verification
-  # ===========================================================================
   docker-build:
-    name: Docker Build Check (${{ matrix.service }})
+    name: Docker Build Check (frontend)
     runs-on: ubuntu-latest
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-
-    strategy:
-      matrix:
-        include:
-          - service: backend
-            context: ./backend
-          - service: frontend
-            context: ./frontend
-            build-args: |
-              NEXT_PUBLIC_API_URL=https://retrieva.online/api/v1
-              NEXT_PUBLIC_WS_URL=https://retrieva.online
-              NEXT_PUBLIC_APP_NAME=Retrieva
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build ${{ matrix.service }} Docker image
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: Build frontend Docker image
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
+          context: ./frontend
           push: false
-          tags: ${{ matrix.service }}:test
-          build-args: ${{ matrix.build-args || '' }}
+          tags: retrieva-frontend:test
+          build-args: |
+            NEXT_PUBLIC_APP_NAME=Retrieva
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ===========================================================================
-  # Storybook Build (design system verification)
-  # ===========================================================================
   storybook-build:
     name: Storybook Build
     runs-on: ubuntu-latest
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: './package-lock.json'
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --ignore-scripts
-        working-directory: .
-
       - name: Build Storybook
         run: npm run build-storybook
         working-directory: ./frontend
 
-  # ===========================================================================
-  # All Checks Pass Gate
-  # ===========================================================================
   ci-success:
     name: CI Success
-    needs: [changes, backend-test, frontend-test, backend-security, docker-build, frontend-e2e, storybook-build]
+    needs: [changes, frontend-test, docker-build, frontend-e2e, storybook-build]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all jobs passed
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          BACKEND_RESULT: ${{ needs.backend-test.result }}
           FRONTEND_RESULT: ${{ needs.frontend-test.result }}
-          SECURITY_RESULT: ${{ needs.backend-security.result }}
           DOCKER_RESULT: ${{ needs.docker-build.result }}
           E2E_RESULT: ${{ needs.frontend-e2e.result }}
           STORYBOOK_RESULT: ${{ needs.storybook-build.result }}
         run: |
-          # Change detection must succeed — otherwise the gates below are meaningless.
           if [[ "$CHANGES_RESULT" != "success" ]]; then
             echo "Change detection failed (result=$CHANGES_RESULT)"; exit 1
           fi
-          # The heavy jobs are gated on `changes.outputs.code`. A 'skipped' result
-          # therefore means "no code changed → correctly not run" and counts as OK.
-          # Only a real 'failure'/'cancelled' fails this gate.
           fail=0
-          for name in BACKEND FRONTEND SECURITY DOCKER E2E STORYBOOK; do
+          for name in FRONTEND DOCKER E2E STORYBOOK; do
             var="${name}_RESULT"; r="${!var}"
             if [[ "$r" != "success" && "$r" != "skipped" ]]; then
               echo "$name job did not pass (result=$r)"; fail=1
