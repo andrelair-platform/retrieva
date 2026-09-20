@@ -97,6 +97,33 @@ Retrieva roles** is documented for enterprise SSO + self-host (RTV-44) — defer
 Depends on RTV-45/48 (Postgres+Drizzle + schema). Sequenced right after RTV-48 so the role model is
 in place before the assessment/approval work (RTV-30/41/43). Supersedes #347/#349.
 
+### Pass 1 delivered — RTV-52 + RTV-53 (non-destructive foundation)
+The first pass lands the **additive foundation** on the live service, deliberately **non-destructive**
+so a bad capability map can never lock users out of their workspaces:
+
+- **RTV-52** — `role_assignments(user_id, scope_type[group|entity], scope_id, role, status)` +
+  `users.platform_admin` boolean, applied via an additive migration (`0001_*`) whose idempotent
+  backfill sets `platform_admin` from the legacy global `admin` role and seeds `role_assignments`
+  from `organization_members` (`org_admin→entity_admin`, `analyst→analyst`, `viewer→viewer`, scope
+  `entity` = the current `organizations.id`). `RoleAssignmentRepository` reads/writes it.
+- **RTV-53** — the versioned capability map (`config/authz/capabilities.js`, `CAPABILITY_MAP_VERSION`),
+  the single default-deny `can(user, action, resource)` resolver (`services/security/can.js`,
+  `platform_admin`=allow-all, per-request memoized), and the `authorizeAction('resource:action')`
+  Express guard.
+
+**Deliberate boundaries of pass 1** (each is a later, individually-verifiable pass):
+- **Scope model is v1 = "Org is the Legal Entity"**; the `group` scope exists in the enum/schema but
+  has no rows or read-across until the domain Group/Entity tables (RTV-35/36).
+- **Nothing destructive**: `organization_members`, `workspace_members` and `users.role` are **kept**.
+  Per-workspace resource access still flows through `loadWorkspace` + `WorkspaceMemberRepository`.
+- **Scope matching in `can()` is deferred to RTV-54** — pass 1 allows a granting role in *any* active
+  scope (preserves current behaviour; the only capability actually gated today is `platform:admin`,
+  and there were **no** live global-admin route guards to migrate).
+- **SoD (maker≠checker)** is expressed in the map (analyst drafts, `ict_risk_officer` approves) but
+  **enforced at the mutation** in RTV-55.
+- Workspace-membership → role_assignments migration and the membership-table **collapse** stay open
+  (RTV-54+).
+
 ## Consequences
 - One coherent, inspectable authz model; "who can approve a finding?" answerable from one place.
 - SoD + audit make the human-in-the-loop model (RTV-43) actually enforceable — the compliance story.
