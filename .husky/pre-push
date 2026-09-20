@@ -10,17 +10,7 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 
 echo "📌 Pushing to branch: $branch"
 
-# Run backend tests
-echo "🔬 Running backend tests..."
-cd backend && npm test -- --run || {
-  echo ""
-  echo "❌ Backend tests failed! Push aborted."
-  echo "Please fix failing tests before pushing."
-  exit 1
-}
-cd ..
-
-# Run frontend tests
+# Run frontend tests (backend moved to andrelair-platform/retrieva-backend)
 echo "🔬 Running frontend tests..."
 cd frontend && npm run test:run || {
   echo ""

@@ -1,52 +1,32 @@
 {
   "name": "retrieva",
   "version": "1.0.0",
-  "description": "RAG-powered knowledge retrieval platform",
+  "description": "Retrieva frontend — Next.js UI for the DORA TPRM / RAG platform (backend lives in andrelair-platform/retrieva-backend)",
   "type": "module",
   "private": true,
   "workspaces": [
-    "backend",
-    "frontend",
-    "ragas-service"
+    "frontend"
   ],
   "scripts": {
     "prepare": "husky",
-    "dev": "npx concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "npm --prefix frontend run dev",
-    "build": "npm run build:backend && npm run build:frontend",
-    "build:backend": "npm --prefix backend run build",
-    "build:frontend": "npm --prefix frontend run build",
-    "backend": "npm --prefix backend",
-    "backend:dev": "npm --prefix backend run dev",
-    "backend:test": "npm --prefix backend test",
-    "backend:lint": "npm --prefix backend run lint",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
     "frontend": "npm --prefix frontend",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:lint": "npm --prefix frontend run lint",
-    "ragas": "cd ragas-service && python app.py",
-    "lint": "npm run backend:lint && npm run frontend:lint",
-    "test": "npm --prefix backend test",
-    "test:ci": "npm --prefix backend test -- --run"
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm --prefix frontend test",
+    "test:ci": "npm --prefix frontend test -- --run"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
-    "concurrently": "^9.2.1",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "pino-pretty": "^13.1.3"
+    "lint-staged": "^15.0.0"
   },
   "lint-staged": {
-    "backend/**/*.js": [
-      "eslint --fix --config backend/eslint.config.js",
-      "prettier --write --config backend/.prettierrc"
-    ],
     "frontend/**/*.{ts,tsx}": [
       "eslint --fix --config frontend/eslint.config.mjs"
-    ],
-    "ragas-service/**/*.py": [
-      "echo 'Python files staged - linting handled in CI'"
     ]
   },
   "repository": {
