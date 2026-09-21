@@ -272,3 +272,25 @@ intake populates the graph.
   scoping and audit only. These fields are what fill RTV-38's register gap columns and unblock RTV-41.
 
 Group-visibility rules across entities remain deferred to RTV-35 (here `scope` is a field only).
+
+## Delivered — RTV-39: the Control Library (data, not prompts)
+
+§4's "the control library is the IP" is now real, structured data (`retrieva-backend`:
+`data/compliance/control-library/v1.0.0.json`, `config/controlLibrary/`, `services/controlLibraryService.js`).
+
+- **Versioned, inspectable controls.** v1.0.0 holds 18 controls seeded from DORA **Art. 28 & 30**, each
+  with `doraArticleRef` (precise citation for RTV-41), `domain`, `description`,
+  `expectedEvidenceTypes[]`, `clauseMatchPatterns[]` (RTV-40's pattern-match-first input), and an
+  `applicability`. Answers "how did you decide audit rights are met?" from data, not a prompt.
+- **Versioned documents, not a table.** The library is JSON committed to the repo — diffable,
+  reviewable, **immutable per version** (a change = a new `vX.Y.Z.json` + a bumped
+  `CURRENT_LIBRARY_VERSION`); a registry keeps old versions resolvable so a past assessment's stamp
+  still resolves. Validated on load by a Zod schema (fail-fast). No DB/migration — it's global
+  reference data.
+- **CIF-keyed applicability = proportionality.** `resolveControlsForArrangement` returns baseline
+  controls for every arrangement, plus `cif_mandatory` / `cif_enhanced` controls only when the
+  arrangement supports a **critical/important function** (RTV-36's `criticality` /
+  `criticalOrImportant`). This is the "a CIF pulls the full obligation set" rule made executable.
+- **The engine's unblocker.** RTV-40 (clause→control mapping + eval) and RTV-41 (evidence-grounded,
+  cited verdicts) both consume the resolver and stamp `libraryVersion` for reproducibility. v1.0.0 is a
+  faithful *starter* set the RTV-40 regression eval then hardens — not a certified-complete catalogue.
