@@ -294,3 +294,30 @@ Group-visibility rules across entities remain deferred to RTV-35 (here `scope` i
 - **The engine's unblocker.** RTV-40 (clause→control mapping + eval) and RTV-41 (evidence-grounded,
   cited verdicts) both consume the resolver and stamp `libraryVersion` for reproducibility. v1.0.0 is a
   faithful *starter* set the RTV-40 regression eval then hardens — not a certified-complete catalogue.
+
+## Delivered — RTV-41: the assessment engine (the §5 guardrails made real)
+
+The engine is live (`retrieva-backend`: `services/assessment/`, `findings` table, migration `0004`).
+`assessArrangement` resolves an arrangement's applicable controls (RTV-39, CIF-keyed) → gathers its
+evidence (RTV-37) per control → produces a **cited, evidence-grounded verdict** → persists a finding →
+records the run in the immutable audit trail (RTV-37). This is what makes the output audit-defensible
+rather than a bare score.
+
+The §5 guardrails are not aspirational — they are enforced in code, and provable in isolation
+(`services/assessment/verdict.js` is a pure module with no DB/LLM):
+
+| §5 rule | How it's guaranteed |
+|---|---|
+| Verdict enum incl. **Insufficient-evidence** | a `verdict` pgEnum |
+| **Absence of expected evidence → Insufficient-evidence, never auto Non-compliant** | a **deterministic** branch that runs *before* any model call — no evidence ⇒ insufficient, full stop |
+| Every verdict **cites the exact evidence** + records **what was searched** | `citations[]` + `searched[]` on every finding |
+| **Coverage, not "% compliant"** | a per-control verdict breakdown; no compliance percentage |
+| **Confidence from evidence coverage**, not the model's self-report | `covered / expected`, computed |
+| **AI analyses/drafts; the human decides** | findings are `status: draft` (approval/SoD = RTV-55), stamped with `libraryVersion` |
+
+Design notes: the LLM judge is **injected** and only ever grades *present* evidence (the risky
+absence path is deterministic), so the engine is safe and testable without a live model — in production
+the judge is the cost-gated, Langfuse-traced gateway model. v1 gathers evidence from RTV-37 records
+(a RAG span source drops in with arrangement intake, RTV-34); until then most verdicts are correctly
+*insufficient-evidence*, which **demonstrates** the guardrail rather than hiding behind a fabricated
+score. Findings feed the register's assessment column (RTV-38) and RTV-42 scoring.
