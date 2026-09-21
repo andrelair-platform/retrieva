@@ -224,3 +224,26 @@ Isolation is inherited, not re-implemented: every arrangement-graph query compos
 `ENTITY_ISOLATION_MODE=enforce` (already prod) — verified by `arrangementGraph.integration.test.js`.
 The legacy `critical_functions` table (concentration graph) is left intact; convergence with
 `business_functions` is deferred to RTV-37+.
+
+## Delivered — RTV-38: the Register is a projection from the graph
+
+§2 is now live: the DORA **Register of Information (RT.02.01)** is generated **on demand from the
+arrangement graph**, never a hand-maintained spreadsheet. Backend `services/registerProjection.js`
+(pure `assembleRegister`) + `registerProjectionService.js` (`buildRegister(orgId)`, reads the live
+graph) + `registerExportService.js` (XLSX/CSV) + `GET /api/v1/register[/export]`.
+
+- **The graph IS the Register.** B_01 (entity) ← `legal_entities`; B_02 (arrangements, the fact) ←
+  `arrangements` joined to its dimensions; B_03 (intra-group) = the `arrangement_type='intra_group'`
+  subset; B_05 (provider) ← `provider_nodes`; subcontracting ← `provider_dependencies`. No stored
+  copy → it can never drift from live state.
+- **Versioned field map** (`config/register/rt0201FieldMap.js`, `REGISTER_TEMPLATE_VERSION`): the EBA
+  template columns live in one place, so an ITS template update is a config change, not code.
+- **Missing required field → a gap, not a blank** (§5 spirit): fields the graph can't yet satisfy —
+  provider country/LEI, and the latest assessment status (RTV-30/40) — surface in a **Gaps** list/sheet
+  instead of a silent empty cell. This is also how RTV-37 (evidence/audit) fields are carried until
+  that ships, so RTV-38 did not block on it.
+- **Isolation inherited** — the register reads only through the RTV-36 repos, so it's entity-scoped
+  under `ENTITY_ISOLATION_MODE=enforce` with no extra code.
+
+Reshapes the placeholder RTV-18 workspace export (`roiExportService`), kept working until arrangement
+intake populates the graph.
