@@ -247,3 +247,28 @@ graph) + `registerExportService.js` (XLSX/CSV) + `GET /api/v1/register[/export]`
 
 Reshapes the placeholder RTV-18 workspace export (`roiExportService`), kept working until arrangement
 intake populates the graph.
+
+## Delivered — RTV-37: two-tier evidence + immutable audit trail
+
+§3 and §5 are now live in `retrieva-backend` (`db/schema/{evidence,auditLog}.js`,
+`EvidenceRepository`, `AuditLogRepository`, `auditLogService`; migration `0003`).
+
+- **Two-tier evidence (§3).** `evidence.scope = provider | arrangement`, with a CHECK enforcing exactly
+  one target. **Provider-global** evidence (ISO 27001, SOC 2, BCP, subprocessor list) attaches to a
+  `provider_node` and is **shared/inherited** across every arrangement of that provider — assess
+  Microsoft once. **Arrangement-local** evidence (contract, usage, exit plan, risk acceptance) attaches
+  to one `arrangement` and is entity-private. `EvidenceRepository.resolveForArrangement` returns the
+  union (local ∪ the provider's global) — this is what makes group scale sane. Content is hashed
+  (`sha256`) on ingest and deduped per (org, target, hash).
+- **Immutable audit trail (§5).** `audit_log` records who/what/target/evidence/when for every
+  state-changing action. It is **provably append-only**: a database `BEFORE UPDATE/DELETE` trigger
+  rejects any mutation, and the repository exposes no update/delete path. This is the
+  "the human decided, on this evidence, at this time" record DORA (management-body accountability) and
+  the EU AI Act (human oversight) both require — verified by an integration test that asserts a raw
+  `UPDATE`/`DELETE` throws.
+- **Isolation inherited** — both tables carry `organization_id` and every query composes
+  `entityScopeCondition`, so evidence/audit are entity-scoped under `ENTITY_ISOLATION_MODE=enforce`.
+- **No new parsing** — evidence reuses the RTV-14 ingestion `storage_key`; this story adds the model,
+  scoping and audit only. These fields are what fill RTV-38's register gap columns and unblock RTV-41.
+
+Group-visibility rules across entities remain deferred to RTV-35 (here `scope` is a field only).
