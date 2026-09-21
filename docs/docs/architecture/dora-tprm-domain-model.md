@@ -196,3 +196,31 @@ The domain engine points the existing stack at the control library and the graph
   audit trail) — the defensibility story for the RNCP defence and for a real risk officer.
 - The graph's **freshness** (RTV-34 intake) is the true operational risk; AI-assisted population is
   treated as a first-class concern, not an afterthought.
+
+## Delivered — RTV-36: arrangement star schema (group-ready)
+
+The §1 star is now a live Drizzle/Postgres schema (`retrieva-backend/db/schema/`), additive migration
+`0002_amused_northstar.sql`. The **fact** is `arrangements` (`organization_id` isolation scope + AC-2
+`entity_id`, FKs to the four dimensions, plus `arrangement_type`, `data_classes`, `data_residency`,
+`criticality`, `dependency`, `exit_difficulty`); the **dimensions** are `legal_entities`,
+`business_functions` (`critical_or_important`), `ict_services`, and the **reused** `provider_nodes`.
+Graph-traversal indexes cover provider→arrangements and function→arrangements (AC-6).
+
+Two decisions taken here (context for RTV-37/38):
+
+- **Provider = the existing `provider_nodes`** (RTV-48), not a new table. The concentration graph
+  already models the deduped, org-scoped provider identity and its nth-party subcontractor edges
+  (`provider_dependencies`) — so AC-3 (Provider→Subcontractor) is satisfied by reuse, and §3's
+  "assess Microsoft once, shared across arrangements" is one identity space, not two. `provider_nodes`
+  gained provider-global `lei` + `provider_type` columns.
+- **`legal_entities` is a first-class dimension**, while `organization_id` remains the RTV-54
+  isolation scope. An arrangement therefore carries **both** `organization_id` (tenant/isolation) and
+  `legal_entity_id` (the DORA financial entity). This is what makes the schema group-ready per §8:
+  `legal_entities.parent_entity_id` (self-ref) + `is_group_entity` (an intra-group arrangement names a
+  group company as provider, AC-5) exist now; group *features* stay deferred to RTV-35.
+
+Isolation is inherited, not re-implemented: every arrangement-graph query composes
+`entityScopeCondition(…organizationId…)`, so the new tables are entity-isolated the moment
+`ENTITY_ISOLATION_MODE=enforce` (already prod) — verified by `arrangementGraph.integration.test.js`.
+The legacy `critical_functions` table (concentration graph) is left intact; convergence with
+`business_functions` is deferred to RTV-37+.
