@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Network, Building2, ExternalLink, Plus } from 'lucide-react';
+import { Network, Building2, ExternalLink, Plus, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,11 +17,13 @@ import {
 import { useArrangementsQuery } from '@/features/arrangements/queries/use-arrangements-query';
 import { CriticalityBadge, ArrangementTypeBadge } from './badges';
 import { ArrangementForm } from './arrangement-form';
+import { IntakeDialog } from './intake-dialog';
 
 export function ArrangementsPage() {
   const router = useRouter();
   const { data: arrangements = [], isLoading } = useArrangementsQuery();
   const [formOpen, setFormOpen] = useState(false);
+  const [intakeOpen, setIntakeOpen] = useState(false);
 
   const cifCount = useMemo(
     () => arrangements.filter((a) => a.criticalOrImportant || a.criticality === 'critical' || a.criticality === 'important').length,
@@ -37,10 +39,16 @@ export function ArrangementsPage() {
             The DORA contractual arrangements — the core object risk is tracked against.
           </p>
         </div>
-        <Button size="sm" onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New arrangement
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setIntakeOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Import from contract
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New arrangement
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -115,6 +123,7 @@ export function ArrangementsPage() {
       )}
 
       <ArrangementForm open={formOpen} onOpenChange={setFormOpen} />
+      <IntakeDialog open={intakeOpen} onOpenChange={setIntakeOpen} />
     </div>
   );
 }
