@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Plus, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Play, Plus, FileText, ShieldCheck, Check, X, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const [evOpen, setEvOpen] = useState(false);
   const [doc, setDoc] = useState('');
   const [src, setSrc] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const assess = useMutation({
     mutationFn: () => arrangementsApi.runAssessment(id),
@@ -76,6 +77,19 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  const decide = useMutation({
+    mutationFn: (v: { findingId: string; decision: 'approve' | 'reject' | 'reset' }) =>
+      arrangementsApi.decideFinding(id, v.findingId, v.decision),
+    onSuccess: () => {
+      toast.success('Decision recorded');
+      qc.invalidateQueries({ queryKey: ['findings', id] });
+    },
+    onError: (e) => {
+      const msg = getErrorMessage(e);
+      toast.error(msg.includes('permission') ? 'A checker role is required to decide findings' : msg);
+    },
   });
 
   if (isLoading) return <div className="page-container max-w-5xl mx-auto space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
@@ -147,22 +161,70 @@ export function ArrangementDetailPage({ id }: { id: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-6"></TableHead>
                   <TableHead>Control</TableHead>
                   <TableHead>Verdict</TableHead>
                   <TableHead>Confidence</TableHead>
-                  <TableHead>Citations</TableHead>
-                  <TableHead>Library</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Decision</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {findings.map((f) => (
-                  <TableRow key={f.id}>
-                    <TableCell className="font-mono text-xs">{f.controlId}</TableCell>
-                    <TableCell><VerdictBadge verdict={f.verdict} /></TableCell>
-                    <TableCell className="text-xs tabular-nums">{f.confidence != null ? `${Math.round(f.confidence * 100)}%` : '—'}</TableCell>
-                    <TableCell className="text-xs">{f.citations?.length ?? 0}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{f.libraryVersion}</TableCell>
-                  </TableRow>
+                  <Fragment key={f.id}>
+                    <TableRow className="cursor-pointer" onClick={() => setExpandedId(expandedId === f.id ? null : f.id)}>
+                      <TableCell>
+                        <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expandedId === f.id ? 'rotate-90' : ''}`} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{f.controlId}</TableCell>
+                      <TableCell><VerdictBadge verdict={f.verdict} /></TableCell>
+                      <TableCell className="text-xs tabular-nums">{f.confidence != null ? `${Math.round(f.confidence * 100)}%` : '—'}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={f.status === 'approved' ? 'default' : f.status === 'rejected' ? 'destructive' : 'outline'}
+                          className={`text-[10px] ${f.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' : ''}`}
+                        >
+                          {f.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {f.status === 'draft' ? (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-green-600" disabled={decide.isPending} onClick={() => decide.mutate({ findingId: f.id, decision: 'approve' })}>
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" disabled={decide.isPending} onClick={() => decide.mutate({ findingId: f.id, decision: 'reject' })}>
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" disabled={decide.isPending} onClick={() => decide.mutate({ findingId: f.id, decision: 'reset' })}>
+                            reopen
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    {expandedId === f.id && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell />
+                        <TableCell colSpan={5} className="text-xs space-y-2 py-3">
+                          <p className="text-muted-foreground">{f.rationale || 'No rationale recorded.'}</p>
+                          {f.citations?.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="font-medium">Cited evidence:</p>
+                              {f.citations.map((c, i) => (
+                                <div key={i} className="rounded bg-background border px-2 py-1">
+                                  <span className="text-muted-foreground">{c.source}</span> — {c.snippet}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground italic">No evidence cited — control library {f.libraryVersion}.</p>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

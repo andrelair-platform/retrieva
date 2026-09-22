@@ -181,6 +181,14 @@ export const arrangementsApi = {
     const res = await apiClient.get<ApiResponse<{ findings: Finding[] }>>(`/arrangements/${id}/findings`);
     return res.data;
   },
+  // The human-in-the-loop decision (RTV-55) — a checker approves/rejects a draft finding.
+  decideFinding: async (arrangementId: string, findingId: string, decision: 'approve' | 'reject' | 'reset') => {
+    const res = await apiClient.patch<ApiResponse<{ finding: Finding }>>(
+      `/arrangements/${arrangementId}/findings/${findingId}`,
+      { decision }
+    );
+    return res.data;
+  },
 
   // ── dimensions ──────────────────────────────────────────────────────────────
   listLegalEntities: async () => {
