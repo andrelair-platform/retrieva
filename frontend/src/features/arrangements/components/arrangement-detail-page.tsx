@@ -30,10 +30,23 @@ import { getErrorMessage } from '@/lib/api/client';
 import { arrangementsApi } from '@/features/arrangements/api/arrangements';
 import {
   useArrangementQuery,
+  useArrangementLifecycleQuery,
   useArrangementEvidenceQuery,
   useFindingsQuery,
 } from '@/features/arrangements/queries/use-arrangements-query';
-import { CriticalityBadge, ArrangementTypeBadge, VerdictBadge } from './badges';
+import { CriticalityBadge, ArrangementTypeBadge, VerdictBadge, LifecycleBadge } from './badges';
+
+// Human labels for the state-machine transitions (the backend returns transition names).
+const TRANSITION_LABEL: Record<string, string> = {
+  start_due_diligence: 'Start due diligence',
+  approve_onboarding: 'Approve onboarding',
+  reject: 'Reject',
+  start_review: 'Start review',
+  flag_remediation: 'Flag remediation',
+  resolve: 'Resolve',
+  start_exit: 'Start exit',
+  complete_exit: 'Complete exit',
+};
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -62,7 +75,26 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   });
 
   const { data: arrangement, isLoading } = useArrangementQuery(id);
+  const { data: lifecycle } = useArrangementLifecycleQuery(id);
   const { data: evidence = [] } = useArrangementEvidenceQuery(id);
+
+  const transition = useMutation({
+    mutationFn: (t: string) => arrangementsApi.setLifecycle(id, t),
+    onSuccess: (_res, t) => {
+      toast.success(`${TRANSITION_LABEL[t] ?? t} — done`);
+      qc.invalidateQueries({ queryKey: ['arrangement-lifecycle', id] });
+      qc.invalidateQueries({ queryKey: ['arrangement', id] });
+      qc.invalidateQueries({ queryKey: ['arrangements'] });
+    },
+    onError: (e) => {
+      const msg = getErrorMessage(e);
+      toast.error(
+        msg.includes('checker') || msg.includes('management-body')
+          ? 'A checker role is required for this decision'
+          : msg
+      );
+    },
+  });
   // Poll findings after a run is triggered; useFindingsQuery stops once findings appear.
   const assessing = assess.isSuccess;
   const { data: findings = [] } = useFindingsQuery(id, assessing);
@@ -125,6 +157,35 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
         </Button>
       </div>
+
+      {/* Lifecycle (RTV-31) — current state + the valid next transitions (approval moves = primary) */}
+      {lifecycle && (
+        <div className="rounded-lg border p-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Lifecycle</span>
+            <LifecycleBadge value={lifecycle.status} />
+          </div>
+          {lifecycle.transitions.length > 0 ? (
+            <div className="flex flex-wrap gap-2 sm:ml-auto">
+              {lifecycle.transitions.map((t) => (
+                <Button
+                  key={t.transition}
+                  size="sm"
+                  variant={t.approval ? 'default' : 'outline'}
+                  disabled={transition.isPending}
+                  onClick={() => transition.mutate(t.transition)}
+                  title={t.approval ? 'Management-body decision — requires a checker role' : undefined}
+                >
+                  {t.approval && <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />}
+                  {TRANSITION_LABEL[t.transition] ?? t.transition}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground sm:ml-auto">Terminal state — no further transitions.</span>
+          )}
+        </div>
+      )}
 
       {/* Dimensions */}
       <div className="rounded-lg border p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">

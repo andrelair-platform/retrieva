@@ -32,6 +32,7 @@ import {
   type ArrangementProposal,
   type ArrangementType,
   type Criticality,
+  type Trigger,
 } from '@/features/arrangements/api/arrangements';
 
 interface Props {
@@ -48,6 +49,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
   const [source, setSource] = useState<string>('');
   const [confidence, setConfidence] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+  const [trigger, setTrigger] = useState<Trigger>('new');
 
   const set = <K extends keyof ArrangementProposal>(k: K, v: ArrangementProposal[K]) =>
     setProposal((p) => (p ? { ...p, [k]: v } : p));
@@ -65,7 +67,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
   });
 
   const confirm = useMutation({
-    mutationFn: () => arrangementsApi.confirmIntake(proposal as ArrangementProposal, source),
+    mutationFn: () => arrangementsApi.confirmIntake(proposal as ArrangementProposal, source, trigger),
     onSuccess: async (res) => {
       toast.success('Arrangement created from contract');
       qc.invalidateQueries({ queryKey: ['arrangements'] });
@@ -84,6 +86,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     setSource('');
     setConfidence(0);
     setFile(null);
+    setTrigger('new');
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -150,6 +153,19 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
               <Badge variant="secondary" className="ml-auto text-[10px]">{Math.round(confidence * 100)}% conf.</Badge>
             </div>
             {proposal.notes && <p className="text-xs text-amber-600">⚠ {proposal.notes}</p>}
+
+            {/* RTV-31 — a contract for a not-yet-contracted provider enters onboarding; an existing
+                one is already active. */}
+            <div className="space-y-1.5">
+              <Label>How does this arrangement enter?</Label>
+              <Select value={trigger} onValueChange={(v) => setTrigger(v as Trigger)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New provider — start onboarding (due diligence)</SelectItem>
+                  <SelectItem value="existing">Existing arrangement — already active</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
