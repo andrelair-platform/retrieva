@@ -79,6 +79,16 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
+  const ingest = useMutation({
+    mutationFn: (f: File) => arrangementsApi.ingestEvidence(id, f),
+    onSuccess: () => {
+      toast.success('Document ingested — the next assessment can cite it');
+      setEvOpen(false);
+      qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
   const decide = useMutation({
     mutationFn: (v: { findingId: string; decision: 'approve' | 'reject' | 'reset' }) =>
       arrangementsApi.decideFinding(id, v.findingId, v.decision),
@@ -236,6 +246,18 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Attach evidence</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <div className="rounded-md border border-dashed p-3">
+              <Label className="text-xs text-muted-foreground">Upload a document (indexed so verdicts cite real text)</Label>
+              <input
+                type="file"
+                accept=".pdf,.docx,.xlsx"
+                disabled={ingest.isPending}
+                className="mt-1.5 block w-full text-xs file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-primary-foreground"
+                onChange={(e) => e.target.files?.[0] && ingest.mutate(e.target.files[0])}
+              />
+              {ingest.isPending && <p className="text-xs text-muted-foreground mt-1">Indexing…</p>}
+            </div>
+            <p className="text-xs text-center text-muted-foreground">— or record metadata only —</p>
             <div className="space-y-1.5">
               <Label>Document *</Label>
               <Input placeholder="e.g. ISO 27001 certificate" value={doc} onChange={(e) => setDoc(e.target.value)} />

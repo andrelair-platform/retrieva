@@ -153,6 +153,17 @@ export const arrangementsApi = {
     );
     return res.data;
   },
+  // Upload a document → index its text (RAG) so assessments cite real passages (RTV-34).
+  ingestEvidence: async (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append('contract', file);
+    const res = await apiClient.post<ApiResponse<{ evidence: Evidence; chunks: number }>>(
+      `/arrangements/${id}/evidence/ingest`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120_000 }
+    );
+    return res.data;
+  },
 
   // AI-assisted intake (RTV-34): upload a contract → the API proposes an arrangement (nothing
   // persisted); the human reviews then confirms.
