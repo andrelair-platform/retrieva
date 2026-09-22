@@ -133,6 +133,8 @@
       "intelligence": "Intelligence"
     },
     "items": {
+      "arrangements": "Arrangements",
+      "register": "Registre d'information",
       "riskRegister": "Registre des risques",
       "vendors": "Fournisseurs",
       "gapAnalysis": "Analyse d'écarts",

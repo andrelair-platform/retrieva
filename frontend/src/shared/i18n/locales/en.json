@@ -133,6 +133,8 @@
       "intelligence": "Intelligence"
     },
     "items": {
+      "arrangements": "Arrangements",
+      "register": "Register of Information",
       "riskRegister": "Risk Register",
       "vendors": "Vendors",
       "gapAnalysis": "Gap Analysis",
