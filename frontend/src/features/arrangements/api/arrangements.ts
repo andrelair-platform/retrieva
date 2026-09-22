@@ -5,6 +5,22 @@ import type { ApiResponse } from '@/types';
 export type ArrangementType = 'external' | 'intra_group';
 export type Criticality = 'critical' | 'important' | 'standard';
 export type Level = 'low' | 'medium' | 'high';
+// RTV-31 — the arrangement lifecycle (one machine entered by three triggers).
+export type LifecycleStatus =
+  | 'prospect'
+  | 'due_diligence'
+  | 'active'
+  | 'under_review'
+  | 'remediation'
+  | 'exiting'
+  | 'exited';
+// 🟢 new provider → onboarding (prospect); 🟡 existing arrangement / default → active.
+export type Trigger = 'new' | 'existing';
+export interface LifecycleTransition {
+  transition: string;
+  to: LifecycleStatus;
+  approval: boolean;
+}
 export type Verdict =
   | 'compliant'
   | 'partial'
@@ -55,6 +71,7 @@ export interface Arrangement {
   criticality: Criticality | null;
   dependency: Level | null;
   exitDifficulty: Level | null;
+  lifecycleStatus: LifecycleStatus; // RTV-31 — current state in the machine
   createdAt: string;
   // resolved by the API for display
   legalEntityName: string | null;
@@ -99,6 +116,7 @@ export interface CreateArrangementInput {
   criticality?: Criticality | null;
   dependency?: Level | null;
   exitDifficulty?: Level | null;
+  trigger?: Trigger; // RTV-31 — sets the initial lifecycle state
 }
 
 export interface ArrangementProposal {
@@ -177,10 +195,28 @@ export const arrangementsApi = {
     });
     return res.data;
   },
-  confirmIntake: async (proposal: ArrangementProposal, sourceFileName?: string) => {
+  confirmIntake: async (proposal: ArrangementProposal, sourceFileName?: string, trigger?: Trigger) => {
     const res = await apiClient.post<ApiResponse<{ arrangement: Arrangement }>>(
       '/arrangements/intake/confirm',
-      { proposal, sourceFileName }
+      { proposal, sourceFileName, trigger }
+    );
+    return res.data;
+  },
+
+  // ── lifecycle (RTV-31) ────────────────────────────────────────────────────────
+  // The current state + the transitions valid from it (drives the detail-page action buttons).
+  getLifecycle: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<{ status: LifecycleStatus; transitions: LifecycleTransition[] }>>(
+      `/arrangements/${id}/lifecycle`
+    );
+    return res.data;
+  },
+  // Advance the state machine. Illegal transitions are rejected (400); approval transitions require
+  // a checker role (403) — SoD. Returns the updated arrangement.
+  setLifecycle: async (id: string, transition: string) => {
+    const res = await apiClient.patch<ApiResponse<{ arrangement: Arrangement }>>(
+      `/arrangements/${id}/lifecycle`,
+      { transition }
     );
     return res.data;
   },

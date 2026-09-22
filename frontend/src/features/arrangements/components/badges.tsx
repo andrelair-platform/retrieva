@@ -1,5 +1,10 @@
 import { Badge } from '@/components/ui/badge';
-import type { Criticality, Verdict, ArrangementType } from '@/features/arrangements/api/arrangements';
+import type {
+  Criticality,
+  Verdict,
+  ArrangementType,
+  LifecycleStatus,
+} from '@/features/arrangements/api/arrangements';
 
 const VERDICT_LABEL: Record<Verdict, string> = {
   compliant: 'Compliant',
@@ -38,6 +43,37 @@ export function ArrangementTypeBadge({ value }: { value: ArrangementType }) {
   return (
     <Badge variant="outline" className="text-xs capitalize">
       {value === 'intra_group' ? 'Intra-group' : 'External'}
+    </Badge>
+  );
+}
+
+const LIFECYCLE_LABEL: Record<LifecycleStatus, string> = {
+  prospect: 'Prospect',
+  due_diligence: 'Due diligence',
+  active: 'Active',
+  under_review: 'Under review',
+  remediation: 'Remediation',
+  exiting: 'Exiting',
+  exited: 'Exited',
+};
+
+/**
+ * Lifecycle badge (RTV-31) — active reads green (in the register), the transient/attention states
+ * (due diligence / under review) amber, remediation red-ish, prospect + exit states muted.
+ */
+export function LifecycleBadge({ value }: { value: LifecycleStatus }) {
+  const cls: Record<LifecycleStatus, string> = {
+    prospect: 'bg-muted text-muted-foreground border-muted',
+    due_diligence: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100',
+    active: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100',
+    under_review: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100',
+    remediation: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-100',
+    exiting: 'bg-muted text-muted-foreground border-muted',
+    exited: 'bg-muted text-muted-foreground border-muted line-through',
+  };
+  return (
+    <Badge variant="outline" className={`text-xs ${cls[value]}`}>
+      {LIFECYCLE_LABEL[value]}
     </Badge>
   );
 }

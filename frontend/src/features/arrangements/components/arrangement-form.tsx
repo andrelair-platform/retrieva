@@ -29,6 +29,7 @@ import {
   type ArrangementType,
   type Criticality,
   type Level,
+  type Trigger,
 } from '@/features/arrangements/api/arrangements';
 
 interface Props {
@@ -51,6 +52,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
   const [exitDifficulty, setExitDifficulty] = useState<Level | ''>('');
   const [dataClasses, setDataClasses] = useState('');
   const [dataResidency, setDataResidency] = useState('');
+  const [trigger, setTrigger] = useState<Trigger>('existing');
 
   // quick-create inline state
   const [newEntity, setNewEntity] = useState('');
@@ -128,6 +130,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
         dependency: dependency || null,
         exitDifficulty: exitDifficulty || null,
         dataResidency,
+        trigger,
         dataClasses: dataClasses
           .split(',')
           .map((s) => s.trim())
@@ -151,6 +154,19 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Trigger (RTV-31) — a new provider enters onboarding (prospect); an existing arrangement
+              is already active in the register. */}
+          <div className="space-y-1.5">
+            <Label>How does this arrangement enter?</Label>
+            <Select value={trigger} onValueChange={(v) => setTrigger(v as Trigger)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New provider — start onboarding (due diligence)</SelectItem>
+                <SelectItem value="existing">Existing arrangement — already active</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Legal entity */}
           <div className="space-y-1.5">
             <Label>Legal entity *</Label>

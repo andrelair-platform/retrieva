@@ -24,6 +24,18 @@ export function useArrangementQuery(id: string) {
   });
 }
 
+/** RTV-31 — the arrangement's lifecycle state + the transitions valid from it. */
+export function useArrangementLifecycleQuery(id: string) {
+  return useQuery({
+    queryKey: ['arrangement-lifecycle', id],
+    queryFn: async () => {
+      const res = await arrangementsApi.getLifecycle(id);
+      return res.data ?? null;
+    },
+    enabled: !!id,
+  });
+}
+
 export function useArrangementEvidenceQuery(id: string) {
   return useQuery({
     queryKey: ['arrangement-evidence', id],
