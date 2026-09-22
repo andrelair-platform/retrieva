@@ -47,6 +47,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
   const [proposal, setProposal] = useState<ArrangementProposal | null>(null);
   const [source, setSource] = useState<string>('');
   const [confidence, setConfidence] = useState(0);
+  const [file, setFile] = useState<File | null>(null);
 
   const set = <K extends keyof ArrangementProposal>(k: K, v: ArrangementProposal[K]) =>
     setProposal((p) => (p ? { ...p, [k]: v } : p));
@@ -65,10 +66,12 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
 
   const confirm = useMutation({
     mutationFn: () => arrangementsApi.confirmIntake(proposal as ArrangementProposal, source),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       toast.success('Arrangement created from contract');
       qc.invalidateQueries({ queryKey: ['arrangements'] });
       const id = res.data?.arrangement?.id;
+      // Index the contract text so the assessment can cite real passages (best-effort).
+      if (id && file) await arrangementsApi.ingestEvidence(id, file).catch(() => {});
       onOpenChange(false);
       reset();
       if (id) router.push(`/arrangements/${id}`);
@@ -80,6 +83,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     setProposal(null);
     setSource('');
     setConfidence(0);
+    setFile(null);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -89,7 +93,12 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
     },
-    onDrop: (files) => files[0] && extract.mutate(files[0]),
+    onDrop: (files) => {
+      if (files[0]) {
+        setFile(files[0]);
+        extract.mutate(files[0]);
+      }
+    },
     disabled: extract.isPending,
   });
 
