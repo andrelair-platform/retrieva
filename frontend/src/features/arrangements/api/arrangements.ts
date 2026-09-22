@@ -100,6 +100,32 @@ export interface CreateArrangementInput {
   exitDifficulty?: Level | null;
 }
 
+export interface ArrangementProposal {
+  providerName: string | null;
+  subcontractors: string[];
+  ictServiceName: string | null;
+  legalEntityName: string | null;
+  businessFunctionName: string | null;
+  criticalOrImportant: boolean | null;
+  dataClasses: string[];
+  dataResidency: string | null;
+  arrangementType: ArrangementType | null;
+  criticality: Criticality | null;
+  confidence: number;
+  notes: string;
+}
+
+export interface IntakeResult {
+  proposal: ArrangementProposal;
+  matches: {
+    legalEntityId: string | null;
+    providerId: string | null;
+    businessFunctionId: string | null;
+    ictServiceId: string | null;
+  };
+  source: { fileName: string; parsedChars: number };
+}
+
 const GRAPH = '/arrangement-graph';
 
 export const arrangementsApi = {
@@ -124,6 +150,25 @@ export const arrangementsApi = {
     const res = await apiClient.post<ApiResponse<{ evidence: Evidence }>>(
       `/arrangements/${id}/evidence`,
       body
+    );
+    return res.data;
+  },
+
+  // AI-assisted intake (RTV-34): upload a contract → the API proposes an arrangement (nothing
+  // persisted); the human reviews then confirms.
+  intake: async (file: File) => {
+    const fd = new FormData();
+    fd.append('contract', file);
+    const res = await apiClient.post<ApiResponse<IntakeResult>>('/arrangements/intake', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120_000,
+    });
+    return res.data;
+  },
+  confirmIntake: async (proposal: ArrangementProposal, sourceFileName?: string) => {
+    const res = await apiClient.post<ApiResponse<{ arrangement: Arrangement }>>(
+      '/arrangements/intake/confirm',
+      { proposal, sourceFileName }
     );
     return res.data;
   },
