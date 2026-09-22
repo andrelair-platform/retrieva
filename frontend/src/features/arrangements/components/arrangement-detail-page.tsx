@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Plus, FileText, ShieldCheck, Check, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Play, Plus, FileText, ShieldCheck, Check, X, ChevronRight, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -164,6 +164,17 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       {/* Findings */}
       <div>
         <h2 className="text-sm font-semibold flex items-center gap-1.5 mb-2"><ShieldCheck className="h-4 w-4" /> Findings ({findings.length})</h2>
+        {findings.some((f) => f.stale) && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-500">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              {findings.filter((f) => f.stale).length} finding(s) are out of date — evidence changed since the last assessment.
+            </span>
+            <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => assess.mutate()} disabled={assess.isPending || (assessing && findings.length === 0)}>
+              Re-assess
+            </Button>
+          </div>
+        )}
         {findings.length === 0 ? (
           <p className="text-sm text-muted-foreground">No findings yet — run an assessment to generate evidence-grounded, cited verdicts.</p>
         ) : (
@@ -190,12 +201,19 @@ export function ArrangementDetailPage({ id }: { id: string }) {
                       <TableCell><VerdictBadge verdict={f.verdict} /></TableCell>
                       <TableCell className="text-xs tabular-nums">{f.confidence != null ? `${Math.round(f.confidence * 100)}%` : '—'}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={f.status === 'approved' ? 'default' : f.status === 'rejected' ? 'destructive' : 'outline'}
-                          className={`text-[10px] ${f.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' : ''}`}
-                        >
-                          {f.status}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            variant={f.status === 'approved' ? 'default' : f.status === 'rejected' ? 'destructive' : 'outline'}
+                            className={`text-[10px] ${f.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' : ''}`}
+                          >
+                            {f.status}
+                          </Badge>
+                          {f.stale && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-amber-600" title="Evidence changed since this was assessed">
+                              <AlertTriangle className="h-3 w-3" /> out of date
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         {f.status === 'draft' ? (

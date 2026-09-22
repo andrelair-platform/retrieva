@@ -84,6 +84,7 @@ export interface Finding {
   searched: unknown[];
   confidence: number | null;
   status: 'draft' | 'approved' | 'rejected';
+  stale?: boolean; // RTV-32: evidence changed since this was assessed → out of date
   createdAt: string;
 }
 
