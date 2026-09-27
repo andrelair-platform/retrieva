@@ -4,6 +4,8 @@ import type {
   Verdict,
   ArrangementType,
   LifecycleStatus,
+  RiskSeverity,
+  RiskStatus,
 } from '@/features/arrangements/api/arrangements';
 
 const VERDICT_LABEL: Record<Verdict, string> = {
@@ -74,6 +76,44 @@ export function LifecycleBadge({ value }: { value: LifecycleStatus }) {
   return (
     <Badge variant="outline" className={`text-xs ${cls[value]}`}>
       {LIFECYCLE_LABEL[value]}
+    </Badge>
+  );
+}
+
+// RTV-43 — risk severity (derived from the approved verdict) + remediation status.
+export function RiskSeverityBadge({ value }: { value: RiskSeverity }) {
+  const cls: Record<RiskSeverity, string> = {
+    low: 'bg-muted text-muted-foreground border-muted',
+    medium: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100',
+    high: 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100',
+    critical: '',
+  };
+  return (
+    <Badge variant={value === 'critical' ? 'destructive' : 'outline'} className={`text-xs capitalize ${cls[value]}`}>
+      {value}
+    </Badge>
+  );
+}
+
+const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
+  open: 'Open',
+  mitigating: 'Mitigating',
+  mitigated: 'Mitigated',
+  accepted: 'Accepted',
+  closed: 'Closed',
+};
+
+export function RiskStatusBadge({ value }: { value: RiskStatus }) {
+  const cls: Record<RiskStatus, string> = {
+    open: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-100',
+    mitigating: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100',
+    mitigated: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100',
+    accepted: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100',
+    closed: 'bg-muted text-muted-foreground border-muted',
+  };
+  return (
+    <Badge variant="outline" className={`text-xs ${cls[value]}`}>
+      {RISK_STATUS_LABEL[value]}
     </Badge>
   );
 }

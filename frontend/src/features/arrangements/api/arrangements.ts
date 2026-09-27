@@ -105,6 +105,43 @@ export interface Finding {
   createdAt: string;
 }
 
+// RTV-42 — arrangement-level "control/evidence coverage" (never "% compliant"): how much of the
+// applicable obligation set we have sufficient evidence to assess, + an evidence-derived confidence.
+export interface Coverage {
+  metricLabel: string; // always "control/evidence coverage"
+  applicableControls: number;
+  controlsWithSufficientEvidence: number;
+  coverage: number; // 0..1
+  confidence: number; // 0..1 — evidence-derived, not the model's self-report
+  byControl: Array<{
+    controlId?: string;
+    verdict?: Verdict;
+    confidence: number;
+    sufficientEvidence: boolean;
+  }>;
+}
+
+// RTV-43 — a Risk opened when a checker approves a gap-finding; it runs through the remediation loop.
+export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type RiskStatus = 'open' | 'mitigating' | 'mitigated' | 'accepted' | 'closed';
+export interface Risk {
+  id: string;
+  arrangementId: string;
+  findingId: string;
+  controlId: string;
+  libraryVersion: string;
+  sourceVerdict: Verdict;
+  title: string;
+  description: string;
+  severity: RiskSeverity;
+  status: RiskStatus;
+  openedBy: string | null;
+  ownerId: string | null;
+  remediation: Array<{ at: string; by: string; from: string; to: string; reason: string | null }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateArrangementInput {
   legalEntityId: string;
   businessFunctionId: string;
@@ -225,15 +262,34 @@ export const arrangementsApi = {
     const res = await apiClient.post<ApiResponse<{ jobId: string }>>(`/arrangements/${id}/assessment`);
     return res.data;
   },
+  // Findings + the arrangement-level coverage metric (RTV-42) + the stale count (RTV-32).
   getFindings: async (id: string) => {
-    const res = await apiClient.get<ApiResponse<{ findings: Finding[] }>>(`/arrangements/${id}/findings`);
+    const res = await apiClient.get<
+      ApiResponse<{ findings: Finding[]; staleCount: number; coverage: Coverage }>
+    >(`/arrangements/${id}/findings`);
     return res.data;
   },
-  // The human-in-the-loop decision (RTV-55) — a checker approves/rejects a draft finding.
+  // The human-in-the-loop decision (RTV-55) — a checker approves/rejects a draft finding. Approving a
+  // GAP verdict opens a Risk (RTV-43), so callers should also invalidate the risks query.
   decideFinding: async (arrangementId: string, findingId: string, decision: 'approve' | 'reject' | 'reset') => {
-    const res = await apiClient.patch<ApiResponse<{ finding: Finding }>>(
+    const res = await apiClient.patch<ApiResponse<{ finding: Finding; risk: Risk | null }>>(
       `/arrangements/${arrangementId}/findings/${findingId}`,
       { decision }
+    );
+    return res.data;
+  },
+
+  // ── risk register + remediation loop (RTV-43) ─────────────────────────────────
+  getRisks: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<{ risks: Risk[] }>>(`/arrangements/${id}/risks`);
+    return res.data;
+  },
+  // Advance a risk through the lifecycle. `mitigating|mitigated|closed|open` need risk:manage;
+  // `accepted` is the management-body sign-off (risk:accept) and requires a rationale.
+  updateRisk: async (arrangementId: string, riskId: string, status: RiskStatus, reason?: string) => {
+    const res = await apiClient.patch<ApiResponse<{ risk: Risk }>>(
+      `/arrangements/${arrangementId}/risks/${riskId}`,
+      { status, ...(reason ? { reason } : {}) }
     );
     return res.data;
   },
