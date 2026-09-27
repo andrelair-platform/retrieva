@@ -4,10 +4,12 @@ import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Plus, FileText, ShieldCheck, Check, X, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -33,8 +35,17 @@ import {
   useArrangementLifecycleQuery,
   useArrangementEvidenceQuery,
   useFindingsQuery,
+  useRisksQuery,
 } from '@/features/arrangements/queries/use-arrangements-query';
-import { CriticalityBadge, ArrangementTypeBadge, VerdictBadge, LifecycleBadge } from './badges';
+import type { RiskStatus } from '@/features/arrangements/api/arrangements';
+import {
+  CriticalityBadge,
+  ArrangementTypeBadge,
+  VerdictBadge,
+  LifecycleBadge,
+  RiskSeverityBadge,
+  RiskStatusBadge,
+} from './badges';
 
 // Human labels for the state-machine transitions (the backend returns transition names).
 const TRANSITION_LABEL: Record<string, string> = {
@@ -46,6 +57,22 @@ const TRANSITION_LABEL: Record<string, string> = {
   resolve: 'Resolve',
   start_exit: 'Start exit',
   complete_exit: 'Complete exit',
+};
+
+// RTV-43 — the risk remediation state machine (mirrors the backend riskLifecycle.ts) + button labels.
+const RISK_TRANSITIONS: Record<RiskStatus, RiskStatus[]> = {
+  open: ['mitigating', 'accepted', 'closed'],
+  mitigating: ['mitigated', 'accepted', 'closed', 'open'],
+  mitigated: ['closed', 'accepted', 'mitigating'],
+  accepted: ['closed', 'open'],
+  closed: ['open'],
+};
+const RISK_ACTION_LABEL: Record<RiskStatus, string> = {
+  open: 'Reopen',
+  mitigating: 'Start mitigating',
+  mitigated: 'Mark mitigated',
+  accepted: 'Accept risk',
+  closed: 'Close',
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -97,7 +124,11 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   });
   // Poll findings after a run is triggered; useFindingsQuery stops once findings appear.
   const assessing = assess.isSuccess;
-  const { data: findings = [] } = useFindingsQuery(id, assessing);
+  const findingsQuery = useFindingsQuery(id, assessing);
+  const findings = findingsQuery.data?.findings ?? [];
+  const coverage = findingsQuery.data?.coverage ?? null;
+  // RTV-43 — the remediation loop: gaps a checker approved into tracked Risks.
+  const { data: risks = [] } = useRisksQuery(id);
 
   const attach = useMutation({
     mutationFn: () => arrangementsApi.attachEvidence(id, { document: doc.trim(), source: src.trim() }),
@@ -124,13 +155,36 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const decide = useMutation({
     mutationFn: (v: { findingId: string; decision: 'approve' | 'reject' | 'reset' }) =>
       arrangementsApi.decideFinding(id, v.findingId, v.decision),
-    onSuccess: () => {
-      toast.success('Decision recorded');
+    onSuccess: (res) => {
+      // approving a gap verdict opens a Risk (RTV-43) → surface it + refresh the remediation loop.
+      toast.success(res.data?.risk ? 'Approved — a risk was opened in the remediation loop' : 'Decision recorded');
       qc.invalidateQueries({ queryKey: ['findings', id] });
+      qc.invalidateQueries({ queryKey: ['risks', id] });
     },
     onError: (e) => {
       const msg = getErrorMessage(e);
       toast.error(msg.includes('permission') ? 'A checker role is required to decide findings' : msg);
+    },
+  });
+
+  // RTV-43 — advance a risk through the remediation lifecycle. `accepted` needs a rationale (the
+  // management-body sign-off, risk:accept); the progress transitions need risk:manage.
+  const [acceptFor, setAcceptFor] = useState<string | null>(null);
+  const [acceptReason, setAcceptReason] = useState('');
+  const changeRisk = useMutation({
+    mutationFn: (v: { riskId: string; status: RiskStatus; reason?: string }) =>
+      arrangementsApi.updateRisk(id, v.riskId, v.status, v.reason),
+    onSuccess: (_res, v) => {
+      toast.success(v.status === 'accepted' ? 'Risk accepted' : `Risk moved to ${v.status}`);
+      qc.invalidateQueries({ queryKey: ['risks', id] });
+      setAcceptFor(null);
+      setAcceptReason('');
+    },
+    onError: (e) => {
+      const msg = getErrorMessage(e);
+      toast.error(
+        msg.includes('permission') ? 'You do not have permission for this risk action' : msg
+      );
     },
   });
 
@@ -221,6 +275,27 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/* Coverage (RTV-42) — "control/evidence coverage", never "% compliant" */}
+      {coverage && findings.length > 0 && (
+        <div className="rounded-lg border p-4 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold flex items-center gap-1.5"><Gauge className="h-4 w-4" /> Control/evidence coverage</h2>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {coverage.controlsWithSufficientEvidence}/{coverage.applicableControls} controls assessed on evidence
+            </span>
+          </div>
+          <Progress value={Math.round(coverage.coverage * 100)} />
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+            <span><span className="font-medium text-foreground tabular-nums">{Math.round(coverage.coverage * 100)}%</span> coverage</span>
+            <span>Confidence <span className="font-medium text-foreground tabular-nums">{Math.round(coverage.confidence * 100)}%</span> (evidence-derived)</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Coverage = controls with sufficient evidence ÷ applicable controls. This is <strong>not</strong> a
+            &ldquo;% compliant&rdquo; score — missing evidence lowers coverage, it never becomes a false pass.
+          </p>
+        </div>
+      )}
 
       {/* Findings */}
       <div>
@@ -321,6 +396,60 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         )}
       </div>
 
+      {/* Risks · remediation loop (RTV-43) — gaps a checker approved into tracked, owned risks */}
+      {risks.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold flex items-center gap-1.5 mb-2">
+            <ShieldAlert className="h-4 w-4" /> Risks · remediation loop ({risks.length})
+          </h2>
+          <div className="rounded-md border divide-y">
+            {risks.map((r) => {
+              const nexts = RISK_TRANSITIONS[r.status] ?? [];
+              return (
+                <div key={r.id} className="px-3 py-2.5 text-sm space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs">{r.controlId}</span>
+                    <RiskSeverityBadge value={r.severity} />
+                    <RiskStatusBadge value={r.status} />
+                  </div>
+                  {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+                  {nexts.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {nexts.map((s) =>
+                        s === 'accepted' ? (
+                          <Button
+                            key={s}
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={changeRisk.isPending}
+                            onClick={() => setAcceptFor(r.id)}
+                            title="Management-body sign-off — requires a checker role"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5 mr-1" /> Accept risk
+                          </Button>
+                        ) : (
+                          <Button
+                            key={s}
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            disabled={changeRisk.isPending}
+                            onClick={() => changeRisk.mutate({ riskId: r.id, status: s })}
+                          >
+                            {RISK_ACTION_LABEL[s]}
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <Dialog open={evOpen} onOpenChange={setEvOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Attach evidence</DialogTitle></DialogHeader>
@@ -349,6 +478,53 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEvOpen(false)}>Cancel</Button>
             <Button disabled={!doc.trim() || attach.isPending} onClick={() => attach.mutate()}>Attach</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Accept-risk dialog (RTV-43) — the management-body sign-off; a rationale is mandatory. */}
+      <Dialog
+        open={!!acceptFor}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAcceptFor(null);
+            setAcceptReason('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Accept risk</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Accepting a risk is the management-body sign-off (requires a checker role). The rationale
+              is recorded in the immutable audit trail.
+            </p>
+            <Textarea
+              rows={4}
+              placeholder="Rationale for accepting the residual risk…"
+              value={acceptReason}
+              onChange={(e) => setAcceptReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAcceptFor(null);
+                setAcceptReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!acceptReason.trim() || changeRisk.isPending}
+              onClick={() =>
+                acceptFor &&
+                changeRisk.mutate({ riskId: acceptFor, status: 'accepted', reason: acceptReason.trim() })
+              }
+            >
+              Accept risk
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -48,17 +48,35 @@ export function useArrangementEvidenceQuery(id: string) {
 }
 
 /**
- * Findings for an arrangement. When `poll` is set, refetch every 4s (the assessment runs
- * async on the worker) until findings appear — mirrors use-assessment-list-query.
+ * Findings for an arrangement, plus the arrangement-level coverage metric (RTV-42). When `poll` is
+ * set, refetch every 4s (the assessment runs async on the worker) until findings appear.
  */
 export function useFindingsQuery(id: string, poll = false) {
   return useQuery({
     queryKey: ['findings', id],
     queryFn: async () => {
       const res = await arrangementsApi.getFindings(id);
-      return res.data?.findings ?? [];
+      return {
+        findings: res.data?.findings ?? [],
+        coverage: res.data?.coverage ?? null,
+        staleCount: res.data?.staleCount ?? 0,
+      };
     },
     enabled: !!id,
-    refetchInterval: poll ? (query) => (query.state.data && query.state.data.length > 0 ? false : 4000) : false,
+    refetchInterval: poll
+      ? (query) => (query.state.data && query.state.data.findings.length > 0 ? false : 4000)
+      : false,
+  });
+}
+
+/** RTV-43 — the arrangement's risk register / remediation loop (gaps a checker approved). */
+export function useRisksQuery(id: string) {
+  return useQuery({
+    queryKey: ['risks', id],
+    queryFn: async () => {
+      const res = await arrangementsApi.getRisks(id);
+      return res.data?.risks ?? [];
+    },
+    enabled: !!id,
   });
 }
