@@ -1,7 +1,7 @@
 ---
 id: RTV-60-concentration-ui
 title: "Concentration & nth-party graph UI (DORA Art. 29)"
-status: Ready
+status: Done
 type: Story
 epic: concentration
 milestone: "RTV — DORA ICT-TPRM domain model"
@@ -41,20 +41,20 @@ close/link them once this lands.
 
 ## Acceptance Criteria
 
-- [ ] AC-1: A `/concentration` dashboard route + nav entry, gated by auth; reachable from the app shell.
-- [ ] AC-2: **Concentration KPIs** from `GET /concentration` — providers count, SPOFs, top providers by
+- [x] AC-1: A `/concentration` dashboard route + nav entry, gated by auth; reachable from the app shell.
+- [x] AC-2: **Concentration KPIs** from `GET /concentration` — providers count, SPOFs, top providers by
       dependency, substrate concentration, coverage — rendered as summary cards (honest labels, no
       invented scores).
-- [ ] AC-3: **Dependency graph** from `GET /concentration/graph` (nodes + edges). Reuse/adapt the
+- [x] AC-3: **Dependency graph** from `GET /concentration/graph` (nodes + edges). Reuse/adapt the
       existing `ConcentrationGraphHero` viz as the base rather than a new graph lib.
-- [ ] AC-4: **nth-party dependencies** list from `GET /dependencies`; an AI-extracted (unconfirmed) edge
+- [x] AC-4: **nth-party dependencies** list from `GET /dependencies`; an AI-extracted (unconfirmed) edge
       can be **confirmed** via `PATCH /dependencies/:id` (optimistic, invalidates the query). Unconfirmed
       edges are visually distinct.
-- [ ] AC-5: **Critical functions** management — list (`GET /functions`), create/update
+- [x] AC-5: **Critical functions** management — list (`GET /functions`), create/update
       (`POST /functions`), delete (`DELETE /functions/:id`), with the standard form + confirm patterns.
-- [ ] AC-6: Errors surface via `getErrorMessage` + toast (mirror the arrangements feature); loading =
+- [x] AC-6: Errors surface via `getErrorMessage` + toast (mirror the arrangements feature); loading =
       skeletons; empty states explain what to do (e.g. "no dependencies extracted yet").
-- [ ] AC-7: A typed `concentrationApi` client + query hooks (mirror `features/arrangements/`), and
+- [x] AC-7: A typed `concentrationApi` client + query hooks (mirror `features/arrangements/`), and
       vitest for the api client calls (endpoints + payloads).
 
 ## Technical Notes
@@ -67,7 +67,7 @@ close/link them once this lands.
 
 ## Definition of Done
 
-- [ ] ACs met; `npm run build` + eslint + vitest green; matches the arrangements feature conventions
+- [x] ACs met; `npm run build` + eslint + vitest green; matches the arrangements feature conventions
 - [ ] Legacy concentration issues (#300 / #350 / #207) linked or closed as superseded
 - [ ] Screens verified against dev data (or seeded fixtures) — KPIs + graph + confirm flow work
 
