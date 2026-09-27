@@ -7,6 +7,7 @@ import {
   ClipboardList,
   BarChart3,
   Network,
+  Share2,
   BookText,
 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ export const desktopNavSections: NavSection[] = [
     label: 'nav.sections.compliance',
     items: [
       { title: 'nav.items.arrangements', href: '/arrangements', icon: Network },
+      { title: 'nav.items.concentration', href: '/concentration', icon: Share2 },
       { title: 'nav.items.register', href: '/register-of-information', icon: BookText },
       { title: 'nav.items.riskRegister', href: '/risk-register', icon: BarChart3 },
       { title: 'nav.items.vendors', href: '/workspaces', icon: Building2 },

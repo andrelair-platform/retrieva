@@ -141,7 +141,8 @@
       "questionnaires": "Questionnaires",
       "askAi": "Demander à l'IA",
       "history": "Historique",
-      "settings": "Paramètres"
+      "settings": "Paramètres",
+      "concentration": "Concentration"
     },
     "titles": {
       "riskRegister": "Registre des risques",
@@ -157,7 +158,8 @@
       "assessmentDetail": "Détail de l'évaluation",
       "vendorDetail": "Détail du fournisseur",
       "conversation": "Conversation",
-      "questionnaire": "Questionnaire"
+      "questionnaire": "Questionnaire",
+      "concentration": "Concentration"
     }
   },
   "riskRegister": {
