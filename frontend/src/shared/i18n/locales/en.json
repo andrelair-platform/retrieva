@@ -348,12 +348,12 @@
   "landing": {
     "badge": "DORA Regulation (EU) 2022/2554",
     "heroTitle": "See where a single vendor takes the business down.",
-    "heroSubtitle": "Retrieva maps every vendor and its subprocessors into one graph — the concentration and single points of failure your Register can’t show. Assess with the evidence you have; the gaps become tracked risk.",
+    "heroSubtitle": "Retrieva maps every vendor and its subprocessors into one graph — the concentration and single points of failure your Register can’t show. Drop in a contract, get an evidence-grounded assessment, and turn gaps into tracked, owned risk. For a single entity or a whole group across borders.",
     "featuresHeading": "Everything you need to meet DORA obligations",
     "features": {
       "gapAnalysis": {
-        "title": "Automated Gap Analysis",
-        "desc": "Upload vendor ICT documentation and get a structured DORA compliance gap report in minutes."
+        "title": "Evidence-grounded assessment",
+        "desc": "The engine grades each control against the evidence you actually have — every verdict cited to its source passage. Absence of proof is flagged for review, never faked as a pass."
       },
       "questionnaires": {
         "title": "Vendor Questionnaires",
@@ -369,27 +369,43 @@
       },
       "roi": {
         "title": "Register of Information",
-        "desc": "One-click EBA-compliant DORA Article 28(3) XLSX export — RT.01.01 to RT.04.01 sheets generated automatically."
-      },
-      "score": {
-        "title": "Live Compliance Score",
-        "desc": "A real-time DORA compliance score per workspace, with a 30-day trend and Red/Amber/Green status — board-ready at a glance."
+        "desc": "The DORA Art. 28(3) Register (RT.01.01–RT.04.01) falls out of your live graph — no spreadsheet to maintain. Export EBA-compliant XLSX/CSV in one click."
       },
       "riskRegister": {
-        "title": "Risk Register",
-        "desc": "Track vendor risk decisions, criticality tiers, and gap remediation across your whole third-party estate in one register."
+        "title": "Risk register & remediation",
+        "desc": "Approved gaps become owned, severity-tiered risks that move through a remediation loop (open → mitigating → mitigated → accepted → closed) — every transition audited."
       },
       "reports": {
         "title": "Regulator-Ready Reports",
         "desc": "Generate a downloadable Word (.docx) DORA gap-analysis report per vendor — formatted for review and submission."
       },
       "security": {
-        "title": "Enterprise-Grade Security",
-        "desc": "Workspace isolation, MFA, PII detection, audit logging, and encrypted secrets — built for regulated industries."
+        "title": "Enterprise-grade security",
+        "desc": "SSO/MFA, least-privilege RBAC with entity isolation, PII detection, encrypted secrets, and a full audit log — built for regulated financial entities."
       },
       "concentration": {
         "title": "Concentration & nth-party graph",
         "desc": "Map critical functions → providers → their subprocessors, and surface concentration risk and single points of failure across your whole portfolio (DORA Art. 28(4)/29) — the cross-vendor question a spreadsheet can’t answer."
+      },
+      "multiEntity": {
+        "title": "Groups & multi-entity",
+        "desc": "Run DORA for an entire group across its country entities — Belgium, Germany, France — from one account, with a consolidated Register and strict per-branch access isolation. Or a single organisation. One platform, both shapes."
+      },
+      "intake": {
+        "title": "AI contract intake",
+        "desc": "Drop in an ICT contract: Retrieva parses it, proposes the arrangement, and shows exactly which DORA controls its clauses touch — before you commit a single field."
+      },
+      "coverage": {
+        "title": "Honest coverage, not a fake %",
+        "desc": "See real control/evidence coverage with an evidence-derived confidence — never a vanity “compliance %”. The number is defensible because it’s grounded in cited evidence."
+      },
+      "humanReview": {
+        "title": "Human-in-the-loop decisions",
+        "desc": "AI drafts; your ICT risk officer decides. Maker-checker separation of duties, mandatory override reasons, and an immutable audit trail — DORA management-body accountability by design."
+      },
+      "selfHost": {
+        "title": "Self-hostable",
+        "desc": "Run Retrieva inside your own environment — signed images, bring-your-own datastores. Your contracts and evidence never leave your perimeter."
       }
     },
     "ingestionHeading": "Get the evidence — even when vendors won’t hand it over",
