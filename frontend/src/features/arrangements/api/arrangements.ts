@@ -171,6 +171,17 @@ export interface ArrangementProposal {
   notes: string;
 }
 
+// RTV-34/40 — the DORA controls a contract's clauses touch (deterministic preview shown at intake).
+export interface ControlTouchpoint {
+  controlId: string;
+  title?: string;
+  doraArticleRef?: string;
+  domain?: string;
+  clauseCount: number;
+  matchedPatterns: string[];
+  sample: string;
+}
+
 export interface IntakeResult {
   proposal: ArrangementProposal;
   matches: {
@@ -179,6 +190,7 @@ export interface IntakeResult {
     businessFunctionId: string | null;
     ictServiceId: string | null;
   };
+  controlTouchpoints: ControlTouchpoint[];
   source: { fileName: string; parsedChars: number };
 }
 

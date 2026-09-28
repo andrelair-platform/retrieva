@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { UploadCloud, Sparkles, Loader2 } from 'lucide-react';
+import { UploadCloud, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 
 import {
   Dialog,
@@ -31,6 +31,7 @@ import {
   arrangementsApi,
   type ArrangementProposal,
   type ArrangementType,
+  type ControlTouchpoint,
   type Criticality,
   type Trigger,
 } from '@/features/arrangements/api/arrangements';
@@ -48,6 +49,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
   const [proposal, setProposal] = useState<ArrangementProposal | null>(null);
   const [source, setSource] = useState<string>('');
   const [confidence, setConfidence] = useState(0);
+  const [touchpoints, setTouchpoints] = useState<ControlTouchpoint[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [trigger, setTrigger] = useState<Trigger>('new');
 
@@ -62,6 +64,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
       setProposal(r.proposal);
       setSource(r.source.fileName);
       setConfidence(r.proposal.confidence);
+      setTouchpoints(r.controlTouchpoints ?? []);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -85,6 +88,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     setProposal(null);
     setSource('');
     setConfidence(0);
+    setTouchpoints([]);
     setFile(null);
     setTrigger('new');
   };
@@ -230,6 +234,30 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
                 />
               </div>
             </div>
+
+            {/* RTV-34/40 — DORA controls this contract's clauses touch (deterministic preview) */}
+            {touchpoints.length > 0 && (
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="text-xs font-medium flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5" /> DORA controls this contract touches ({touchpoints.length})
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  A deterministic clause→control preview — the full evidence-grounded assessment runs after you confirm.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {touchpoints.map((t) => (
+                    <span
+                      key={t.controlId}
+                      className="inline-flex items-center gap-1 rounded border bg-muted/40 px-1.5 py-0.5 text-[10px]"
+                      title={`${t.title ?? ''}${t.doraArticleRef ? ` · ${t.doraArticleRef}` : ''} — ${t.clauseCount} clause(s)`}
+                    >
+                      <span className="font-mono">{t.controlId}</span>
+                      <span className="text-muted-foreground">×{t.clauseCount}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
