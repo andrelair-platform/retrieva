@@ -348,12 +348,12 @@
   "landing": {
     "badge": "Règlement DORA (UE) 2022/2554",
     "heroTitle": "Voyez où un seul fournisseur fait tomber l’activité.",
-    "heroSubtitle": "Retrieva cartographie chaque fournisseur et ses sous-traitants en un seul graphe — la concentration et les points uniques de défaillance que votre Registre ne montre pas. Évaluez avec les preuves disponibles ; les lacunes deviennent un risque suivi.",
+    "heroSubtitle": "Retrieva cartographie chaque prestataire et ses sous-traitants dans un seul graphe — la concentration et les points uniques de défaillance que votre Registre ne montre pas. Déposez un contrat, obtenez une évaluation fondée sur les preuves, et transformez les écarts en risques suivis et attribués. Pour une entité unique ou tout un groupe transfrontalier.",
     "featuresHeading": "Tout ce qu'il faut pour respecter vos obligations DORA",
     "features": {
       "gapAnalysis": {
-        "title": "Analyse d'écarts automatisée",
-        "desc": "Téléversez la documentation TIC d'un prestataire et obtenez un rapport structuré d'écarts de conformité DORA en quelques minutes."
+        "title": "Évaluation fondée sur les preuves",
+        "desc": "Le moteur évalue chaque contrôle au regard des preuves réellement disponibles — chaque verdict cité à sa source. L’absence de preuve est signalée pour revue, jamais présentée comme conforme."
       },
       "questionnaires": {
         "title": "Questionnaires fournisseurs",
@@ -368,16 +368,12 @@
         "desc": "Alertes automatiques toutes les 24 h : expiration des certifications (90/30/7 jours), renouvellement des contrats et évaluations en retard."
       },
       "roi": {
-        "title": "Registre d'information",
-        "desc": "Export XLSX conforme EBA (article 28(3) de DORA) en un clic — feuilles RT.01.01 à RT.04.01 générées automatiquement."
-      },
-      "score": {
-        "title": "Score de conformité en temps réel",
-        "desc": "Un score de conformité DORA par espace de travail, avec une tendance sur 30 jours et un statut Rouge/Orange/Vert — prêt pour le conseil d'administration."
+        "title": "Registre d’information",
+        "desc": "Le Registre DORA Art. 28(3) (RT.01.01–RT.04.01) découle de votre graphe vivant — aucun tableur à maintenir. Export XLSX/CSV conforme EBA en un clic."
       },
       "riskRegister": {
-        "title": "Registre des risques",
-        "desc": "Suivez les décisions de risque fournisseurs, les niveaux de criticité et la remédiation des écarts sur l'ensemble de votre parc de tiers, dans un seul registre."
+        "title": "Registre des risques & remédiation",
+        "desc": "Les écarts approuvés deviennent des risques attribués et hiérarchisés qui suivent une boucle de remédiation (ouvert → en cours → atténué → accepté → clôturé) — chaque transition auditée."
       },
       "reports": {
         "title": "Rapports prêts pour le régulateur",
@@ -385,11 +381,31 @@
       },
       "security": {
         "title": "Sécurité de niveau entreprise",
-        "desc": "Isolation des espaces de travail, MFA, détection des données personnelles, journalisation d'audit et secrets chiffrés — conçu pour les secteurs réglementés."
+        "desc": "SSO/MFA, RBAC à moindre privilège avec isolation par entité, détection de PII, secrets chiffrés et journal d’audit complet — conçu pour les entités financières réglementées."
       },
       "concentration": {
         "title": "Graphe de concentration & nème-partie",
         "desc": "Cartographiez fonctions critiques → prestataires → leurs sous-traitants, et révélez le risque de concentration et les points uniques de défaillance sur tout votre portefeuille (DORA Art. 28(4)/29) — la question inter-fournisseurs qu’un tableur ne peut pas traiter."
+      },
+      "multiEntity": {
+        "title": "Groupes & multi-entités",
+        "desc": "Pilotez DORA pour tout un groupe et ses entités par pays — Belgique, Allemagne, France — depuis un seul compte, avec un Registre consolidé et une isolation stricte par filiale. Ou une organisation unique. Une plateforme, les deux modèles."
+      },
+      "intake": {
+        "title": "Intake de contrat par IA",
+        "desc": "Déposez un contrat ICT : Retrieva l’analyse, propose l’arrangement et montre exactement quels contrôles DORA ses clauses touchent — avant même de saisir un champ."
+      },
+      "coverage": {
+        "title": "Une couverture honnête, pas un faux %",
+        "desc": "Une vraie couverture contrôles/preuves avec une confiance dérivée des preuves — jamais un « % de conformité » cosmétique. Un chiffre défendable car ancré dans des preuves citées."
+      },
+      "humanReview": {
+        "title": "Décision humaine dans la boucle",
+        "desc": "L’IA propose ; votre responsable des risques ICT décide. Séparation des tâches (maker-checker), motifs d’override obligatoires et journal d’audit inaltérable — la responsabilité de l’organe de direction DORA par conception."
+      },
+      "selfHost": {
+        "title": "Auto-hébergeable",
+        "desc": "Exécutez Retrieva dans votre propre environnement — images signées, bases de données à votre choix. Vos contrats et preuves ne quittent jamais votre périmètre."
       }
     },
     "ingestionHeading": "Obtenez les preuves — même quand les fournisseurs ne les fournissent pas",

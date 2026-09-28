@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Bell,
   Bot,
+  Building2,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -23,6 +24,7 @@ import {
   Server,
   ShieldCheck,
   Upload,
+  UserCheck,
   Check,
   Minus,
   X,
@@ -159,14 +161,18 @@ export function LandingPageContent() {
             title={t('landing.features.concentration.title')}
             description={t('landing.features.concentration.desc')}
           />
+          <FeatureCard icon={<Building2 className="h-7 w-7" />} title={t('landing.features.multiEntity.title')} description={t('landing.features.multiEntity.desc')} />
+          <FeatureCard icon={<Upload className="h-7 w-7" />} title={t('landing.features.intake.title')} description={t('landing.features.intake.desc')} />
+          <FeatureCard icon={<ScrollText className="h-7 w-7" />} title={t('landing.features.roi.title')} description={t('landing.features.roi.desc')} />
           <FeatureCard icon={<FileSearch className="h-7 w-7" />} title={t('landing.features.gapAnalysis.title')} description={t('landing.features.gapAnalysis.desc')} />
+          <FeatureCard icon={<Gauge className="h-7 w-7" />} title={t('landing.features.coverage.title')} description={t('landing.features.coverage.desc')} />
+          <FeatureCard icon={<UserCheck className="h-7 w-7" />} title={t('landing.features.humanReview.title')} description={t('landing.features.humanReview.desc')} />
+          <FeatureCard icon={<ListChecks className="h-7 w-7" />} title={t('landing.features.riskRegister.title')} description={t('landing.features.riskRegister.desc')} />
           <FeatureCard icon={<ClipboardCheck className="h-7 w-7" />} title={t('landing.features.questionnaires.title')} description={t('landing.features.questionnaires.desc')} />
           <FeatureCard icon={<Bot className="h-7 w-7" />} title={t('landing.features.copilot.title')} description={t('landing.features.copilot.desc')} />
           <FeatureCard icon={<Bell className="h-7 w-7" />} title={t('landing.features.monitoring.title')} description={t('landing.features.monitoring.desc')} />
-          <FeatureCard icon={<FileSpreadsheet className="h-7 w-7" />} title={t('landing.features.roi.title')} description={t('landing.features.roi.desc')} />
-          <FeatureCard icon={<Gauge className="h-7 w-7" />} title={t('landing.features.score.title')} description={t('landing.features.score.desc')} />
-          <FeatureCard icon={<ListChecks className="h-7 w-7" />} title={t('landing.features.riskRegister.title')} description={t('landing.features.riskRegister.desc')} />
           <FeatureCard icon={<FileText className="h-7 w-7" />} title={t('landing.features.reports.title')} description={t('landing.features.reports.desc')} />
+          <FeatureCard icon={<Server className="h-7 w-7" />} title={t('landing.features.selfHost.title')} description={t('landing.features.selfHost.desc')} />
           <FeatureCard icon={<Lock className="h-7 w-7" />} title={t('landing.features.security.title')} description={t('landing.features.security.desc')} />
         </div>
       </section>
