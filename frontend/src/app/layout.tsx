@@ -28,8 +28,28 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Retrieva',
-  description: 'DORA compliance assessment powered by AI',
+  metadataBase: new URL('https://retrieva.online'),
+  title: 'Retrieva — DORA Compliance Platform',
+  description:
+    'A production SaaS that automates third-party ICT-risk assessment for financial entities — document analysis against DORA, AI-scored questionnaires, a compliance copilot, and one-click EBA Register of Information export.',
+  openGraph: {
+    type: 'website',
+    url: 'https://retrieva.online',
+    siteName: 'Retrieva',
+    title: 'Retrieva — DORA Compliance Platform',
+    description:
+      'Automate third-party ICT-risk assessment for financial entities — DORA document analysis, AI-scored questionnaires, a compliance copilot, and one-click EBA Register of Information export.',
+    images: [
+      { url: '/og-image.png', width: 1200, height: 630, alt: 'Retrieva — DORA compliance, AI-powered' },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Retrieva — DORA Compliance Platform',
+    description:
+      'DORA compliance, AI-powered — third-party ICT-risk assessment, AI-scored questionnaires, one-click EBA Register.',
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({
