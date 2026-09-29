@@ -1,6 +1,6 @@
 {
   "name": "retrieva",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Retrieva frontend — Next.js UI for the DORA TPRM / RAG platform (backend lives in andrelair-platform/retrieva-backend)",
   "type": "module",
   "private": true,
