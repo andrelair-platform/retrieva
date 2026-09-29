@@ -45,22 +45,37 @@ const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
 When `billing === 'annual'`, each card shows the annual unit price with a
 `"billed annually"` sub-label beneath.
 
-### Plan grid
+### Plan grid — "all capabilities included, priced by estate size"
 
-Four plans displayed in a `sm:grid-cols-2 lg:grid-cols-4` responsive grid:
+Four plans in a `sm:grid-cols-2 lg:grid-cols-4` responsive grid. **The cards only show what actually
+varies by plan** — vendors + seats are enforced by `config/stripe.ts` `PLAN_LIMITS` (Stripe-wired);
+support + onboarding are the ops differences. There are **no per-tier feature gates**, because the
+product doesn't enforce any beyond vendors/seats — faking them on the page would be incoherent (see
+the coherence rationale in [Unit Economics](../strategy/unit-economics.md)).
 
-| Plan | Monthly | Annual | Vendors | Members | Data sources |
-|------|---------|--------|---------|---------|--------------|
-| Starter | €199/mo | €159/mo | Up to 10 | 3 | File, URL |
-| Professional | €499/mo | €399/mo | Up to 50 | 10 | File, URL, Confluence |
-| Business | €999/mo | €799/mo | Up to 150 | 30 | All sources |
-| Enterprise | Custom | Custom | Unlimited | Unlimited | All + custom |
+| Plan | Monthly | Annual | Vendors | Members | Support | Onboarding |
+|------|---------|--------|---------|---------|---------|------------|
+| Starter | €199/mo | €159/mo | Up to 10 | 3 | Email | 20-day trial |
+| Professional | €499/mo | €399/mo | Up to 50 | 10 | Priority email | 20-day trial |
+| Business | €999/mo | €799/mo | Up to 150 | 30 | Slack + SLA | 20-day trial |
+| Enterprise | Custom | Custom | Unlimited | Unlimited | Dedicated CSM | Guided POC |
 
-- **Professional** is highlighted: `ring-2 ring-primary` border + "Most Popular" badge
-  at `absolute -top-3 left-1/2 -translate-x-1/2`
-- Each card fades up with `framer-motion` `whileInView`, staggered by `index × 0.1 s`
-- CTA buttons: `default` variant on highlighted card, `outline` on others
-- Enterprise CTA → `/contact`; all others → `/register`
+- **Professional** is highlighted: `ring-2 ring-primary` border + "Most Popular" badge.
+- Each card fades up with `framer-motion` `whileInView`, staggered by `index × 0.1 s`.
+- CTA buttons: `default` variant on highlighted card, `outline` on others.
+- Enterprise CTA → `/contact`; all others → `/register`.
+
+### "Included on every plan" block
+
+Below the grid, a full-width panel lists the capabilities included on **all** plans — each verified to
+actually ship in the codebase (no feature paywalls): unlimited DORA gap assessments, Register of
+Information export (EBA RT.02.01, XLSX/CSV), vendor questionnaires, the vendor evidence portal,
+nth-party dependency mapping, concentration-risk analysis, AI Copilot (RAG), certificate/contract
+alerts, maker-checker + immutable audit, and role-based access control.
+
+> Features intentionally **not** listed because they aren't built yet (audit surfaced them):
+> customer SSO/SAML (#626), customer API access (#627), per-plan AI metering (#628, kept fair-use),
+> configurable audit retention (#629).
 
 ### FAQ
 
