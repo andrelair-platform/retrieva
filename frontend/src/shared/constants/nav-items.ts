@@ -9,6 +9,7 @@ import {
   Network,
   Share2,
   BookText,
+  Inbox,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -30,6 +31,7 @@ export const desktopNavSections: NavSection[] = [
   {
     label: 'nav.sections.compliance',
     items: [
+      { title: 'nav.items.decisionInbox', href: '/decision-inbox', icon: Inbox },
       { title: 'nav.items.arrangements', href: '/arrangements', icon: Network },
       { title: 'nav.items.concentration', href: '/concentration', icon: Share2 },
       { title: 'nav.items.register', href: '/register-of-information', icon: BookText },
