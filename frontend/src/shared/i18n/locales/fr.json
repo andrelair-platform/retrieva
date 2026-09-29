@@ -142,7 +142,8 @@
       "askAi": "Demander à l'IA",
       "history": "Historique",
       "settings": "Paramètres",
-      "concentration": "Concentration"
+      "concentration": "Concentration",
+      "decisionInbox": "Boîte de décision"
     },
     "titles": {
       "riskRegister": "Registre des risques",

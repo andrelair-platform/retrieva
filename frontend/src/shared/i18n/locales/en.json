@@ -142,7 +142,8 @@
       "askAi": "Ask AI",
       "history": "History",
       "settings": "Settings",
-      "concentration": "Concentration"
+      "concentration": "Concentration",
+      "decisionInbox": "Decision Inbox"
     },
     "titles": {
       "riskRegister": "Risk Register",

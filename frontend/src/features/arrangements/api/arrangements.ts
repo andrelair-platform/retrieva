@@ -283,10 +283,15 @@ export const arrangementsApi = {
   },
   // The human-in-the-loop decision (RTV-55) — a checker approves/rejects a draft finding. Approving a
   // GAP verdict opens a Risk (RTV-43), so callers should also invalidate the risks query.
-  decideFinding: async (arrangementId: string, findingId: string, decision: 'approve' | 'reject' | 'reset') => {
+  decideFinding: async (
+    arrangementId: string,
+    findingId: string,
+    decision: 'approve' | 'reject' | 'reset',
+    reason?: string
+  ) => {
     const res = await apiClient.patch<ApiResponse<{ finding: Finding; risk: Risk | null }>>(
       `/arrangements/${arrangementId}/findings/${findingId}`,
-      { decision }
+      { decision, ...(reason ? { reason } : {}) }
     );
     return res.data;
   },
