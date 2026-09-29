@@ -34,10 +34,15 @@ import {
   useArrangementQuery,
   useArrangementLifecycleQuery,
   useArrangementEvidenceQuery,
+  useEvidenceChecklistQuery,
   useFindingsQuery,
   useRisksQuery,
 } from '@/features/arrangements/queries/use-arrangements-query';
-import type { RiskStatus } from '@/features/arrangements/api/arrangements';
+import {
+  EVIDENCE_CATEGORY_LABELS,
+  type RiskStatus,
+  type EvidenceCategory,
+} from '@/features/arrangements/api/arrangements';
 import {
   CriticalityBadge,
   ArrangementTypeBadge,
@@ -90,6 +95,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const [evOpen, setEvOpen] = useState(false);
   const [doc, setDoc] = useState('');
   const [src, setSrc] = useState('');
+  const [cat, setCat] = useState<EvidenceCategory | ''>('');
+  const [expiry, setExpiry] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const assess = useMutation({
@@ -104,6 +111,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const { data: arrangement, isLoading } = useArrangementQuery(id);
   const { data: lifecycle } = useArrangementLifecycleQuery(id);
   const { data: evidence = [] } = useArrangementEvidenceQuery(id);
+  const { data: checklist } = useEvidenceChecklistQuery(id); // RTV-64/#226
 
   const transition = useMutation({
     mutationFn: (t: string) => arrangementsApi.setLifecycle(id, t),
@@ -131,13 +139,22 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const { data: risks = [] } = useRisksQuery(id);
 
   const attach = useMutation({
-    mutationFn: () => arrangementsApi.attachEvidence(id, { document: doc.trim(), source: src.trim() }),
+    mutationFn: () =>
+      arrangementsApi.attachEvidence(id, {
+        document: doc.trim(),
+        source: src.trim(),
+        category: cat || undefined,
+        validityUntil: expiry || undefined,
+      }),
     onSuccess: () => {
       toast.success('Evidence attached');
       setDoc('');
       setSrc('');
+      setCat('');
+      setExpiry('');
       setEvOpen(false);
       qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
+      qc.invalidateQueries({ queryKey: ['evidence-checklist', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -259,6 +276,40 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           <h2 className="text-sm font-semibold flex items-center gap-1.5"><FileText className="h-4 w-4" /> Evidence ({evidence.length})</h2>
           <Button size="sm" variant="outline" onClick={() => setEvOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Attach</Button>
         </div>
+        {/* DORA evidence checklist (RTV-64/#226) — expected vs present; missing = a tracked gap. */}
+        {checklist && checklist.items.length > 0 && (
+          <div className="rounded-lg border p-3 mb-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold">DORA evidence checklist</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {checklist.summary.present}/{checklist.summary.expected} present · {Math.round(checklist.summary.coverage * 100)}%
+              </span>
+            </div>
+            <div className="divide-y">
+              {checklist.items.map((it) => (
+                <div key={it.category} className="flex items-center justify-between py-1.5 text-sm">
+                  <span>
+                    {it.label}{' '}
+                    <span className="text-[10px] text-muted-foreground">({it.expectedSource})</span>
+                  </span>
+                  {it.status === 'present' ? (
+                    <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-[10px]">present</Badge>
+                  ) : it.status === 'expired' ? (
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 text-[10px]">expired</Badge>
+                  ) : (
+                    <Badge variant="destructive" className="text-[10px]">missing{it.blockedOn ? ` · ${it.blockedOn}` : ''}</Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+            {checklist.summary.missing > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {checklist.summary.missing} expected item(s) missing — tracked as gaps (DORA keeps the firm accountable).
+                {checklist.summary.missingFromVendor.length > 0 && ` ${checklist.summary.missingFromVendor.length} to request from the vendor.`}
+              </p>
+            )}
+          </div>
+        )}
         {evidence.length === 0 ? (
           <p className="text-sm text-muted-foreground">No evidence attached. Without evidence, every control is <em>insufficient evidence</em> (human review) — never a false pass.</p>
         ) : (
@@ -474,6 +525,26 @@ export function ArrangementDetailPage({ id }: { id: string }) {
               <Label>Source</Label>
               <Input placeholder="e.g. Provider Trust Center" value={src} onChange={(e) => setSrc(e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>DORA category</Label>
+                <select
+                  value={cat}
+                  onChange={(e) => setCat(e.target.value as EvidenceCategory | '')}
+                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">— uncategorised —</option>
+                  {(Object.keys(EVIDENCE_CATEGORY_LABELS) as EvidenceCategory[]).map((c) => (
+                    <option key={c} value={c}>{EVIDENCE_CATEGORY_LABELS[c]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Valid until</Label>
+                <Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Set a DORA category so it counts on the checklist; a validity date flags expiry.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEvOpen(false)}>Cancel</Button>

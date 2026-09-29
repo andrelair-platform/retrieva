@@ -47,6 +47,15 @@ export function useArrangementEvidenceQuery(id: string) {
   });
 }
 
+// RTV-64/#226 — the evidence checklist (expected vs present; missing = a tracked gap).
+export function useEvidenceChecklistQuery(id: string) {
+  return useQuery({
+    queryKey: ['evidence-checklist', id],
+    queryFn: async () => (await arrangementsApi.getEvidenceChecklist(id)).data ?? null,
+    enabled: !!id,
+  });
+}
+
 /**
  * Findings for an arrangement, plus the arrangement-level coverage metric (RTV-42). When `poll` is
  * set, refetch every 4s (the assessment runs async on the worker) until findings appear.

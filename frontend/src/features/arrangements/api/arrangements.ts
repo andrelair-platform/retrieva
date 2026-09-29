@@ -87,7 +87,56 @@ export interface Evidence {
   document: string;
   source: string;
   version: string;
+  category?: EvidenceCategory | null; // RTV-64/#226 — canonical DORA evidence category (nullable)
+  validityUntil?: string | null;
   createdAt: string;
+}
+
+// RTV-64 / #226 — Evidence Library. Canonical DORA Art 28/30 categories (mirror the backend enum).
+export type EvidenceCategory =
+  | 'master_service_agreement'
+  | 'dora_addendum'
+  | 'soc2_report'
+  | 'iso27001_cert'
+  | 'vendor_dora_attestation'
+  | 'subprocessor_list'
+  | 'bcp_dr_plan'
+  | 'exit_strategy'
+  | 'risk_classification';
+
+export const EVIDENCE_CATEGORY_LABELS: Record<EvidenceCategory, string> = {
+  master_service_agreement: 'Master Service Agreement',
+  dora_addendum: 'DORA Addendum / Annex',
+  soc2_report: 'SOC 2 Type II Report',
+  iso27001_cert: 'ISO 27001 Cert + SoA',
+  vendor_dora_attestation: "Vendor's DORA Attestation",
+  subprocessor_list: 'Sub-processor List',
+  bcp_dr_plan: 'BCP / DR Plan',
+  exit_strategy: 'Exit / Migration Strategy',
+  risk_classification: 'Internal CIF Classification',
+};
+
+export interface ChecklistItem {
+  category: EvidenceCategory;
+  label: string;
+  expectedSource: 'institution' | 'vendor' | 'both';
+  status: 'present' | 'expired' | 'missing';
+  count: number;
+  latestValidityUntil: string | null;
+  blockedOn: 'institution' | 'vendor' | null;
+}
+
+export interface EvidenceChecklist {
+  items: ChecklistItem[];
+  summary: {
+    expected: number;
+    present: number;
+    expired: number;
+    missing: number;
+    coverage: number;
+    missingFromVendor: EvidenceCategory[];
+    missingFromInstitution: EvidenceCategory[];
+  };
 }
 
 export interface Finding {
@@ -214,10 +263,26 @@ export const arrangementsApi = {
     const res = await apiClient.get<ApiResponse<{ evidence: Evidence[] }>>(`/arrangements/${id}/evidence`);
     return res.data;
   },
-  attachEvidence: async (id: string, body: { document: string; source?: string; version?: string }) => {
+  attachEvidence: async (
+    id: string,
+    body: {
+      document: string;
+      source?: string;
+      version?: string;
+      category?: EvidenceCategory | null;
+      validityUntil?: string | null;
+    }
+  ) => {
     const res = await apiClient.post<ApiResponse<{ evidence: Evidence }>>(
       `/arrangements/${id}/evidence`,
       body
+    );
+    return res.data;
+  },
+  // RTV-64/#226 — expected vs present evidence (missing = a tracked gap).
+  getEvidenceChecklist: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<EvidenceChecklist>>(
+      `/arrangements/${id}/evidence/checklist`
     );
     return res.data;
   },
