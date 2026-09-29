@@ -139,6 +139,21 @@ export interface EvidenceChecklist {
   };
 }
 
+// RTV-227 / #227 — an evidence collection request raised to a vendor (the institution side).
+export interface EvidenceRequest {
+  id: string;
+  vendorEmail: string;
+  vendorContactName: string;
+  requestedCategories: EvidenceCategory[];
+  message: string;
+  status: 'pending' | 'fulfilled' | 'revoked';
+  token: string | null; // present only while the request is live (pending + unexpired)
+  tokenExpiresAt: string | null;
+  revokedAt: string | null;
+  fulfilledAt: string | null;
+  createdAt: string;
+}
+
 export interface Finding {
   id: string;
   arrangementId: string;
@@ -286,6 +301,38 @@ export const arrangementsApi = {
     );
     return res.data;
   },
+  // RTV-227/#227 — evidence collection requests (institution side). Ask a vendor for the categories
+  // the checklist shows missing; the vendor uploads via the public /v/evidence/<token> portal.
+  createEvidenceRequest: async (
+    id: string,
+    body: {
+      vendorEmail: string;
+      vendorContactName?: string;
+      requestedCategories?: EvidenceCategory[];
+      message?: string;
+      expiresInDays?: number;
+    }
+  ) => {
+    const res = await apiClient.post<ApiResponse<{ request: EvidenceRequest }>>(
+      `/arrangements/${id}/evidence-requests`,
+      body
+    );
+    return res.data;
+  },
+  listEvidenceRequests: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<{ requests: EvidenceRequest[] }>>(
+      `/arrangements/${id}/evidence-requests`
+    );
+    return res.data;
+  },
+  revokeEvidenceRequest: async (id: string, requestId: string) => {
+    const res = await apiClient.post<ApiResponse<{ request: EvidenceRequest }>>(
+      `/arrangements/${id}/evidence-requests/${requestId}/revoke`,
+      {}
+    );
+    return res.data;
+  },
+
   // Upload a document → index its text (RAG) so assessments cite real passages (RTV-34).
   ingestEvidence: async (id: string, file: File) => {
     const fd = new FormData();

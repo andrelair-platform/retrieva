@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle, Send, Copy, Ban } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,7 @@ import {
   useArrangementLifecycleQuery,
   useArrangementEvidenceQuery,
   useEvidenceChecklistQuery,
+  useEvidenceRequestsQuery,
   useFindingsQuery,
   useRisksQuery,
 } from '@/features/arrangements/queries/use-arrangements-query';
@@ -98,6 +99,11 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const [cat, setCat] = useState<EvidenceCategory | ''>('');
   const [expiry, setExpiry] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // RTV-227/#227 — the "request from vendor" dialog + the freshly-minted shareable link.
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqEmail, setReqEmail] = useState('');
+  const [reqMessage, setReqMessage] = useState('');
+  const [reqLink, setReqLink] = useState<string | null>(null);
 
   const assess = useMutation({
     mutationFn: () => arrangementsApi.runAssessment(id),
@@ -155,6 +161,34 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       setEvOpen(false);
       qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
       qc.invalidateQueries({ queryKey: ['evidence-checklist', id] });
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  // RTV-227/#227 — evidence collection requests (the vendor-portal institution side).
+  const { data: evidenceRequests = [] } = useEvidenceRequestsQuery(id);
+  const createRequest = useMutation({
+    mutationFn: () =>
+      arrangementsApi.createEvidenceRequest(id, {
+        vendorEmail: reqEmail.trim(),
+        message: reqMessage.trim() || undefined,
+        // categories default server-side to the checklist's missingFromVendor.
+      }),
+    onSuccess: (res) => {
+      const token = res.data?.request?.token;
+      setReqLink(token ? `${window.location.origin}/v/evidence/${token}` : null);
+      setReqEmail('');
+      setReqMessage('');
+      qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
+      toast.success('Evidence request created — share the link with the vendor');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+  const revokeRequest = useMutation({
+    mutationFn: (requestId: string) => arrangementsApi.revokeEvidenceRequest(id, requestId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
+      toast.success('Request revoked');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -303,11 +337,55 @@ export function ArrangementDetailPage({ id }: { id: string }) {
               ))}
             </div>
             {checklist.summary.missing > 0 && (
-              <p className="text-[11px] text-muted-foreground">
-                {checklist.summary.missing} expected item(s) missing — tracked as gaps (DORA keeps the firm accountable).
-                {checklist.summary.missingFromVendor.length > 0 && ` ${checklist.summary.missingFromVendor.length} to request from the vendor.`}
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] text-muted-foreground">
+                  {checklist.summary.missing} expected item(s) missing — tracked as gaps (DORA keeps the firm accountable).
+                  {checklist.summary.missingFromVendor.length > 0 && ` ${checklist.summary.missingFromVendor.length} to request from the vendor.`}
+                </p>
+                {checklist.summary.missingFromVendor.length > 0 && (
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={() => { setReqLink(null); setReqOpen(true); }}>
+                    <Send className="h-3.5 w-3.5 mr-1" /> Request from vendor
+                  </Button>
+                )}
+              </div>
             )}
+          </div>
+        )}
+        {/* RTV-227/#227 — outstanding evidence requests raised to vendors. */}
+        {evidenceRequests.length > 0 && (
+          <div className="rounded-lg border p-3 mb-3 space-y-1.5">
+            <span className="text-xs font-semibold">Vendor evidence requests</span>
+            <div className="divide-y">
+              {evidenceRequests.map((r) => (
+                <div key={r.id} className="flex items-center justify-between py-1.5 text-sm gap-2">
+                  <span className="truncate">
+                    {r.vendorEmail}{' '}
+                    <span className="text-[10px] text-muted-foreground">({r.requestedCategories.length} categor{r.requestedCategories.length === 1 ? 'y' : 'ies'})</span>
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {r.status === 'pending' ? (
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 text-[10px]">pending</Badge>
+                    ) : r.status === 'fulfilled' ? (
+                      <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-[10px]">submitted</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">revoked</Badge>
+                    )}
+                    {r.status === 'pending' && r.token && (
+                      <Button size="icon" variant="ghost" className="h-6 w-6" title="Copy vendor link"
+                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/v/evidence/${r.token}`); toast.success('Link copied'); }}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {r.status === 'pending' && (
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" title="Revoke"
+                        onClick={() => revokeRequest.mutate(r.id)} disabled={revokeRequest.isPending}>
+                        <Ban className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {evidence.length === 0 ? (
@@ -550,6 +628,52 @@ export function ArrangementDetailPage({ id }: { id: string }) {
             <Button variant="outline" onClick={() => setEvOpen(false)}>Cancel</Button>
             <Button disabled={!doc.trim() || attach.isPending} onClick={() => attach.mutate()}>Attach</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request-from-vendor dialog (RTV-227/#227) — asks the vendor for the missing categories. */}
+      <Dialog open={reqOpen} onOpenChange={(o) => { setReqOpen(o); if (!o) setReqLink(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Request evidence from the vendor</DialogTitle></DialogHeader>
+          {reqLink ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Share this secure link with the vendor. It lets them upload only the requested
+                documents — no Retrieva account needed.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={reqLink} className="text-xs" onFocus={(e) => e.target.select()} />
+                <Button size="icon" variant="outline" className="shrink-0" title="Copy"
+                  onClick={() => { navigator.clipboard.writeText(reqLink); toast.success('Link copied'); }}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setReqOpen(false); setReqLink(null); }}>Done</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                We&apos;ll ask the vendor for the {checklist?.summary.missingFromVendor.length ?? 0} categor
+                {(checklist?.summary.missingFromVendor.length ?? 0) === 1 ? 'y' : 'ies'} currently missing from them.
+              </p>
+              <div className="space-y-1.5">
+                <Label>Vendor email *</Label>
+                <Input type="email" placeholder="contact@vendor.com" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Message (optional)</Label>
+                <Textarea rows={3} placeholder="A short note shown to the vendor…" value={reqMessage} onChange={(e) => setReqMessage(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setReqOpen(false)}>Cancel</Button>
+                <Button disabled={!reqEmail.trim() || createRequest.isPending} onClick={() => createRequest.mutate()}>
+                  {createRequest.isPending ? 'Creating…' : 'Create request'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

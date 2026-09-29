@@ -56,6 +56,15 @@ export function useEvidenceChecklistQuery(id: string) {
   });
 }
 
+// RTV-227/#227 — evidence collection requests raised to a vendor for this arrangement.
+export function useEvidenceRequestsQuery(id: string) {
+  return useQuery({
+    queryKey: ['evidence-requests', id],
+    queryFn: async () => (await arrangementsApi.listEvidenceRequests(id)).data?.requests ?? [],
+    enabled: !!id,
+  });
+}
+
 /**
  * Findings for an arrangement, plus the arrangement-level coverage metric (RTV-42). When `poll` is
  * set, refetch every 4s (the assessment runs async on the worker) until findings appear.
