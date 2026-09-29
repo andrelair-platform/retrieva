@@ -25,6 +25,7 @@ const sidebars: SidebarsConfig = {
         'architecture/overview',
         'architecture/solution-architecture',
         'architecture/rag-pipeline',
+        'architecture/assessment-engine',
         'architecture/semantic-chunking',
         'architecture/multi-tenancy',
         'architecture/llm-model-selection',
