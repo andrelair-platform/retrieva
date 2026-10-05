@@ -102,21 +102,10 @@ const sidebars: SidebarsConfig = {
     'contributing',
   ],
   apiSidebar: [
+    // Per-endpoint pages were removed (RTV-74): the authoritative, always-current
+    // endpoint reference is the auto-generated OpenAPI spec served at /api-docs.
+    // Only the overview (which points there) + cross-cutting guides remain.
     'api/overview',
-    {
-      type: 'category',
-      label: 'Endpoints',
-      collapsed: false,
-      items: [
-        'api/rag',
-        'api/conversations',
-        'api/auth',
-        'api/organizations',
-        'api/workspaces',
-        'api/assessments',
-        'api/compliance',
-      ],
-    },
     'api/error-handling',
     'api/rate-limiting',
   ],
