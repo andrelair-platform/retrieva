@@ -305,13 +305,12 @@ Retrieva uses an **organization-first B2B model**. Every user must belong to a c
 6. All vendor workspaces of the organization are immediately visible
 
 :::info Role mapping
-Your org role (`org_admin`, `analyst`, `viewer`) maps to workspace permissions automatically. See [Organizations API](/api/organizations#role-mapping) for the full mapping table.
+Your org role (`org_admin`, `analyst`, `viewer`) maps to workspace permissions automatically. See the [API Reference](/api/overview) (the live OpenAPI docs) for the organizations endpoints and request/response shapes.
 :::
 
 ## Next Steps
 
 - [Architecture Overview](/architecture/overview) — Understand the system design
-- [Organizations API](/api/organizations) — Team onboarding and invitation endpoints
-- [API Reference](/api/overview) — Explore available endpoints
+- [API Reference](/api/overview) — The live, auto-generated OpenAPI docs (all endpoints, always current)
 - [Background Workers](/backend/workers) — BullMQ worker reference
 - [Environment Variables](/deployment/environment-variables) — Full configuration reference
