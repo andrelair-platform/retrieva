@@ -91,6 +91,12 @@ export interface UpsertCriticalFunctionInput {
   dependsOn?: string[];
 }
 
+// Result of AI sub-provider extraction (POST /concentration/extract/:workspaceId).
+export interface SubProviderExtractionResult {
+  created: number;
+  candidates: Array<{ name: string; service?: string | null }>;
+}
+
 const BASE = '/concentration';
 
 export const concentrationApi = {
@@ -123,6 +129,14 @@ export const concentrationApi = {
     const res = await apiClient.patch<ApiResponse<{ dependency: ProviderDependency }>>(
       `${BASE}/dependencies/${id}`,
       { confirmed }
+    );
+    return res.data;
+  },
+  // AI-extract sub-provider edges for a vendor from its indexed documents (RTV-72).
+  // Created edges are UNCONFIRMED — they appear in listDependencies() for human confirmation.
+  extractSubProviders: async (workspaceId: string) => {
+    const res = await apiClient.post<ApiResponse<SubProviderExtractionResult>>(
+      `${BASE}/extract/${workspaceId}`
     );
     return res.data;
   },

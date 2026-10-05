@@ -59,4 +59,11 @@ describe('concentrationApi (RTV-60)', () => {
     expect(url).toBe('/concentration/dependencies/d1');
     expect(body).toEqual({ confirmed: true });
   });
+
+  it('extractSubProviders POSTs /concentration/extract/:workspaceId (RTV-72)', async () => {
+    mockPost.mockResolvedValue({ data: { data: { created: 2, candidates: [{ name: 'OpenAI' }] } } });
+    const res = await concentrationApi.extractSubProviders('ws-123');
+    expect(mockPost.mock.calls[0][0]).toBe('/concentration/extract/ws-123');
+    expect(res.data?.created).toBe(2);
+  });
 });

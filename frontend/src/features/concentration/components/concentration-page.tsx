@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Network, AlertTriangle, Layers, GitBranch, Plus, Trash2, Check } from 'lucide-react';
+import { Network, AlertTriangle, Layers, GitBranch, Plus, Trash2, Check, ScanSearch } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +58,32 @@ export function ConcentrationPage() {
       concentrationApi.confirmDependency(v.id, v.confirmed),
     onSuccess: () => {
       toast.success('Dependency updated');
+      invalidateAll();
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  // ── AI sub-provider extraction (RTV-72) ─────────────────────────────────────
+  // Scans a vendor's indexed documents and proposes UNCONFIRMED nth-party edges,
+  // which then flow into the confirm table below (propose → human confirms).
+  const [extractOpen, setExtractOpen] = useState(false);
+  const [extractWs, setExtractWs] = useState('');
+  const extractDeps = useMutation({
+    mutationFn: (workspaceId: string) => concentrationApi.extractSubProviders(workspaceId),
+    onSuccess: (res) => {
+      const created = res.data?.created ?? 0;
+      if (created > 0) {
+        toast.success(`${created} sub-provider edge(s) proposed — review and confirm below`);
+      } else {
+        const hadCandidates = (res.data?.candidates?.length ?? 0) > 0;
+        toast.info(
+          hadCandidates
+            ? 'No new sub-providers — everything found is already mapped'
+            : 'No sub-providers found (this vendor has no indexed documents yet)'
+        );
+      }
+      setExtractOpen(false);
+      setExtractWs('');
       invalidateAll();
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -203,7 +229,18 @@ export function ConcentrationPage() {
 
       {/* nth-party dependencies + confirm */}
       <div>
-        <h2 className="text-sm font-semibold mb-2">nth-party dependencies ({dependencies.length})</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold">nth-party dependencies ({dependencies.length})</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={providerChoices.length === 0}
+            title={providerChoices.length === 0 ? 'Add vendors first' : 'Extract sub-providers from a vendor’s documents'}
+            onClick={() => setExtractOpen(true)}
+          >
+            <ScanSearch className="h-3.5 w-3.5 mr-1" /> Scan vendor docs
+          </Button>
+        </div>
         {dependencies.length === 0 ? (
           <p className="text-sm text-muted-foreground">No sub-provider edges yet.</p>
         ) : (
@@ -275,6 +312,46 @@ export function ConcentrationPage() {
           </div>
         )}
       </div>
+
+      {/* Extract sub-providers dialog (RTV-72) */}
+      <Dialog open={extractOpen} onOpenChange={(o) => { setExtractOpen(o); if (!o) setExtractWs(''); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Scan a vendor&apos;s documents for sub-providers</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Retrieva reads the vendor&apos;s indexed evidence (SOC&nbsp;2, contracts, sub-processor lists) and
+              proposes nth-party dependency edges. Proposed edges are <strong>unconfirmed</strong> and do not
+              affect concentration scoring until you confirm them in the table.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Vendor</Label>
+              {providerChoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No vendors yet.</p>
+              ) : (
+                <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
+                  {providerChoices.map((p) => (
+                    <label key={p.id} className="flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="extract-vendor"
+                        checked={extractWs === p.id}
+                        onChange={() => setExtractWs(p.id)}
+                      />
+                      {p.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setExtractOpen(false); setExtractWs(''); }}>Cancel</Button>
+            <Button disabled={!extractWs || extractDeps.isPending} onClick={() => extractDeps.mutate(extractWs)}>
+              {extractDeps.isPending ? 'Scanning…' : 'Extract'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add critical function dialog */}
       <Dialog open={cfOpen} onOpenChange={(o) => (o ? setCfOpen(true) : resetCf())}>
