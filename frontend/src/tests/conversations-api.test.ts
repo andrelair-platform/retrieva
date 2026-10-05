@@ -2,8 +2,8 @@
  * Frontend Tests — conversationsApi client
  *
  * All tests mock the Axios client so no real HTTP requests are made.
- * Covers all 9 methods: list, get, create, update, delete, bulkDelete,
- * ask, togglePin, submitFeedback, getMessages
+ * Covers: list, get, create, update, delete, bulkDelete,
+ * ask, togglePin, submitFeedback
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -288,29 +288,6 @@ describe('conversationsApi', () => {
         '/conversations/conv-001/messages/msg-001/feedback',
         { feedback: null }
       );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // getMessages
-  // -------------------------------------------------------------------------
-  describe('getMessages()', () => {
-    it('calls GET /conversations/:id/messages', async () => {
-      mockGet.mockResolvedValue({
-        data: { status: 'success', data: { items: [mockMessage], total: 1 } },
-      });
-      await conversationsApi.getMessages('conv-001');
-      expect(mockGet).toHaveBeenCalledWith('/conversations/conv-001/messages', { params: undefined });
-    });
-
-    it('passes pagination params', async () => {
-      mockGet.mockResolvedValue({
-        data: { status: 'success', data: { items: [], total: 0 } },
-      });
-      await conversationsApi.getMessages('conv-001', { page: 2, limit: 50 });
-      expect(mockGet).toHaveBeenCalledWith('/conversations/conv-001/messages', {
-        params: { page: 2, limit: 50 },
-      });
     });
   });
 });

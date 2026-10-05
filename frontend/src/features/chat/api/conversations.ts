@@ -1,7 +1,6 @@
 import apiClient from '@/shared/api/client';
 import type {
   ApiResponse,
-  PaginatedResponse,
   Conversation,
   Message,
 } from '@/types';
@@ -130,20 +129,6 @@ export const conversationsApi = {
     const response = await apiClient.post<ApiResponse<{ message: Message }>>(
       `/conversations/${conversationId}/messages/${messageId}/feedback`,
       data
-    );
-    return response.data;
-  },
-
-  /**
-   * Get messages for a conversation (paginated)
-   */
-  getMessages: async (
-    id: string,
-    params?: { page?: number; limit?: number }
-  ) => {
-    const response = await apiClient.get<PaginatedResponse<Message>>(
-      `/conversations/${id}/messages`,
-      { params }
     );
     return response.data;
   },

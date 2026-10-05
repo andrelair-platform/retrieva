@@ -4,7 +4,6 @@ export { billingApi } from '@/shared/api/billing';
 export { organizationsApi } from '@/shared/api/organizations';
 export { conversationsApi } from '@/features/chat/api/conversations';
 export { workspacesApi } from '@/features/workspaces/api/workspaces';
-export { ragApi } from '@/features/chat/api/rag';
 export { assessmentsApi } from '@/features/assessments/api/assessments';
 export type {
   Assessment,
