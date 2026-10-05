@@ -464,8 +464,4 @@ export const arrangementsApi = {
     });
     return res.data;
   },
-  createIctService: async (body: { name: string; providerId: string }) => {
-    const res = await apiClient.post<ApiResponse<{ ictService: IctService }>>(`${GRAPH}/ict-services`, body);
-    return res.data;
-  },
 };
