@@ -44,7 +44,8 @@ a certification signal (BC04 — optimiser & faire évoluer). See #474 + the Jan
 ## Notes
 - Issues are created in `retrieva` (the backend repo doesn't exist until RTV-19). Once
   `retrieva-backend` exists, later backend issues target it (`repo: andrelair-platform/retrieva-backend`).
-- Blocs map to the #282 authoritative set (BC01 Piloter · BC02 Concevoir & développer ·
-  BC03 Déployer & sécuriser · BC04 Optimiser & faire évoluer).
+- Blocs map to the RNCP39583 official set (Bloc 1 Cadrer · Bloc 2 Concevoir & développer ·
+  Bloc 3 Coordonner & piloter · Bloc 4 Maintenir en condition opérationnelle). NB: the old
+  « Piloter / Déployer & sécuriser / Optimiser » labels were wrong (corrected 2026-10-08).
 - Migration is incremental: `allowJs: true` + `strict: false` first, tighten per-directory, vitest
   guards each step. No big-bang rewrite.

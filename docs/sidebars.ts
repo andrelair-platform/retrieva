@@ -96,7 +96,40 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'certification/overview',
-        'certification/bc02-accessibility-audit',
+        {
+          type: 'category',
+          label: 'Bloc 1 — Cadrer (oral)',
+          collapsed: false,
+          items: [
+            'certification/bc01-cahier-des-charges-fonctionnel',
+            'certification/bc01-budget-previsionnel',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Bloc 2 — Concevoir & développer (écrit)',
+          collapsed: false,
+          items: [
+            'certification/bc02-dossier-conception-developpement',
+            'certification/bc02-accessibility-audit',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Bloc 3 — Coordonner & piloter (oral)',
+          collapsed: false,
+          items: [
+            'certification/bc03-gestion-projet',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Bloc 4 — Maintenir en condition opérationnelle (écrit)',
+          collapsed: false,
+          items: [
+            'certification/bc04-maintien-condition-operationnelle',
+          ],
+        },
       ],
     },
     'contributing',
