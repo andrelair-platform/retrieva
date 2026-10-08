@@ -29,13 +29,6 @@ acquises** *et* **aucune compétence éliminatoire n'est « non acquise »**. La
 **validation des 4 blocs**. Jury d'évaluation = **2 professionnels externes**. Dépôt sur
 **DigiformaCertif**. Livrables **strictement individuels** (plagiat = fraude).
 
-## Le modèle à deux couches (ne jamais confondre)
-
-| Couche | Ce que c'est | Rôle dans la certification |
-|---|---|---|
-| **ktayl-solution IS** | Le SI de l'organisation assurantielle (plateforme minicloud + apps) | **Contexte organisationnel** — la « société » et l'infra sur lesquelles Retrieva tourne. Sert surtout le **Bloc 3** (rôles, RACI, outils d'équipe). |
-| **Retrieva** | Ce projet — produit RAG d'évaluation du risque tiers TIC DORA | Le **logiciel défendu** pour les 4 blocs. |
-
 ## Comment lire cette section
 
 Deux natures de pages coexistent dans la doc Retrieva :
