@@ -103,6 +103,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'certification/bc01-cahier-des-charges-fonctionnel',
             'certification/bc01-budget-previsionnel',
+            'certification/bc01-support-presentation',
           ],
         },
         {
