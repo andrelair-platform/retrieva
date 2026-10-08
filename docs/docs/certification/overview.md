@@ -46,7 +46,7 @@ Deux natures de pages coexistent dans la doc Retrieva :
 |---|---|---|
 | Cahier des charges fonctionnel (document d'appui de l'oral) | ✅ v1.0 | [Bloc 1 — CdCF](./bc01-cahier-des-charges-fonctionnel.md) |
 | Budget prévisionnel (C1.4.2) | ✅ v1.0 | [Bloc 1 — Budget prévisionnel](./bc01-budget-previsionnel.md) |
-| **Support de présentation (slides)** | ⬜ à produire | — |
+| **Support de présentation (plan de soutenance)** | ✅ v1.0 | [Bloc 1 — Support de présentation](./bc01-support-presentation.md) |
 
 **La présentation orale doit couvrir :** cartographie des parties prenantes · analyse de la demande/
 objectifs/enjeux · opportunités & menaces (SWOT) · démarche d'audit + diagnostic de l'existant ·
@@ -132,7 +132,7 @@ problème résolu avec le support client**.
 |---|---|---|---|
 | Bloc 1 | ORAL | Cahier des charges fonctionnel | ✅ |
 | Bloc 1 | ORAL | Budget prévisionnel | ✅ |
-| Bloc 1 | ORAL | Support de présentation | ⬜ |
+| Bloc 1 | ORAL | Support de présentation (plan de soutenance) | ✅ |
 | Bloc 2 | ÉCRIT | Dossier conception & développement (index) | ✅ |
 | Bloc 2 | ÉCRIT | Audit RGAA | ✅ 96/100 |
 | Bloc 2 | ÉCRIT | Cahier de recettes · Manuels | ⬜ |
