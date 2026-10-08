@@ -5,12 +5,10 @@ sidebar_position: 1
 # Certification RNCP39583 — carte de preuves
 
 **Cette section est le seul domicile de l'évidence de certification de Retrieva.** Elle vit dans la
-**documentation propre à Retrieva**, séparée des docs de la plateforme ktayl-solution / minicloud,
-même si Retrieva tourne sur cette infrastructure.
+**documentation propre à Retrieva**, même si Retrieva tourne sur cette infrastructure.
 
 > **Nomenclature autoritative (référentiel France Compétences / YNOV, v1.01 du 15/09/2025).**
-> Les intitulés ci-dessous sont ceux du **référentiel officiel RNCP39583** — à ne pas confondre avec
-> d'anciens libellés internes (« Piloter / Déployer & sécuriser / Optimiser »), qui étaient **erronés**.
+> Les intitulés ci-dessous sont ceux du **référentiel officiel RNCP39583**.
 
 ## Les 4 blocs — intitulés, modalités et livrables officiels
 
