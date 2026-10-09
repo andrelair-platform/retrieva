@@ -1,34 +1,37 @@
 # =============================================================================
-# Docker Compose - Local Development
+# Docker Compose — Full local stack (zero-config run for reviewers / cert jury)
 # =============================================================================
-# Mirrors production as closely as possible to catch environment bugs early.
+# Goal: `git clone` the two repos side by side, then `docker compose up` and the
+# ENTIRE application works — no API key, no manual .env, no cluster needed.
 #
-# Key parity points:
-#   - Same image versions as docker-compose.production.yml
-#   - Same healthchecks on every service (app + infra)
-#   - JSON-file logging with rotation (prevents log bloat)
-#   - DOCKER_ENV=true so logger.js skips pino-roll file rotation
-#   - NEXT_PUBLIC_WS_URL build arg set (was absent, broke WebSocket locally)
-#   - Qdrant GRPC port env matches production
+#   ~/.../retrieva/            <- this repo (frontend + docs + this compose)
+#   ~/.../retrieva-backend/    <- sibling repo (Express + Drizzle/Postgres API)
 #
-# Intentional local-only differences:
-#   - Backend source code mounted (./backend:/app) for hot-reload
-#   - Ports exposed on 0.0.0.0 (not loopback-only) for easy host access
-#   - Redis has no password (REDIS_URL stays simple)
-#   - MongoDB runs as a container (production uses Atlas)
-#   - NODE_ENV=development (enables pino-pretty console logs)
-#   - No resource limits (avoid throttling dev machines)
+# What `docker compose up` starts:
+#   postgres · redis · qdrant · ollama (chat + embeddings, LOCAL/keyless)
+#   backend (auto-applies Drizzle migrations on boot) · frontend
+#   + one-shot `ollama-pull` (models) and `seed` (DORA knowledge base).
+#
+# LLM (chat/copilot): runs KEYLESS on the local Ollama sidecar by default.
+#   For faster answers you MAY paste a free key — create a `.env` NEXT TO this
+#   file (retrieva/.env) with e.g.:
+#       LLM_PROVIDER=groq
+#       GROQ_API_KEY=gsk_...
+#   (or OLLAMA_BASE_URL=https://ollama.com + OLLAMA_API_KEY=...). Compose reads
+#   that .env for the ${VAR} overrides below; with no .env it stays fully local.
+#
+# Datastore: PostgreSQL + Drizzle (the backend migrated off MongoDB, RTV-45..49).
 #
 # Usage:
-#   docker compose up -d              # Start all services
-#   docker compose up -d backend      # Start only backend
-#   docker compose logs -f backend    # Follow backend logs
-#   docker compose down -v            # Stop and remove volumes
+#   docker compose up            # foreground (watch logs; first run pulls models)
+#   docker compose up -d         # detached
+#   docker compose logs -f backend
+#   docker compose down -v       # stop + wipe volumes
 # =============================================================================
 
 services:
   # ===========================================================================
-  # Frontend (Next.js)
+  # Frontend (Next.js) — the app the reviewer opens at http://localhost:3000
   # ===========================================================================
   frontend:
     build:
@@ -43,6 +46,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
+    depends_on:
+      backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000"]
       interval: 10s
@@ -59,35 +65,46 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # Backend Service (Node.js/Express)
-  # Post-split (RFC #474): the backend lives in andrelair-platform/retrieva-backend.
-  # This assumes it's checked out as a SIBLING (~/Developer/cloudplateform/retrieva-backend,
-  # the standard repo layout). For local full-stack dev, clone it alongside this repo.
+  # Backend (Express 5) — built from the SIBLING retrieva-backend repo.
+  # Applies Drizzle migrations + seeds the default template automatically on boot.
+  # All required env is injected here, so NO ../retrieva-backend/.env is needed.
   # ===========================================================================
   backend:
     build:
       context: ../retrieva-backend
       dockerfile: Dockerfile
+    image: retrieva-backend:local
     container_name: rag-backend
     ports:
       - "3007:3007"
-    env_file:
-      - ../retrieva-backend/.env
     environment:
       - NODE_ENV=development
       - DOCKER_ENV=true
       - PORT=3007
-      - MONGODB_URI=mongodb://mongodb:27017/enterprise_rag
+      - DATABASE_URL=postgres://retrieva:retrieva@postgres:5432/retrieva
       - REDIS_URL=redis://redis:6379
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - QDRANT_URL=http://qdrant:6333
-      # Embeddings hit the self-hosted Ollama sidecar — Ollama Cloud does not
-      # authorize the embeddings API. Overrides OLLAMA_BASE_URL from .env so the
-      # chat LLM can stay on Ollama Cloud while embeddings run locally (bge-m3).
+      - QDRANT_COLLECTION_NAME=documents
+      # --- LLM (chat/copilot): keyless local by default; override via retrieva/.env ---
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2:3b}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # --- Embeddings: local Ollama bge-m3 (1024-dim, keyless) ---
+      - EMBEDDING_PROVIDER=ollama
       - EMBEDDING_OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=bge-m3:latest
+      # --- Dev-only secrets (LOCAL reviewer run only — NEVER use in production) ---
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-dev_access_secret_change_me_min_32_chars_0001}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev_refresh_secret_change_me_min_32_chars_01}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000abcdef}
+      - FRONTEND_URL=http://localhost:3000
+      - ALLOWED_ORIGINS=http://localhost:3000
     depends_on:
-      mongodb:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -97,15 +114,12 @@ services:
         condition: service_healthy
       ollama-pull:
         condition: service_completed_successfully
-    volumes:
-      - ../retrieva-backend:/app
-      - /app/node_modules
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 40s
     logging:
       driver: "json-file"
       options:
@@ -116,19 +130,51 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # MongoDB Database
+  # Seed (one-shot): loads the DORA knowledge base + control library.
+  # Runs once after the backend is healthy (migrations done), then exits.
   # ===========================================================================
-  mongodb:
-    image: mongodb/mongodb-community-server:7.0-ubuntu2204
-    container_name: rag-mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
+  seed:
+    image: retrieva-backend:local
+    container_name: rag-seed
+    depends_on:
+      backend:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
     environment:
-      - MONGODB_INITDB_DATABASE=enterprise_rag
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://retrieva:retrieva@postgres:5432/retrieva
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=documents
+      - EMBEDDING_PROVIDER=ollama
+      - EMBEDDING_OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=bge-m3:latest
+    entrypoint: ["/bin/sh", "-c", "npm run seed:compliance && npm run seed:controls"]
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - rag-network
+
+  # ===========================================================================
+  # PostgreSQL (Drizzle ORM — reads DATABASE_URL)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: rag-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=retrieva
+      - POSTGRES_PASSWORD=retrieva
+      - POSTGRES_DB=retrieva
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand({ping:1})"]
+      test: ["CMD-SHELL", "pg_isready -U retrieva -d retrieva"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -166,7 +212,7 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # Qdrant Vector Database
+  # Qdrant (Vector store)
   # ===========================================================================
   qdrant:
     image: qdrant/qdrant:v1.13.2
@@ -194,11 +240,8 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # Ollama (self-hosted embeddings — bge-m3, 1024-dim)
+  # Ollama — serves BOTH the chat model (keyless local LLM) and bge-m3 embeddings
   # ===========================================================================
-  # Ollama Cloud serves chat/generate but NOT the embeddings API (it returns
-  # "unauthorized"). RAG embeddings therefore run against this local sidecar,
-  # which keeps the existing 1024-dim Qdrant vectors valid (no re-indexing).
   ollama:
     image: ollama/ollama:latest
     container_name: rag-ollama
@@ -221,8 +264,8 @@ services:
       - rag-network
     restart: unless-stopped
 
-  # One-shot: pull the embedding model into the ollama volume, then exit.
-  # Runs on every `up` but is a fast no-op once bge-m3 is cached.
+  # One-shot: pull the chat model + the embedding model, then exit.
+  # First run downloads ~2-3 GB; subsequent runs are a fast no-op (cached volume).
   ollama-pull:
     image: ollama/ollama:latest
     container_name: rag-ollama-pull
@@ -231,23 +274,18 @@ services:
         condition: service_healthy
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["/bin/sh", "-c", "ollama pull bge-m3:latest"]
+    entrypoint: ["/bin/sh", "-c", "ollama pull bge-m3:latest && ollama pull llama3.2:3b"]
+    restart: "no"
     networks:
       - rag-network
-    restart: "no"
 
-# =============================================================================
-# Networks
 # =============================================================================
 networks:
   rag-network:
     driver: bridge
 
-# =============================================================================
-# Volumes
-# =============================================================================
 volumes:
-  mongodb_data:
+  postgres_data:
   redis_data:
   qdrant_data:
   ollama_data:
