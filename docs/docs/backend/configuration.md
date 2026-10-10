@@ -8,36 +8,36 @@ Configuration modules manage connections to external services and application se
 
 ## Database Configuration
 
-### MongoDB (`config/database.js`)
+### PostgreSQL + Drizzle (`config/db.ts`)
 
-```javascript
-import mongoose from 'mongoose';
-import logger from './logger.js';
+Drizzle ORM over a `pg` connection pool. `connectPg()` opens the pool from `DATABASE_URL`;
+`runMigrations()` (`db/migrate.ts`) applies pending Drizzle migrations on boot (idempotent).
 
-export async function connectDB() {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+```typescript
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+
+let pool: Pool | null = null;
+
+/** Lazily create (and cache) the pg Pool. Reads DATABASE_URL at call time. */
+export function getPool() {
+  if (!pool) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is not set — cannot open a Postgres pool');
+    }
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: Number(process.env.PG_POOL_MAX ?? 50),
+      min: Number(process.env.PG_POOL_MIN ?? 10),
     });
-
-    logger.info(`MongoDB connected: ${conn.connection.host}`);
-
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
-    });
-
-    return conn;
-  } catch (error) {
-    logger.error('MongoDB connection failed:', error);
-    process.exit(1);
   }
+  return pool;
+}
+
+export const db = drizzle(getPool());
+
+export async function connectPg() {
+  await getPool().query('SELECT 1'); // fail fast if the DB is unreachable
 }
 ```
 
@@ -71,73 +71,49 @@ export const redisConnection = {
 
 ## LLM Configuration
 
-### LLM Provider (`config/llm.js`)
+### LLM Provider (`config/llmProvider.ts`) — the AI gateway client
 
-```javascript
-import { AzureChatOpenAI } from '@langchain/openai';
-import logger from './logger.js';
+A **single** OpenAI-compatible client pointed at the platform **AI gateway (LiteLLM)**. The gateway
+owns provider routing (Ollama Cloud, Azure, Bedrock…), key rotation, retries/fallbacks, PII masking,
+budgets and EU governance — so the app carries none of that. Callers pick a **model name / intent
+alias** (`tier-premium`, `tier-standard`, …) per `purpose` / `LLM_MODEL`; the gateway resolves it.
 
-let defaultLLM = null;
-let judgeLLM = null;
+```typescript
+import { ChatOpenAI } from '@langchain/openai';
 
-export async function getDefaultLLM() {
-  if (defaultLLM) return defaultLLM;
+// baseURL is normalised to end in /v1 (OpenAI-compatible gateway endpoint).
+const GATEWAY_BASE_URL = normaliseGatewayUrl(process.env.LITELLM_BASE_URL);
+const GATEWAY_API_KEY = process.env.LITELLM_API_KEY;
 
-  defaultLLM = new AzureChatOpenAI({
-    azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
-    azureOpenAIApiInstanceName: extractInstanceName(process.env.AZURE_OPENAI_ENDPOINT),
-    azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_LLM_DEPLOYMENT || 'gpt-4o-mini',
-    azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
-    temperature: parseFloat(process.env.LLM_TEMPERATURE) || 0.3,
-    maxTokens: parseInt(process.env.LLM_MAX_TOKENS) || 2000,
+export async function createLLM({ purpose = 'chat', temperature, maxTokens, jsonMode } = {}) {
+  const model = process.env[`LLM_${purpose.toUpperCase()}_MODEL`] || process.env.LLM_MODEL;
+  return new ChatOpenAI({
+    model,                              // a gateway model name / intent alias
+    apiKey: GATEWAY_API_KEY,
+    configuration: { baseURL: GATEWAY_BASE_URL },
+    temperature: temperature ?? 0.1,
+    maxTokens: maxTokens ?? 2048,
+    // json_object → LiteLLM maps to the provider's native JSON mode
+    ...(jsonMode ? { modelKwargs: { response_format: { type: 'json_object' } } } : {}),
   });
-
-  // Warm up the model
-  try {
-    await defaultLLM.invoke('Hello');
-    logger.info('LLM initialized and warmed up', {
-      deployment: process.env.AZURE_OPENAI_LLM_DEPLOYMENT,
-    });
-  } catch (error) {
-    logger.warn('LLM warmup failed:', error.message);
-  }
-
-  return defaultLLM;
-}
-
-export async function getJudgeLLM() {
-  if (judgeLLM) return judgeLLM;
-
-  judgeLLM = new AzureChatOpenAI({
-    azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
-    azureOpenAIApiInstanceName: extractInstanceName(process.env.AZURE_OPENAI_ENDPOINT),
-    azureOpenAIApiDeploymentName: process.env.JUDGE_LLM_MODEL || 'gpt-4o-mini',
-    azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
-    temperature: 0,  // Deterministic for evaluation
-  });
-
-  return judgeLLM;
 }
 ```
 
-### Embeddings (`config/embeddings.js`)
+### Embeddings (`config/embeddingProvider.ts`)
 
-The embeddings module wraps `AzureOpenAIEmbeddings` from `@langchain/openai` inside a custom `BatchedEmbeddings` class that adds automatic batching, text truncation, and metrics tracking.
+Embeddings run on **self-hosted Ollama `bge-m3`** (1024-dimension vectors) — *not* through the gateway
+(Ollama Cloud doesn't serve the embeddings API), with an OpenAI (`text-embedding-3-small`) fallback.
+Hybrid cloud/local routing honours per-workspace consent (GDPR).
 
-**Provider:** Azure OpenAI — `text-embedding-3-small` (1 536-dimension vectors, Cosine distance).
-Hybrid mode (`ENABLE_HYBRID_EMBEDDINGS`) is disabled; Azure is the only active provider.
+```typescript
+import { OllamaEmbeddings } from '@langchain/ollama';
+import { OpenAIEmbeddings } from '@langchain/openai';
 
-```javascript
-// Simplified structure — actual class has ~350 lines
-import { AzureOpenAIEmbeddings } from '@langchain/openai';
-
-const baseEmbeddings = new AzureOpenAIEmbeddings({
-  azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
-  azureOpenAIApiInstanceName: AZURE_OPENAI_INSTANCE_NAME, // extracted from AZURE_OPENAI_ENDPOINT
-  azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT || 'text-embedding-3-small',
-  azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
-  maxConcurrency: parseInt(process.env.EMBEDDING_MAX_CONCURRENCY) || 10,
+const baseEmbeddings = new OllamaEmbeddings({
+  baseUrl: process.env.EMBEDDING_OLLAMA_BASE_URL || 'http://localhost:11434',
+  model: process.env.EMBEDDING_MODEL || 'bge-m3:latest',   // 1024-dim
 });
+// OpenAI text-embedding-3-small is used as the fallback provider.
 
 export const embeddings = new BatchedEmbeddings(baseEmbeddings, BATCH_CONFIG);
 ```
@@ -198,7 +174,7 @@ export async function getVectorStore(documents = []) {
   if (!exists) {
     await qdrantClient.createCollection(collectionName, {
       vectors: {
-        size: 1536,  // text-embedding-3-small dimension
+        size: 1024,  // bge-m3 embedding dimension
         distance: 'Cosine',
       },
     });
@@ -331,9 +307,9 @@ NODE_ENV=development
 LOG_LEVEL=info
 
 # ===========================================
-# MongoDB
+# PostgreSQL (Drizzle)
 # ===========================================
-MONGODB_URI=mongodb://localhost:27017/enterprise_rag
+DATABASE_URL=postgres://localhost:5432/retrieva
 
 # ===========================================
 # Redis
@@ -347,18 +323,19 @@ QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=documents
 
 # ===========================================
-# Azure OpenAI
+# LLM — the AI gateway (LiteLLM, OpenAI-compatible); the gateway resolves the model
 # ===========================================
-LLM_PROVIDER=azure_openai
-EMBEDDING_PROVIDER=azure
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4o-mini
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
-LLM_TEMPERATURE=0.3
-LLM_MAX_TOKENS=2000
-JUDGE_LLM_MODEL=gpt-4o-mini
+LITELLM_BASE_URL=http://localhost:4000       # minicloud LiteLLM gateway (or any OpenAI-compatible /v1)
+LITELLM_API_KEY=your-gateway-key
+LLM_MODEL=tier-standard                      # gateway model name / intent alias
+# LLM_JUDGE_MODEL=tier-standard              # per-purpose override (chat|analysis|judge|formatter)
+
+# ===========================================
+# Embeddings — self-hosted Ollama bge-m3 (OpenAI fallback)
+# ===========================================
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_OLLAMA_BASE_URL=http://localhost:11434
+EMBEDDING_MODEL=bge-m3:latest                # 1024-dim
 
 # ===========================================
 # Embedding Batching (optional — defaults shown)
@@ -411,9 +388,11 @@ ENABLE_CODE_FILTER=true
 # Observability
 # ===========================================
 LOG_RETRIEVAL_TRACE=false
-LANGSMITH_API_KEY=your-langsmith-key
-LANGSMITH_PROJECT=retrieva
-LANGSMITH_ENABLED=true
+# Langfuse (self-hosted LLMOps: traces, prompt management, feedback, cost)
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
+LANGFUSE_BASEURL=
+LANGFUSE_TRACING_ENVIRONMENT=development
 ```
 
 ## Configuration Validation
@@ -422,10 +401,10 @@ LANGSMITH_ENABLED=true
 // config/envValidator.js
 
 const requiredVars = [
-  'MONGODB_URI',
-  'REDIS_HOST',
+  'DATABASE_URL',
+  'REDIS_URL',
   'QDRANT_URL',
-  'JWT_SECRET',
+  'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
 ];
 

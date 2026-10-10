@@ -35,7 +35,7 @@ The platform implements a robust multi-tenant architecture ensuring complete dat
 │  │  • Request-scoped context                                        │   │
 │  │  • Automatic query filtering                                     │   │
 │  │  • Cross-tenant access detection                                 │   │
-│  │  • Mongoose plugin integration                                   │   │
+│  │  • Drizzle entityScopeCondition (tenant query scoping)           │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -191,9 +191,16 @@ export function getCurrentTenant() {
 }
 ```
 
-### Mongoose Plugin
+### Tenant isolation — query scoping
+
+> **Current mechanism (Drizzle/PostgreSQL):** relational queries compose an
+> `entityScopeCondition(organizationId)` predicate (tenant scope held in `db/tenantContext.ts` via
+> AsyncLocalStorage) and run entity-scoped under `ENTITY_ISOLATION_MODE=enforce`. The Mongoose
+> pre/post-hook plugin below is the **legacy** illustration of the same intent — see
+> [datastore-postgresql](./datastore-postgresql).
 
 ```javascript
+// LEGACY (Mongoose) — replaced by the Drizzle entityScopeCondition approach above
 // services/tenantIsolation.js
 
 export function tenantIsolationPlugin(schema) {
@@ -357,7 +364,7 @@ const ROLE_PERMISSIONS = {
 
 | Property | Implementation |
 |----------|---------------|
-| **No Cross-Tenant Reads** | Qdrant filter + Mongoose plugin |
+| **No Cross-Tenant Reads** | Qdrant filter + Drizzle entityScopeCondition |
 | **No Cross-Tenant Writes** | Middleware + tenant context |
 | **BOLA Prevention** | Explicit membership verification |
 | **Privilege Escalation Prevention** | Role-based permissions |

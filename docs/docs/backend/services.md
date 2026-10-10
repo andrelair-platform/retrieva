@@ -22,7 +22,7 @@ class RAGService {
     // 5. Rerank documents (RRF + BM25, top-15)
     // 6. Compress context → generate streaming answer
     // 7. Validate answer (LLM Judge)
-    // 8. Cache + persist to MongoDB
+    // 8. Cache + persist to PostgreSQL
   }
 }
 ```
@@ -35,7 +35,7 @@ class RAGService {
 | `askWithConversation()` | Process RAG query with conversation context |
 | `_rephraseQuery()` | Rephrase query for standalone search |
 | `_prepareContext()` | Format documents for LLM context |
-| `_generateAnswer()` | Generate streaming answer via Azure OpenAI |
+| `_generateAnswer()` | Generate streaming answer via the AI gateway (LiteLLM) |
 | `_processAnswer()` | Validate answer with LLM Judge |
 
 ### RAG Agent (`services/ragAgent.js`)
@@ -55,7 +55,7 @@ export async function runRetrievalAgent({ question, vectorStore, workspaceId, qd
 |------|--------|-------------|
 | `search_knowledge_base` | `langchain-rag` Qdrant collection (tenant-filtered) | k ≤ 15 per call |
 | `search_dora_articles` | `compliance_kb` Qdrant collection; optional domain filter | 8 per call |
-| `lookup_vendor_assessment` | MongoDB `assessments` collection (regex vendor match) | 1 record |
+| `lookup_vendor_assessment` | PostgreSQL `assessments` table (vendor match) | 1 record |
 | `done_searching` | — signals retrieval complete | — |
 
 Documents from all tool calls are deduplicated (by first 200 chars of content) and returned as a flat array for reranking.
@@ -264,8 +264,10 @@ export function getCurrentTenant() {
   // Get current tenant from AsyncLocalStorage
 }
 
-export function tenantIsolationPlugin(schema) {
-  // Mongoose plugin for auto-filtering
+// Current: Drizzle entityScopeCondition(organizationId) composed into every tenant-scoped query
+// (tenant scope from db/tenantContext.ts, under ENTITY_ISOLATION_MODE=enforce).
+export function entityScopeCondition(organizationId) {
+  // returns a Drizzle `eq(table.organizationId, organizationId)` predicate
 }
 ```
 
@@ -320,7 +322,7 @@ export const notificationService = {
 
 **Delivery logic (both modes):**
 
-1. Persist notification in MongoDB
+1. Persist notification in PostgreSQL
 2. If user is online, deliver via WebSocket (in-process emit or Redis pub/sub publish)
 3. If user has email enabled for the notification type **and** priority is not LOW, send email
 4. Urgent/high-priority notifications always attempt email delivery
@@ -452,7 +454,7 @@ new AssessmentService({ Assessment, Workspace, User, assessmentQueue, monitoring
 | `listAssessments(authorizedWorkspaceIds, filters)` | Paginated list scoped to user's workspaces |
 | `getAssessment(id, authorizedWorkspaceIds)` | Fetch with 403/404 guards |
 | `deleteAssessment(id, userId, authorizedWorkspaceIds)` | Creator-only delete + Qdrant cleanup |
-| `setRiskDecision(id, userId, authorizedIds, { decision, rationale })` | Atomic dual-write (assessment + workspace `nextReviewDate`) wrapped in a MongoDB transaction; schedules 30-day review reminder via `monitoringQueue` |
+| `setRiskDecision(id, userId, authorizedIds, { decision, rationale })` | Atomic dual-write (assessment + workspace `nextReviewDate`) wrapped in a PostgreSQL transaction; schedules 30-day review reminder via `monitoringQueue` |
 | `setClauseSignoff(id, userId, authorizedIds, { clauseRef, status, note })` | CONTRACT_A30 only; upserts signoff by clauseRef |
 
 ---
@@ -484,7 +486,7 @@ Three-step ReAct agent that produces structured compliance gap output.
 
 1. **Extract vendor claims** — runs 8 domain-focused semantic queries against `assessment_{id}` to surface what the vendor documents actually claim
 2. **Retrieve DORA obligations** — queries the shared `compliance_kb` collection per DORA domain with metadata filtering
-3. **Diff & score** — passes both sets to Azure OpenAI with `bindTools()` (function calling) using the `GAP_ANALYSIS_TOOL` schema; falls back to JSON mode if tool calling fails
+3. **Diff & score** — passes both sets to the LLM (via the AI gateway / LiteLLM) with `bindTools()` (function calling) using the `GAP_ANALYSIS_TOOL` schema; falls back to JSON mode if tool calling fails
 
 **Output schema**
 

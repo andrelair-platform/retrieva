@@ -85,14 +85,15 @@ services:
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_COLLECTION_NAME=documents
-      # --- LLM (chat/copilot): keyless local by default; override via retrieva/.env ---
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      # --- LLM (chat): the backend is an OpenAI-compatible client to the AI gateway (LiteLLM).
+      # In production that's the minicloud LiteLLM gateway (routing, key rotation, retries,
+      # PII masking, budgets, EU governance). For the KEYLESS local run we point it at the local
+      # Ollama OpenAI-compatible endpoint (the app appends /v1) — no real gateway needed.
+      # Override via retrieva/.env for a real gateway or a faster provider, e.g.
+      #   LITELLM_BASE_URL=https://api.groq.com/openai/v1  LITELLM_API_KEY=gsk_...  LLM_MODEL=llama-3.3-70b-versatile
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-http://ollama:11434}
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-ollama}
       - LLM_MODEL=${LLM_MODEL:-llama3.2:3b}
-      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # --- Embeddings: local Ollama bge-m3 (1024-dim, keyless) ---
       - EMBEDDING_PROVIDER=ollama
       - EMBEDDING_OLLAMA_BASE_URL=http://ollama:11434

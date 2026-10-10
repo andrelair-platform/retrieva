@@ -63,17 +63,20 @@ That single command:
 Go to **[http://localhost:3000](http://localhost:3000)** → register an account → create a workspace →
 upload a vendor document (PDF/DOCX) to run your first DORA gap analysis, or ask the copilot a question.
 
-### AI model — keyless by default, optional free key for speed
+### AI model — keyless by default, optional override for speed
 
-The chat/copilot runs **100 % locally on Ollama** (no key, works offline). On a modest laptop the local
-model can be slow. **For faster answers (optional)**, create a `.env` file **next to `docker-compose.yml`**
-(`retrieva/.env`) with a free provider key, then `docker compose up` again:
+The backend reaches the chat LLM through an **OpenAI-compatible AI gateway** — in production the
+self-hosted **minicloud LiteLLM gateway** (provider routing, key rotation, retries, PII masking,
+budgets, EU governance). For this local run it points at the **local Ollama** OpenAI-compatible
+endpoint, so the copilot runs **keyless and offline**. On a modest laptop the local model can be slow.
+**For faster answers (optional)**, point it at a real gateway or a free provider via a `.env` next to
+`docker-compose.yml` (`retrieva/.env`), then `docker compose up` again:
 
 ```bash
-# retrieva/.env  — optional, for faster chat responses
-LLM_PROVIDER=groq
-GROQ_API_KEY=gsk_your_free_groq_key
-# (alternatively: OLLAMA_BASE_URL=https://ollama.com + OLLAMA_API_KEY=...)
+# retrieva/.env  — optional, for a real gateway or faster chat
+LITELLM_BASE_URL=https://api.groq.com/openai/v1
+LITELLM_API_KEY=gsk_your_free_groq_key
+LLM_MODEL=llama-3.3-70b-versatile
 ```
 
 Embeddings always run locally (`bge-m3`), so document ingestion never needs a key.
@@ -137,8 +140,8 @@ docker compose down -v && docker compose up   # full clean reset (wipes volumes)
 | Database | **PostgreSQL + Drizzle ORM** |
 | Vector store | Qdrant |
 | Cache / queue | Redis, BullMQ |
-| LLM (chat) | Ollama (local by default) · pluggable to Groq / OpenAI / Anthropic / Ollama Cloud |
-| Embeddings | self-hosted Ollama `bge-m3` (1024-dim) |
+| LLM (chat) | via an OpenAI-compatible **AI gateway** (prod: self-hosted **LiteLLM** — routing, key rotation, PII masking, budgets, EU governance); local run points it at Ollama |
+| Embeddings | self-hosted Ollama `bge-m3` (1024-dim), OpenAI fallback |
 | Auth | JWT (httpOnly cookies), bcrypt, AES-256 field encryption |
 | Observability | Langfuse (LLM traces + cost) · Prometheus / Grafana |
 | Delivery | Docker, GHCR, GitHub Actions CI/CD, ArgoCD + Kargo (GitOps on minicloud k3s) |

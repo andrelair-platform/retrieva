@@ -26,7 +26,7 @@ Triggered when a user uploads a file for an assessment.
 
 1. Parses the file buffer (PDF, DOCX, XLSX) via `fileIngestionService`
 2. Splits text into semantic chunks
-3. Embeds each chunk via Azure OpenAI (`text-embedding-3-small`)
+3. Embeds each chunk via Ollama (`bge-m3`, 1024-dim)
 4. Upserts chunk vectors to Qdrant collection (`assessment_{id}`)
 5. Updates `Assessment.documents[].status` → `indexed` | `failed`
 
@@ -36,7 +36,7 @@ Triggered once all files for an assessment have been indexed.
 
 1. Polls (up to 2 minutes) until all `fileIndex` jobs complete
 2. For each DORA article, retrieves relevant chunks from Qdrant
-3. Calls LLM (`gpt-4o-mini`) to classify coverage: `covered` | `partial` | `missing`
+3. Calls the LLM (via the AI gateway / LiteLLM) to classify coverage: `covered` | `partial` | `missing`
 4. Stores gap results in `Assessment.results`
 5. Updates Assessment status: `analyzing` → `complete` | `failed`
 
@@ -104,7 +104,7 @@ All queues use exponential backoff and Redis for persistence.
 
 1. `closeQueues()` — stops accepting new jobs, waits for active jobs
 2. `disconnectRedis()` — closes Redis connections
-3. `disconnectDB()` — closes MongoDB connection
+3. `closePg()` — closes the PostgreSQL connection pool
 
 ## Running Workers
 
