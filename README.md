@@ -2,324 +2,185 @@
 
 **DORA Compliance Intelligence for Financial Entities**
 
-Retrieva automates third-party ICT risk assessments under DORA (Regulation EU 2022/2554). Upload vendor documentation, get a structured compliance gap report in minutes, and ask follow-up questions to an AI copilot trained on your documents.
+Retrieva automates third-party ICT risk assessments under **DORA (Regulation EU 2022/2554)**: upload
+vendor documentation, get a structured compliance gap report in minutes, and ask follow-up questions to
+an AI copilot grounded on your documents and the built-in DORA knowledge base.
 
-**Live:** [retrieva.online](https://retrieva.online) · **Docs:** [andreliar.github.io/Retrieva](https://andreliar.github.io/Retrieva/)
+**Docs:** [andrelair-platform.github.io/retrieva](https://andrelair-platform.github.io/retrieva/) · **Live:** [retrieva.online](https://retrieva.online)
 
-> **Repo layout (post-split, RFC #474):** this repository is the **frontend** (Next.js).
-> The **backend** (Express + Drizzle/Postgres + LangChain RAG API) lives in
-> **[andrelair-platform/retrieva-backend](https://github.com/andrelair-platform/retrieva-backend)**.
-> The architecture diagram below shows the full system across both repos. For local full-stack
-> dev, clone `retrieva-backend` as a sibling directory (the `docker-compose.yml` `backend` service
-> builds from `../retrieva-backend`).
+> **Repo layout (post-split, RFC #474).** This repository is the **frontend** (Next.js) + the docs +
+> the local-run `docker-compose.yml`. The **backend** (Express 5 + Drizzle/PostgreSQL + LangChain RAG API)
+> lives in **[andrelair-platform/retrieva-backend](https://github.com/andrelair-platform/retrieva-backend)**.
+> The one-command local run below builds both.
 
 ---
 
-## Features
+## 🚀 Run the whole application locally (reviewers / certification jury)
 
-| Feature | Description |
-|---------|-------------|
-| **DORA Gap Analysis** | Upload vendor ICT contracts or policies → AI produces a structured report with Critical / High / Medium / Low gaps mapped to DORA articles |
-| **Multi-Source Ingestion** | File upload (PDF, DOCX, XLSX), URL crawling, Confluence Cloud — all indexed into a unified vector store |
-| **DORA Copilot (RAG Q&A)** | Ask compliance questions in natural language; the agentic pipeline retrieves from your docs and the built-in DORA knowledge base |
-| **Workspace Isolation** | Multi-tenant: every workspace is fully isolated at the DB and vector store layer (AsyncLocalStorage + Qdrant metadata filter) |
-| **Enterprise Security** | PII masking, prompt-injection detection, output sanitisation, httpOnly JWT cookies, AES-256 field encryption |
+This is the recommended way to evaluate Retrieva: **one command, zero config, no API key, no cluster.**
+Everything (database, vector store, queue, AI models, backend, frontend) runs in Docker on your machine.
+
+### Prerequisites
+
+- **Docker Desktop** (or Docker Engine + Compose v2) — that's the only requirement.
+- **git**, and **~8 GB free disk + ~6 GB free RAM** (a small chat LLM runs locally).
+
+### 1. Clone BOTH repos **side by side** (same parent folder)
+
+```bash
+mkdir retrieva-eval && cd retrieva-eval
+git clone https://github.com/andrelair-platform/retrieva.git
+git clone https://github.com/andrelair-platform/retrieva-backend.git
+```
+
+You should have:
+
+```
+retrieva-eval/
+├── retrieva/            # this repo (frontend + docker-compose.yml)
+└── retrieva-backend/    # the API (built automatically by compose)
+```
+
+### 2. Start everything
+
+```bash
+cd retrieva
+docker compose up
+```
+
+That single command:
+1. starts **PostgreSQL, Redis, Qdrant, Ollama**;
+2. pulls the **AI models** (`bge-m3` embeddings + `llama3.2:3b` chat) — *first run only, ~2–3 GB*;
+3. builds + starts the **backend** (it **auto-applies database migrations** on boot);
+4. runs a one-shot **seed** of the DORA knowledge base + control library;
+5. builds + starts the **frontend**.
+
+> **First run takes a few minutes** (model download + image builds). Later runs start in seconds.
+> When you see the frontend become healthy, you're ready.
+
+### 3. Open the app
+
+Go to **[http://localhost:3000](http://localhost:3000)** → register an account → create a workspace →
+upload a vendor document (PDF/DOCX) to run your first DORA gap analysis, or ask the copilot a question.
+
+### AI model — keyless by default, optional override for speed
+
+The backend reaches the chat LLM through an **OpenAI-compatible AI gateway** — in production the
+self-hosted **minicloud LiteLLM gateway** (provider routing, key rotation, retries, PII masking,
+budgets, EU governance). For this local run it points at the **local Ollama** OpenAI-compatible
+endpoint, so the copilot runs **keyless and offline**. On a modest laptop the local model can be slow.
+**For faster answers (optional)**, point it at a real gateway or a free provider via a `.env` next to
+`docker-compose.yml` (`retrieva/.env`), then `docker compose up` again:
+
+```bash
+# retrieva/.env  — optional, for a real gateway or faster chat
+LITELLM_BASE_URL=https://api.groq.com/openai/v1
+LITELLM_API_KEY=gsk_your_free_groq_key
+LLM_MODEL=llama-3.3-70b-versatile
+```
+
+Embeddings always run locally (`bge-m3`), so document ingestion never needs a key.
+
+### Ports & services
+
+| Service | URL / Port | Role |
+|---|---|---|
+| Frontend | http://localhost:3000 | the app you use |
+| Backend API | http://localhost:3007 | REST + RAG (`/health`, `/api/v1`) |
+| PostgreSQL | localhost:5432 | application data (Drizzle) |
+| Qdrant | localhost:6333 | vector store |
+| Redis | localhost:6378 | cache / BullMQ queues |
+| Ollama | localhost:11434 | local chat + embedding models |
+
+### Troubleshooting
+
+```bash
+docker compose logs -f backend        # watch backend (migrations, boot)
+docker compose logs -f seed           # watch the DORA knowledge-base seeding
+docker compose ps                     # service health
+docker compose down -v && docker compose up   # full clean reset (wipes volumes)
+```
+
+- **A port is already in use** → stop the conflicting local service, or edit the `ports:` in `docker-compose.yml`.
+- **Copilot answers slowly / times out** → use the optional free key above (local LLM is CPU-bound).
+- **Re-run the knowledge-base seed** → `docker compose run --rm seed`.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                          retrieva.online                        │
-│                             Nginx                               │
-└────────────────────┬──────────────────────┬─────────────────────┘
-                     │                      │
-              ┌──────▼──────┐       ┌───────▼──────┐
-              │  Frontend   │       │   Backend    │
-              │  Next.js 16 │       │  Express 5   │
-              │  React 19   │       │  Node.js 20  │
-              └─────────────┘       └──────┬───────┘
-                                           │
-              ┌────────────────────────────┼──────────────────────┐
-              │                            │                       │
-       ┌──────▼──────┐            ┌────────▼───────┐     ┌────────▼──────┐
-       │   MongoDB   │            │     Qdrant     │     │     Redis     │
-       │   (Atlas)   │            │ Vector Store   │     │  Queue/Cache  │
-       └─────────────┘            └────────────────┘     └───────────────┘
+            ┌──────────────┐            ┌──────────────┐
+ Reviewer ─▶│   Frontend   │ ── API ──▶ │   Backend    │   (this repo)   (retrieva-backend)
+ (browser)  │  Next.js 16  │            │  Express 5   │
+            └──────────────┘            └──────┬───────┘
+                                               │
+                 ┌──────────────┬──────────────┼──────────────┐
+                 ▼              ▼               ▼              ▼
+          ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+          │ PostgreSQL │ │   Qdrant   │ │   Redis    │ │   Ollama   │
+          │ (Drizzle)  │ │ (vectors)  │ │ (queue)    │ │ (LLM+embed)│
+          └────────────┘ └────────────┘ └────────────┘ └────────────┘
 ```
 
-**Data flow — Gap Analysis:**
-```
-File Upload → BullMQ (assessmentWorker) → PDF/DOCX parse → chunk → embed
-           → Qdrant index → LLM gap analysis → structured report
-```
+**Gap analysis:** `upload → BullMQ worker → parse → chunk → embed (bge-m3) → Qdrant → LLM gap analysis → structured report`
+**RAG Q&A:** `question → multi-query + HyDE → Qdrant (k=15) → cross-encoder re-rank (RRF) → LLM answer + citations`
 
-**Data flow — RAG Q&A:**
-```
-User question → multi-query expansion + HyDE → Qdrant retrieval (k=15)
-             → cross-encoder re-ranking (RRF) → LLM answer → citations
-```
+> **Production** runs on the self-hosted **minicloud k3s** cluster via **GitOps (ArgoCD + Kargo)** —
+> not via this compose (which is for local evaluation/dev only).
 
 ---
 
-## Monorepo Structure
-
-```
-.
-├── backend/          Express 5 API (ES modules, Node.js 20)
-├── frontend/         Next.js 16 App Router (React 19, TypeScript)
-├── docs/             Docusaurus documentation site
-├── infra/            Terraform (DigitalOcean droplet)
-├── nginx/            Reverse proxy config
-├── docker-compose.yml                 Local development
-└── docker-compose.production.yml
-```
-
----
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS v3, Shadcn/ui, Zustand, React Query |
-| Backend | Express 5, Node.js 20, ES modules, BullMQ, Winston |
-| AI | Ollama Cloud (chat LLM) + self-hosted Ollama with `bge-m3` (embeddings) |
-| Databases | MongoDB Atlas (documents), Qdrant (vectors), Redis (queues + cache) |
-| Auth | JWT (httpOnly cookies, 15 min access / 7 day refresh), bcrypt |
-| Infra | DigitalOcean Droplet (fra1), Docker, GHCR, GitHub Actions CI/CD |
+|---|---|
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui, Zustand, React Query |
+| Backend | Express 5, Node.js 20, BullMQ, LangChain (LCEL) |
+| Database | **PostgreSQL + Drizzle ORM** |
+| Vector store | Qdrant |
+| Cache / queue | Redis, BullMQ |
+| LLM (chat) | via an OpenAI-compatible **AI gateway** (prod: self-hosted **LiteLLM** — routing, key rotation, PII masking, budgets, EU governance); local run points it at Ollama |
+| Embeddings | self-hosted Ollama `bge-m3` (1024-dim), OpenAI fallback |
+| Auth | JWT (httpOnly cookies), bcrypt, AES-256 field encryption |
+| Observability | Langfuse (LLM traces + cost) · Prometheus / Grafana |
+| Delivery | Docker, GHCR, GitHub Actions CI/CD, ArgoCD + Kargo (GitOps on minicloud k3s) |
 
 ---
 
-## Getting Started
+## Features
 
-### Prerequisites
-
-- Node.js 20+
-- Docker + Docker Compose
-- Ollama Cloud API key (`OLLAMA_API_KEY_*`) and/or a local Ollama with `bge-m3:latest` pulled
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/AndreLiar/Retrieva.git
-cd Retrieva
-npm install --legacy-peer-deps
-```
-
-### 2. Configure environment
-
-```bash
-cp backend/.env.example backend/.env
-# Fill in at minimum:
-#   AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
-#   JWT_ACCESS_SECRET, JWT_REFRESH_SECRET  (min 32 chars each)
-#   ENCRYPTION_KEY  (64 hex chars — node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-```
-
-### 3. Start infrastructure
-
-```bash
-docker compose up -d mongodb redis qdrant minio
-```
-
-### 4. Run the app
-
-```bash
-npm run dev          # starts backend (port 3007) + frontend (port 3000) concurrently
-```
-
-Open [http://localhost:3000](http://localhost:3000), register an account, create a workspace, and upload a document to run your first assessment.
+| Feature | Description |
+|---|---|
+| **DORA gap analysis** | Upload vendor ICT docs → structured report with Critical/High/Medium/Low gaps mapped to DORA articles |
+| **Multi-source ingestion** | PDF / DOCX / XLSX upload, URL crawling — indexed into a per-tenant vector store |
+| **DORA copilot (RAG Q&A)** | Natural-language compliance questions, grounded on your docs + the DORA knowledge base, with citations |
+| **Workspace isolation** | Multi-tenant: each workspace isolated at the DB and vector-store layer |
+| **Enterprise security** | PII masking, prompt-injection detection, output sanitisation, httpOnly JWT, AES-256 field encryption |
 
 ---
 
-## Development Commands
+## Frontend development (this repo)
 
-### Root (monorepo)
-
-```bash
-npm run dev                  # backend + frontend concurrently
-npm run dev:backend          # backend only (nodemon, port 3007)
-npm run dev:frontend         # frontend only (Next.js, port 3000)
-npm run test                 # backend tests (vitest)
-npm run lint                 # lint backend + frontend
-```
-
-### Backend
+For UI-only work you can run just the frontend against a running backend:
 
 ```bash
-npm --prefix backend test              # all tests (1099)
-npm --prefix backend run test:unit     # unit tests only
-npm --prefix backend run test:integration  # integration tests only
-npm --prefix backend run lint
-npm --prefix backend run lint:fix
+npm install            # root npm workspace (installs frontend deps)
+npm run dev            # Next.js dev server on http://localhost:3000
+npm run lint
+npm test
 ```
 
-### Frontend
-
-```bash
-npm --prefix frontend run dev
-npm --prefix frontend run build        # production build (TypeScript check)
-npm --prefix frontend run test:run     # all tests (357)
-npm --prefix frontend run lint
-```
-
-### Docker (local)
-
-```bash
-docker compose up -d                   # all services
-docker compose up -d backend           # single service
-docker compose logs -f backend         # follow logs
-docker compose down
-```
-
----
-
-## Testing
-
-The project has comprehensive test coverage across both services.
-
-| Suite | Count | Runner |
-|-------|-------|--------|
-| Backend unit tests | 39 files | Vitest (forks pool, sequential) |
-| Backend integration tests | 5 files (auth, RAG, conversations, assessment, health) | Vitest + MongoMemoryServer |
-| Frontend component/hook tests | 12 files | Vitest + jsdom + React Testing Library |
-| **Total** | **1456 tests** | |
-
-Run all:
-
-```bash
-npm run test                           # backend (1099 tests)
-npm --prefix frontend run test:run     # frontend (357 tests)
-```
-
----
-
-## Project Structure — Backend
-
-```
-backend/
-├── app.js                    Express app setup, middleware, routes
-├── server.js                 HTTP server entry point
-├── workers/
-│   ├── assessmentWorker.js   BullMQ: fileIndex + gapAnalysis jobs
-│   └── documentIndexWorker.js  BullMQ: chunk + embed + upsert to Qdrant
-├── controllers/              Route handlers (auth, workspace, assessment, RAG, sources…)
-├── services/
-│   ├── rag.js                Core RAG pipeline (pre-warmed, history-aware, cached)
-│   └── emailService.js       Resend HTTP API (password reset, invitations)
-├── models/                   Mongoose models (User, Workspace, Assessment, DocumentSource…)
-├── middleware/               Auth, workspace auth, rate limiting, tenant isolation
-├── config/                   DB, Redis, queues, LLM provider, embeddings
-└── tests/
-    ├── unittest/             Unit tests for utils, middleware, models
-    └── integrationtest/      End-to-end API tests with in-memory MongoDB
-```
-
-## Project Structure — Frontend
-
-```
-frontend/src/
-├── app/
-│   ├── (auth)/               login, register, forgot-password, reset-password, verify-email
-│   └── (dashboard)/
-│       ├── assessments/      DORA gap analysis — list, new, detail
-│       ├── conversations/    RAG Q&A — list + chat thread
-│       ├── sources/          Data source management
-│       ├── workspaces/       Workspace switcher, members, settings
-│       └── settings/         Profile + security
-├── components/
-│   ├── ui/                   Shadcn/ui primitives (Radix UI)
-│   ├── chat/                 Message bubbles, streaming, citation cards
-│   ├── layout/               Header, sidebar, modal outlet
-│   └── providers/            Auth + theme providers
-├── lib/
-│   ├── api/                  Axios client + domain modules (auth, rag, assessments…)
-│   ├── stores/               Zustand stores (auth, ui, workspace)
-│   └── hooks/                useStreaming (SSE), useWorkspace
-└── types/index.ts            Shared TypeScript interfaces
-```
-
----
-
-## Environment Variables
-
-See [`backend/.env.example`](backend/.env.example) for the full reference. Key variables:
-
-```bash
-# Ollama (required for AI features)
-LLM_PROVIDER=ollama
-EMBEDDING_PROVIDER=ollama
-OLLAMA_BASE_URL=https://ollama.com               # Ollama Cloud (chat LLM)
-EMBEDDING_OLLAMA_BASE_URL=http://localhost:11434  # local Ollama (embeddings)
-OLLAMA_API_KEY_1=                                 # Ollama Cloud Bearer token
-EMBEDDING_MODEL=bge-m3:latest
-LLM_MODEL=qwen2.5:14b
-
-# Auth secrets (required — min 32 chars)
-JWT_ACCESS_SECRET=
-JWT_REFRESH_SECRET=
-ENCRYPTION_KEY=          # 64 hex chars
-
-# Databases
-MONGODB_URI=mongodb://localhost:27017/enterprise_rag
-REDIS_URL=redis://localhost:6378
-QDRANT_URL=http://localhost:6333
-
-# Email (Resend)
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@yourdomain.com
-```
-
----
-
-## CI/CD
-
-GitHub Actions pipelines:
-
-| Workflow | Trigger | Steps |
-|----------|---------|-------|
-| **CI** (`ci.yml`) | Push / PR to `main`, `dev`, `staging` | Lint → backend tests → security audit → Docker build |
-| **CD** (`cd.yml`) | Push to `main` | CI → build & push Docker images to GHCR → SSH deploy to DigitalOcean → health check → auto-rollback on failure |
-| **Docs** (`docs.yml`) | Push to `main` (docs/**) | Build + deploy Docusaurus to GitHub Pages |
-
-### Branch strategy
-
-```
-feat/<name>  ──PR──►  dev  ──PR──►  main  ──CD──►  production
-fix/<name>   ──PR──►  dev
-hotfix/<name>         ──PR──────────────►  main
-```
-
----
-
-## Production
-
-| Item | Value |
-|------|-------|
-| Server | DigitalOcean Droplet, Ubuntu 22.04, fra1 |
-| Domain | [retrieva.online](https://retrieva.online) (SSL via Let's Encrypt) |
-| Frontend | `ghcr.io/andreliar/retrieva/frontend:latest` |
-| Backend | `ghcr.io/andreliar/retrieva/backend:latest` |
-| MongoDB | MongoDB Atlas (free M0, `rag.ukqrhqq.mongodb.net`) |
-| Vector DB | Qdrant (self-hosted Docker, `qdrant/qdrant:v1.13.2`) |
-| AI | Ollama Cloud (chat) + self-hosted Ollama container `bge-m3:latest` (embeddings) |
-| Email | Resend (domain `retrieva.online`, eu-west-1) |
+Backend development lives in **[retrieva-backend](https://github.com/andrelair-platform/retrieva-backend)**
+(its own README, tests and scripts).
 
 ---
 
 ## Documentation
 
-Full documentation at [andreliar.github.io/Retrieva](https://andreliar.github.io/Retrieva/) — architecture, API reference, deployment guide, security model.
-
-Local preview:
-
-```bash
-cd docs && npm start
-```
-
----
+Full documentation (architecture, security, API reference, and the **RNCP39583 certification** dossier)
+is published at **[andrelair-platform.github.io/retrieva](https://andrelair-platform.github.io/retrieva/)**.
 
 ## License
 
-ISC
+MIT — see [LICENSE](LICENSE).

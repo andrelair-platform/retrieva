@@ -23,7 +23,7 @@ User → Upload vendor PDF/DOCX/XLSX
      → assessmentWorker:
          1. fileIndex: parse → embed chunks → Qdrant
          2. gapAnalysis: retrieve chunks → LLM generates DORA gap report
-     → Assessment.results stored in MongoDB
+     → Assessment results stored in PostgreSQL
      → User downloads report or queries via chat
 ```
 
@@ -66,7 +66,7 @@ Legacy users without an `organizationId` fall back to the previous per-workspace
 ```
 Routes → Middleware (authenticate, requireWorkspaceAccess, validateBody)
        → Controllers (thin — parse HTTP, call service, send response)
-       → Services (business logic) → Repositories → MongoDB
+       → Services (business logic) → Repositories (Drizzle) → PostgreSQL
                                    → BullMQ queues
                                    → Qdrant (vector store)
 ```
@@ -116,11 +116,12 @@ All repositories extend `BaseRepository` (`repositories/BaseRepository.js`) whic
 ### Configuration
 | Module | Purpose |
 |--------|---------|
-| `config/llm.js` | Azure OpenAI LLM client (gpt-4o-mini) |
-| `config/embeddings.js` | Azure OpenAI embeddings (text-embedding-3-small) |
+| `config/llmProvider.ts` | Chat LLM client → the AI gateway (LiteLLM, OpenAI-compatible) |
+| `config/embeddingProvider.ts` | Ollama `bge-m3` embeddings (OpenAI fallback) |
+| `config/tracing.ts` | Langfuse (traces, prompt management, feedback) |
 | `config/vectorStore.js` | Qdrant client + collection management |
 | `config/queue.js` | BullMQ queue definitions |
-| `config/database.js` | MongoDB connection |
+| `config/db.ts` | PostgreSQL (pg Pool) connection + migrations on boot |
 | `config/redis.js` | Redis connection (BullMQ + RAG cache) |
 
 ## Infrastructure
@@ -136,23 +137,21 @@ All repositories extend `BaseRepository` (`repositories/BaseRepository.js`) whic
         │ :3000    │        │ :3007    │
         └──────────┘        └────┬─────┘
                            ┌─────┼──────┐
-                           ↓     ↓      ↓
-                      MongoDB  Redis  Qdrant
+                           ↓      ↓      ↓
+                      PostgreSQL Redis Qdrant
 ```
 
-**Production** (DigitalOcean fra1):
-- Nginx reverse proxy + Let's Encrypt SSL
-- Docker Compose with health checks
-- MongoDB Atlas (M0 free tier)
-- Qdrant v1.13.2 (self-hosted Docker)
-- Redis 7 (self-hosted Docker, 256MB)
-- DigitalOcean Spaces for file storage
-- Azure OpenAI: `gpt-4o-mini` + `text-embedding-3-small`
+**Production** (self-hosted **minicloud** k3s, GitOps via ArgoCD + Kargo):
+- ingress-nginx + cert-manager TLS (Cloudflare tunnel for public access)
+- **PostgreSQL** (CNPG on k8s; Drizzle migrations on boot)
+- Qdrant (vector store) · Redis 7 (cache + BullMQ)
+- Object storage: MinIO / Cloudflare R2
+- **LLM via the minicloud LiteLLM AI gateway** (routing, PII masking, budgets, EU governance) · embeddings on self-hosted Ollama `bge-m3`
 
 ## Multi-Tenancy
 
-Workspace-based isolation. Every Qdrant query filters by `workspaceId`. The `ENFORCE_TENANT_ISOLATION=true` env var adds a defense-in-depth check at the vector store layer.
+Workspace/organization isolation. Every Qdrant query filters by `workspaceId`; relational queries compose `entityScopeCondition` (Drizzle) and run entity-scoped under `ENTITY_ISOLATION_MODE=enforce` (defense-in-depth at both the DB and vector-store layers).
 
 ## LLM Provider Abstraction
 
-The provider factory (`config/llmProvider.js`) supports Azure OpenAI (default), OpenAI, and Anthropic. Switch via the `LLM_PROVIDER` env var.
+`config/llmProvider.ts` is a thin OpenAI-compatible client over the platform **AI gateway (LiteLLM)** — the single provider. The gateway owns provider routing (Ollama Cloud, Azure, Bedrock…), key rotation, retries/fallbacks, PII masking, budgets and EU governance. Callers pick a **model name / intent alias** (e.g. `tier-premium`, `tier-standard`) via `purpose` / `LLM_MODEL`; the gateway resolves it. Config: `LITELLM_BASE_URL` + `LITELLM_API_KEY`.

@@ -4,7 +4,15 @@ sidebar_position: 5
 
 # Models
 
-Mongoose models define the data schema and provide an interface to MongoDB.
+The data model is **PostgreSQL + Drizzle ORM**: schema is defined as **Drizzle tables** in
+`db/schema/*.ts` and accessed through typed repositories in `repositories/drizzle/`.
+
+:::note Legacy ORM references
+Some code snippets on this page still show the previous **Mongoose** shapes. They are kept as an
+illustration of the domain entities; the authoritative, current schema (Drizzle tables + migrations)
+lives in the **[retrieva-backend](https://github.com/andrelair-platform/retrieva-backend)** repo
+(`db/schema/`, `db/migrations/`). See [architecture/datastore-postgresql](../architecture/datastore-postgresql).
+:::
 
 ## User Model
 
