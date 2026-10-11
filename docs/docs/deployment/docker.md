@@ -6,6 +6,15 @@ sidebar_position: 1
 
 Container-based deployment using Docker and Docker Compose.
 
+:::warning Authoritative source
+The **authoritative local run** is the repo's `docker-compose.yml` + the
+[README run section](https://github.com/andrelair-platform/retrieva#-run-the-whole-application-locally-reviewers--certification-jury)
+(PostgreSQL + Redis + Qdrant + Ollama + backend + frontend, one command). **Production** runs on the
+self-hosted **minicloud k3s** cluster via GitOps (ArgoCD + Kargo), *not* Docker Compose. Some detailed
+snippets further down still show the **pre-migration** stack (MongoDB / Azure / DigitalOcean) and are
+kept only as legacy illustration — prefer the repo's compose + the [Environment Variables](./environment-variables) reference.
+:::
+
 ## Architecture
 
 ### Development Stack
@@ -89,13 +98,13 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3007
-      - MONGODB_URI=mongodb://mongodb:27017/enterprise_rag
+      - DATABASE_URL=postgres://retrieva:retrieva@postgres:5432/retrieva
       - REDIS_URL=redis://redis:6379
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - QDRANT_URL=http://qdrant:6333
-      # Azure OpenAI — set via .env file (not hardcoded here)
-      # LLM_PROVIDER=azure_openai, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, etc.
+      # LLM via the AI gateway (LiteLLM) — set via .env (not hardcoded here)
+      # LITELLM_BASE_URL, LITELLM_API_KEY, LLM_MODEL ; embeddings: EMBEDDING_OLLAMA_BASE_URL
     depends_on:
       mongodb:
         condition: service_healthy

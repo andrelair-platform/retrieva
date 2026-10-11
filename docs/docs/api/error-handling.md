@@ -179,7 +179,7 @@ Dependency unavailable.
   "message": "LLM service unavailable",
   "error": {
     "code": "SERVICE_UNAVAILABLE",
-    "details": ["Azure OpenAI connection failed"]
+    "details": ["AI gateway (LiteLLM) connection failed"]
   }
 }
 ```

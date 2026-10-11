@@ -20,7 +20,7 @@ Essential tasks before deploying to production.
   openssl rand -hex 32
   ```
 
-- [ ] **Azure OpenAI key secured** - Never commit to version control
+- [ ] **AI gateway key (`LITELLM_API_KEY`) secured** - Never commit to version control
 
 - [ ] **Resend API key secured** - Store in encrypted `.env.resend.production.enc`
 
@@ -89,7 +89,7 @@ Essential tasks before deploying to production.
 
 ### LLM Configuration
 
-- [ ] **Azure OpenAI configured** - All required variables set
+- [ ] **AI gateway configured** - `LITELLM_BASE_URL` + `LITELLM_API_KEY` + `LLM_MODEL` set
 - [ ] **Timeouts configured** - LLM and streaming timeouts
 - [ ] **Guardrails enabled** - Hallucination blocking active
 - [ ] **Fallback messages** - User-friendly error messages

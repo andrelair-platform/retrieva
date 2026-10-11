@@ -97,7 +97,7 @@ The CI job spins up MongoDB and Redis as service containers and sets test-specif
 ```yaml
 env:
   NODE_ENV: test
-  MONGODB_URI: mongodb://localhost:27017/test_db
+  DATABASE_URL: postgres://localhost:5432/test_db
   REDIS_URL: redis://localhost:6378
   JWT_ACCESS_SECRET: <test-secret>
   JWT_REFRESH_SECRET: <test-secret>
