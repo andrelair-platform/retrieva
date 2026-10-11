@@ -169,9 +169,12 @@ export async function retrieveAdditionalDocuments(queries, retriever, vectorStor
 }
 ```
 
-## Object Storage (`config/storage.js`)
+## Object Storage (`config/storage.ts`)
 
-Provides persistent file storage using **DigitalOcean Spaces** (S3-compatible). All objects are stored under an org-scoped key prefix to enforce multi-tenant isolation. The module degrades gracefully when Spaces env vars are absent — uploads are skipped and download endpoints return 404.
+Provides persistent file storage on any **S3-compatible** object store (`@aws-sdk/client-s3`) — in
+production **MinIO / Cloudflare R2** on the minicloud platform. All objects are stored under an
+org-scoped key prefix to enforce multi-tenant isolation. The module degrades gracefully when the
+storage env vars are absent — uploads are skipped and download endpoints return 404.
 
 ```javascript
 // Key builders
@@ -185,7 +188,7 @@ buildAssessmentFileKey(orgId, workspaceId, assessmentId, docIndex, fileName)
 | Export | Description |
 |--------|-------------|
 | `isStorageConfigured()` | Returns `true` when all four `DO_SPACES_*` env vars are set |
-| `uploadFile(key, buffer, mimeType)` | Uploads a buffer to Spaces, returns the key |
+| `uploadFile(key, buffer, mimeType)` | Uploads a buffer to object storage, returns the key |
 | `downloadFileStream(key)` | Returns a readable stream — pipe directly to Express `res` |
 | `deleteFile(key)` | Deletes an object; no-op when storage is not configured |
 

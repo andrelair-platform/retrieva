@@ -6,6 +6,13 @@ sidebar_position: 4
 
 The project uses GitHub Actions for continuous integration and continuous deployment.
 
+:::warning Deployment model changed (GitOps, not SSH-to-server)
+Production now runs on the self-hosted **minicloud k3s** cluster via **GitOps**: CI builds + signs the
+image (cosign + SBOM), **Kargo** promotes it dev→prod, and **ArgoCD** reconciles the cluster — there is
+**no SSH-to-server deploy** and no DigitalOcean. The `cd.yml` / SSH-to-droplet flow described below is
+the **legacy DigitalOcean-era** pipeline, kept for historical reference.
+:::
+
 ## Overview
 
 ```
@@ -222,7 +229,7 @@ Never commit plaintext `.env` files. Only `.enc` (encrypted) files belong in the
           └─────────┘    └─────────┘  └─────────┘
 ```
 
-All services run on a single **DigitalOcean droplet** via `docker-compose.production.yml`.
+*(Legacy single-host topology.)* Today all services run **in-cluster on minicloud k3s** (GitOps via ArgoCD + Kargo).
 
 ### Nginx Reverse Proxy
 

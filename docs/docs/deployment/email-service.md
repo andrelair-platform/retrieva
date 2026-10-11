@@ -8,9 +8,11 @@ The platform sends transactional emails using the **Resend HTTP API**. This page
 
 ## Why Resend (not SMTP)
 
-DigitalOcean blocks outbound traffic on SMTP ports (25, 465, 587) for all droplets. This means traditional SMTP libraries like Nodemailer cannot deliver email from production.
+Outbound SMTP ports (25, 465, 587) are commonly blocked by clouds, clusters and egress policies, so
+traditional SMTP libraries like Nodemailer are unreliable from production.
 
-**Resend** solves this by providing an HTTP API over port 443 (HTTPS), which is never blocked. The migration from Nodemailer to Resend was done for this reason.
+**Resend** solves this by providing an HTTP API over port 443 (HTTPS), which is never blocked. The
+migration from Nodemailer to Resend was done for this reason.
 
 ## Setup
 
@@ -60,15 +62,8 @@ After adding your domain in the Resend dashboard, you'll be given records to cre
 
 ### DNS Management
 
-Even if your domain is registered at a different registrar (e.g., Namecheap), DNS can be managed at **DigitalOcean** by pointing the domain's nameservers to:
-
-```
-ns1.digitalocean.com
-ns2.digitalocean.com
-ns3.digitalocean.com
-```
-
-Then add the DNS records in the DigitalOcean control panel under **Networking > Domains**.
+DNS for the domain is managed in **Cloudflare**. Add the records above in the Cloudflare dashboard
+under **DNS > Records** (for the email records, keep them **DNS-only / grey-cloud**, not proxied).
 
 :::warning
 DNS propagation can take up to 48 hours. Resend will show the domain as "Pending" until all records are verified.
@@ -148,7 +143,7 @@ The backend health endpoint at `GET /api/v1/health` includes email service statu
 **Symptom:** Resend dashboard shows domain as "Pending".
 
 **Fix:**
-1. Double-check all 6 DNS records are created in DigitalOcean
+1. Double-check all 6 DNS records are created in Cloudflare
 2. Use `dig` to verify records have propagated:
    ```bash
    dig TXT resend._domainkey.retrieva.online

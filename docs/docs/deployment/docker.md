@@ -384,7 +384,7 @@ mongodb:
 
 ### 3. Redis (Production — Self-Hosted)
 
-In production, Redis runs as a Docker service on the same droplet (see `docker-compose.production.yml`):
+In production (minicloud k3s, GitOps), Redis runs as an in-cluster service (legacy single-host example below):
 
 ```yaml
 redis:
@@ -429,7 +429,7 @@ openssl rand -base64 32
 
 ### 4. Qdrant (Production — Self-Hosted)
 
-In production, Qdrant runs as a Docker service on the same droplet (see `docker-compose.production.yml`):
+In production (minicloud k3s, GitOps), Qdrant runs as an in-cluster service (legacy single-host example below):
 
 ```yaml
 qdrant:

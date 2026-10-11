@@ -93,15 +93,19 @@ Generate encryption key:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-### Object Storage (DigitalOcean Spaces)
+### Object Storage (S3-compatible)
 
-Persistent file storage for uploaded data source files and assessment documents. All variables are optional — when unset the upload step is silently skipped and download buttons are hidden in the UI.
+Persistent file storage for uploaded data source files and assessment documents, via any
+**S3-compatible** object store (`@aws-sdk/client-s3`, `config/storage.ts`). In production that's
+**MinIO / Cloudflare R2** on the minicloud platform — the `DO_SPACES_*` variable names are historical
+(the endpoint is just an S3 endpoint). All variables are optional — when unset the upload step is
+silently skipped and download buttons are hidden in the UI.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DO_SPACES_KEY` | - | Spaces access key ID |
-| `DO_SPACES_SECRET` | - | Spaces secret access key |
-| `DO_SPACES_ENDPOINT` | - | Spaces endpoint URL (e.g. `https://fra1.digitaloceanspaces.com`) |
+| `DO_SPACES_KEY` | - | S3 access key ID |
+| `DO_SPACES_SECRET` | - | S3 secret access key |
+| `DO_SPACES_ENDPOINT` | - | S3 endpoint URL (MinIO / Cloudflare R2 / any S3-compatible) |
 | `DO_SPACES_BUCKET` | - | Bucket name |
 | `DO_SPACES_REGION` | `fra1` | Bucket region |
 
@@ -213,7 +217,7 @@ Traces, prompt management, feedback and cost. All optional — absent keys disab
 | `RESEND_FROM_EMAIL` | `noreply@retrieva.online` | Sender email address (must match a verified Resend domain) |
 
 :::note
-The email service uses the **Resend HTTP API** over HTTPS (port 443). No SMTP ports (25, 465, 587) are needed — this is important because DigitalOcean blocks outbound SMTP traffic.
+The email service uses the **Resend HTTP API** over HTTPS (port 443). No SMTP ports (25, 465, 587) are needed — the HTTP API works from any environment, including clusters/clouds that block outbound SMTP.
 :::
 
 ### Optional Microservice Extension Points
@@ -277,10 +281,10 @@ JWT_REFRESH_SECRET=
 # Encryption (REQUIRED - generate with: openssl rand -hex 32)
 ENCRYPTION_KEY=
 
-# Object Storage (DigitalOcean Spaces) — optional, files stored in-memory only when unset
+# Object Storage (S3-compatible: MinIO / Cloudflare R2) — optional, in-memory only when unset
 DO_SPACES_KEY=
 DO_SPACES_SECRET=
-DO_SPACES_ENDPOINT=https://fra1.digitaloceanspaces.com
+DO_SPACES_ENDPOINT=                      # S3 endpoint (MinIO / R2 / any S3-compatible)
 DO_SPACES_BUCKET=
 DO_SPACES_REGION=fra1
 

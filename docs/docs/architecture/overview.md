@@ -101,7 +101,7 @@ Routes → Middleware (authenticate, requireWorkspaceAccess, validateBody)
 | `services/roiExportService.js` | EBA-compliant DORA Art. 28(3) XLSX workbook |
 | `services/fileIngestionService.js` | Parses PDF, DOCX, XLSX; deterministic Qdrant point IDs (SHA-256) |
 | `services/emailService.js` | Transactional email via Resend HTTP API |
-| `services/storageService.js` | File backup via DigitalOcean Spaces (S3-compatible) |
+| `services/storageService` | File storage on S3-compatible object storage (MinIO / Cloudflare R2) |
 
 ### Repository Layer
 | Repository | Purpose |
