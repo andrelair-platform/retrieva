@@ -32,7 +32,7 @@ cd backend && npm install --legacy-peer-deps
 cd ../frontend && npm install
 
 # Start infrastructure services
-cd .. && docker-compose up -d mongodb redis qdrant
+cd .. && docker compose up -d postgres redis qdrant
 
 # Start development servers
 npm run dev  # In backend/
@@ -47,7 +47,7 @@ rag/
 │   ├── config/               # Service configurations
 │   ├── controllers/          # Request handlers
 │   ├── middleware/           # Express middleware
-│   ├── models/               # Mongoose schemas
+│   ├── db/schema/            # Drizzle tables (+ repositories/drizzle/)
 │   ├── routes/               # API route definitions
 │   ├── services/             # Business logic
 │   ├── utils/                # Utility functions

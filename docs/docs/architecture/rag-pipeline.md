@@ -84,7 +84,7 @@ Retrieval is handled by a **LangGraph ReAct agent** (`services/ragAgent.js`) tha
 |------|-------------|------------|
 | `search_knowledge_base` | Semantic search over workspace documents (policies, contracts, uploaded files) | `langchain-rag` (tenant-filtered) |
 | `search_dora_articles` | Search DORA regulatory articles; optional domain filter | `compliance_kb` |
-| `lookup_vendor_assessment` | Retrieve a completed gap analysis for a named ICT vendor | MongoDB |
+| `lookup_vendor_assessment` | Retrieve a completed gap analysis for a named ICT vendor | PostgreSQL |
 | `done_searching` | Signal retrieval complete; triggers synthesis | — |
 
 ### Agent Retrieval Strategy
@@ -277,15 +277,17 @@ Key environment variables:
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=documents          # workspace knowledge base collection
 
-# LLM (Azure OpenAI — production default)
-LLM_PROVIDER=azure_openai
-AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4o-mini
+# LLM — the AI gateway (LiteLLM, OpenAI-compatible); the gateway resolves the model
+LITELLM_BASE_URL=http://localhost:4000
+LITELLM_API_KEY=your-gateway-key
+LLM_MODEL=tier-standard                   # gateway model name / intent alias
 LLM_TEMPERATURE=0.3
 LLM_MAX_TOKENS=2000
 
-# Embeddings (Azure OpenAI — text-embedding-3-small, 1536 dims, Cosine)
-EMBEDDING_PROVIDER=azure
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+# Embeddings — self-hosted Ollama bge-m3 (1024 dims, Cosine; OpenAI fallback)
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_OLLAMA_BASE_URL=http://localhost:11434
+EMBEDDING_MODEL=bge-m3:latest
 EMBEDDING_MAX_CONCURRENCY=10              # parallel embedding API calls (S0 tier: 5-10 safe)
 EMBEDDING_BATCH_MAX_CHUNKS=50            # max chunks per batch request
 EMBEDDING_BATCH_MAX_TOKENS=8192          # max tokens per batch request

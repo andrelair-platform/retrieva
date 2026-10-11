@@ -202,5 +202,5 @@ At expected ARR per customer ($30k-150k depending on segment), Mongo infrastruct
 ## Related
 
 - `/docs/deployment/production-checklist.md` — full production readiness checklist
-- `/docs/deployment/environment-variables.md` — `MONGODB_URI` configuration
+- `/docs/deployment/environment-variables.md` — `DATABASE_URL` configuration
 - `/docs/security/data-protection.md` — encryption at rest, Field Level Encryption setup

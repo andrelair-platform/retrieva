@@ -13,26 +13,27 @@ The backend is built with Express 5 and follows a modular architecture with clea
 | Framework | Express 5 |
 | Runtime | Node.js 20+ |
 | AI Orchestration | LangChain (@langchain/core, @langchain/openai, @langchain/qdrant) |
-| LLM | Azure OpenAI (GPT-4o-mini) via LangChain |
-| Embeddings | Azure OpenAI (text-embedding-3-small) via LangChain |
+| LLM | via the platform **AI gateway (LiteLLM)**, OpenAI-compatible — the gateway owns provider routing, key rotation, retries/fallbacks, PII masking, budgets & EU governance |
+| Embeddings | Self-hosted Ollama `bge-m3` (1024-dim), OpenAI fallback |
 | Vector Store | Qdrant (via @langchain/qdrant) |
-| Database | MongoDB (Mongoose ODM) |
+| Database | PostgreSQL (Drizzle ORM) |
 | Cache | Redis |
 | Queue | BullMQ |
 | Real-Time | Socket.io |
 | Export | xlsx (XLSX workbook generation) |
-| Monitoring | LangSmith (LLM tracing) |
+| Monitoring | Langfuse (LLM traces, prompts, cost) · Prometheus / Grafana |
 
 ## Directory Structure
 
 ```
 backend/
 ├── config/             # Configuration modules
-│   ├── database.js     # MongoDB connection
+│   ├── db.ts           # PostgreSQL (pg Pool) connection + migrations on boot
 │   ├── redis.js        # Redis connection
 │   ├── queue.js        # BullMQ queues + schedulers
-│   ├── llm.js          # LLM provider
-│   ├── embeddings.js   # Embedding model
+│   ├── llmProvider.ts  # Chat LLM client → the AI gateway (LiteLLM, OpenAI-compatible)
+│   ├── embeddingProvider.ts  # Ollama bge-m3 embeddings (OpenAI fallback)
+│   ├── tracing.ts      # Langfuse (traces, prompt mgmt, feedback)
 │   ├── vectorStore.js  # Qdrant setup
 │   ├── logger.js       # Winston logger
 │   └── guardrails.js   # LLM guardrails config
@@ -52,16 +53,11 @@ backend/
 │   ├── rateLimiter.js
 │   ├── validate.js
 │   └── errorHandler.js
-├── models/             # Mongoose schemas
-│   ├── User.js
-│   ├── Conversation.js
-│   ├── Message.js
-│   ├── Analytics.js
-│   ├── Workspace.js              # Vendor registry (DORA Article 28)
-│   ├── WorkspaceMember.js
-│   ├── Assessment.js
-│   ├── VendorQuestionnaire.js
-│   └── DeadLetterJob.js
+├── db/
+│   ├── schema/          # Drizzle tables (User, Workspace, Assessment, VendorQuestionnaire…)
+│   ├── migrations/      # drizzle-kit SQL migrations (applied on boot)
+│   └── tenantContext.ts # AsyncLocalStorage tenant scope (entityScopeCondition)
+├── repositories/drizzle/  # typed data access (replaces Mongoose models)
 ├── routes/             # API routes
 │   ├── ragRoutes.js
 │   ├── authRoutes.js
@@ -108,15 +104,17 @@ Server initialization:
 ```javascript
 // index.js
 
-import { connectDB } from './config/database.js';
+import { connectPg } from './config/db.js';
+import { runMigrations } from './db/migrate.js';
 import { createServer } from './app.js';
 import { ragService } from './services/rag.js';
 import { scheduleMonitoringJob } from './config/queue.js';
 import './workers/monitoringWorker.js';
 
 async function startServer() {
-  // 1. Connect to MongoDB
-  await connectDB();
+  // 1. Connect to PostgreSQL + apply Drizzle migrations (idempotent)
+  await connectPg();
+  await runMigrations();
 
   // 2. Pre-warm RAG system
   await ragService.init();
@@ -320,8 +318,8 @@ logger.error('Operation failed', {
 PORT=3007
 NODE_ENV=development
 
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/enterprise_rag
+# PostgreSQL (Drizzle)
+DATABASE_URL=postgres://localhost:5432/retrieva
 
 # Redis
 REDIS_URL=redis://localhost:6378
@@ -330,13 +328,15 @@ REDIS_URL=redis://localhost:6378
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=documents
 
-# Azure OpenAI
-LLM_PROVIDER=azure_openai
-EMBEDDING_PROVIDER=azure
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4o-mini
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+# LLM — the AI gateway (LiteLLM, OpenAI-compatible); the gateway resolves the model
+LITELLM_BASE_URL=http://localhost:4000      # minicloud LiteLLM gateway (or any OpenAI-compatible /v1)
+LITELLM_API_KEY=your-gateway-key
+LLM_MODEL=tier-standard                     # gateway model name / intent alias
+
+# Embeddings — self-hosted Ollama bge-m3 (OpenAI fallback)
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_OLLAMA_BASE_URL=http://localhost:11434
+EMBEDDING_MODEL=bge-m3:latest
 
 # JWT
 JWT_ACCESS_SECRET=your-secret

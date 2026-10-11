@@ -19,32 +19,33 @@ Complete reference for all configuration options.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MONGODB_URI` | `mongodb://localhost:27017/enterprise_rag` | MongoDB connection string |
+| `DATABASE_URL` | `postgres://localhost:5432/retrieva` | PostgreSQL connection string (Drizzle); migrations applied on boot |
 | `REDIS_URL` | `redis://localhost:6378` | Redis connection URL (production: `redis://:password@redis:6379`) |
 | `REDIS_PASSWORD` | - | Redis authentication password (production only, used by docker-compose) |
 | `QDRANT_URL` | `http://localhost:6333` | Qdrant vector database URL (production: `http://qdrant:6333`) |
 | `QDRANT_API_KEY` | - | Qdrant API key (only needed for Qdrant Cloud; not needed for self-hosted) |
 | `QDRANT_COLLECTION_NAME` | `documents` | Qdrant collection name |
 
-### Azure OpenAI Configuration
+### AI Gateway (LLM) & Embeddings
+
+The chat LLM is reached through an OpenAI-compatible **AI gateway (LiteLLM)** — the gateway owns
+provider routing, key rotation, retries/fallbacks, PII masking, budgets and EU governance. Embeddings
+run on self-hosted Ollama `bge-m3` (OpenAI fallback), not through the gateway.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `LLM_PROVIDER` | Yes | Set to `azure_openai` |
-| `EMBEDDING_PROVIDER` | Yes | Set to `azure` |
-| `AZURE_OPENAI_API_KEY` | Yes | Azure OpenAI API key |
-| `AZURE_OPENAI_ENDPOINT` | Yes | Azure OpenAI endpoint URL |
-| `AZURE_OPENAI_LLM_DEPLOYMENT` | Yes | LLM deployment name (e.g., `gpt-4o-mini`) |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Yes | Embedding deployment name |
-| `AZURE_OPENAI_API_VERSION` | `2024-02-15-preview` | API version |
+| `LITELLM_BASE_URL` | Yes | AI gateway endpoint (OpenAI-compatible; normalised to `/v1`) |
+| `LITELLM_API_KEY` | Yes | AI gateway API key |
+| `EMBEDDING_PROVIDER` | Yes | `ollama` (embeddings run locally) |
+| `EMBEDDING_OLLAMA_BASE_URL` | Yes | Ollama base URL for embeddings (e.g. `http://localhost:11434`) |
 
 ### LLM Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_MODEL` | `gpt-4o-mini` | LLM model name |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model |
-| `JUDGE_LLM_MODEL` | `gpt-4o-mini` | Model for LLM Judge |
+| `LLM_MODEL` | `tier-standard` | Gateway model name / intent alias |
+| `LLM_<PURPOSE>_MODEL` | - | Per-purpose override (`chat` \| `analysis` \| `judge` \| `formatter`) |
+| `EMBEDDING_MODEL` | `bge-m3:latest` | Embedding model (1024-dim) |
 | `LLM_TEMPERATURE` | `0.3` | Generation temperature |
 | `LLM_MAX_TOKENS` | `2000` | Maximum output tokens |
 | `LLM_TOP_P` | `1` | Top-p sampling |
@@ -92,15 +93,19 @@ Generate encryption key:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-### Object Storage (DigitalOcean Spaces)
+### Object Storage (S3-compatible)
 
-Persistent file storage for uploaded data source files and assessment documents. All variables are optional — when unset the upload step is silently skipped and download buttons are hidden in the UI.
+Persistent file storage for uploaded data source files and assessment documents, via any
+**S3-compatible** object store (`@aws-sdk/client-s3`, `config/storage.ts`). In production that's
+**MinIO / Cloudflare R2** on the minicloud platform — the `DO_SPACES_*` variable names are historical
+(the endpoint is just an S3 endpoint). All variables are optional — when unset the upload step is
+silently skipped and download buttons are hidden in the UI.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DO_SPACES_KEY` | - | Spaces access key ID |
-| `DO_SPACES_SECRET` | - | Spaces secret access key |
-| `DO_SPACES_ENDPOINT` | - | Spaces endpoint URL (e.g. `https://fra1.digitaloceanspaces.com`) |
+| `DO_SPACES_KEY` | - | S3 access key ID |
+| `DO_SPACES_SECRET` | - | S3 secret access key |
+| `DO_SPACES_ENDPOINT` | - | S3 endpoint URL (MinIO / Cloudflare R2 / any S3-compatible) |
 | `DO_SPACES_BUCKET` | - | Bucket name |
 | `DO_SPACES_REGION` | `fra1` | Bucket region |
 
@@ -184,13 +189,17 @@ Files are stored under `organizations/{orgId}/workspaces/{wsId}/...` enforcing o
 | `MONITORING_INTERVAL_HOURS` | `24` | How often the compliance monitoring alert worker runs (hours) |
 | `INSTITUTION_NAME` | `Financial Entity` | Institution name written into the RT.01.01 sheet of the RoI export |
 
-### LangSmith Monitoring
+### Langfuse Observability (self-hosted LLMOps)
+
+Traces, prompt management, feedback and cost. All optional — absent keys disable tracing (no-op).
 
 | Variable | Description |
 |----------|-------------|
-| `LANGSMITH_API_KEY` | LangSmith API key |
-| `LANGSMITH_PROJECT` | `retrieva` - Project name |
-| `LANGSMITH_ENABLED` | `true` - Enable tracing |
+| `LANGFUSE_PUBLIC_KEY` | Langfuse public key |
+| `LANGFUSE_SECRET_KEY` | Langfuse secret key |
+| `LANGFUSE_BASEURL` | Self-hosted Langfuse base URL |
+| `LANGFUSE_TRACING_ENVIRONMENT` | `development` / `production` filter in the Langfuse UI |
+| `LANGFUSE_PROMPT_LABEL` | `latest` (dev) / `production` (prod) — managed-prompt routing |
 
 ### CORS & Security
 
@@ -208,7 +217,7 @@ Files are stored under `organizations/{orgId}/workspaces/{wsId}/...` enforcing o
 | `RESEND_FROM_EMAIL` | `noreply@retrieva.online` | Sender email address (must match a verified Resend domain) |
 
 :::note
-The email service uses the **Resend HTTP API** over HTTPS (port 443). No SMTP ports (25, 465, 587) are needed — this is important because DigitalOcean blocks outbound SMTP traffic.
+The email service uses the **Resend HTTP API** over HTTPS (port 443). No SMTP ports (25, 465, 587) are needed — the HTTP API works from any environment, including clusters/clouds that block outbound SMTP.
 :::
 
 ### Optional Microservice Extension Points
@@ -251,17 +260,19 @@ PORT=3007
 NODE_ENV=development
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/enterprise_rag
+DATABASE_URL=postgres://localhost:5432/retrieva
 REDIS_URL=redis://localhost:6378
 QDRANT_URL=http://localhost:6333
 
-# Azure OpenAI (REQUIRED)
-LLM_PROVIDER=azure_openai
-EMBEDDING_PROVIDER=azure
-AZURE_OPENAI_API_KEY=
-AZURE_OPENAI_ENDPOINT=
-AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4o-mini
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+# LLM — the AI gateway (LiteLLM, OpenAI-compatible); the gateway resolves the model
+LITELLM_BASE_URL=http://localhost:4000      # minicloud LiteLLM gateway (or any OpenAI-compatible /v1)
+LITELLM_API_KEY=
+LLM_MODEL=tier-standard
+
+# Embeddings — self-hosted Ollama bge-m3 (OpenAI fallback)
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_OLLAMA_BASE_URL=http://localhost:11434
+EMBEDDING_MODEL=bge-m3:latest
 
 # JWT (REQUIRED - generate with: openssl rand -base64 48)
 JWT_ACCESS_SECRET=
@@ -270,10 +281,10 @@ JWT_REFRESH_SECRET=
 # Encryption (REQUIRED - generate with: openssl rand -hex 32)
 ENCRYPTION_KEY=
 
-# Object Storage (DigitalOcean Spaces) — optional, files stored in-memory only when unset
+# Object Storage (S3-compatible: MinIO / Cloudflare R2) — optional, in-memory only when unset
 DO_SPACES_KEY=
 DO_SPACES_SECRET=
-DO_SPACES_ENDPOINT=https://fra1.digitaloceanspaces.com
+DO_SPACES_ENDPOINT=                      # S3 endpoint (MinIO / R2 / any S3-compatible)
 DO_SPACES_BUCKET=
 DO_SPACES_REGION=fra1
 
@@ -337,5 +348,5 @@ ENFORCE_TENANT_ISOLATION=true
 ```bash
 NODE_ENV=test
 LOG_LEVEL=error
-MONGODB_URI=mongodb://localhost:27017/enterprise_rag_test
+DATABASE_URL=postgres://localhost:5432/retrieva_test
 ```

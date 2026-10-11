@@ -84,12 +84,12 @@ A BullMQ repeatable job runs every 24 hours and sends email alerts to workspace 
 | LLM | Ollama Cloud (default, 3-key rotation via LangChain `withFallbacks`); pluggable to OpenAI / Anthropic / Groq via `LLM_<purpose>_PROVIDER` |
 | Embeddings | Self-hosted Ollama `bge-m3:latest` (1024-dim, 8192-token context); OpenAI `text-embedding-3-small` fallback |
 | Vector Store | Qdrant |
-| Database | MongoDB (Mongoose ODM) |
+| Database | PostgreSQL (Drizzle ORM) |
 | Cache / Queue | Redis, BullMQ |
 | Real-Time | Socket.io |
 | Frontend | Next.js 16, React 19, TypeScript |
 | UI Components | shadcn/ui, Tailwind CSS |
-| Monitoring | LangSmith |
+| Monitoring | Langfuse (LLM traces + cost) · Prometheus / Grafana |
 | Export | xlsx (XLSX workbook generation) |
 
 ## Architecture Overview
@@ -107,7 +107,7 @@ A BullMQ repeatable job runs every 24 hours and sends email alerts to workspace 
 │              Background Workers (BullMQ)                        │
 │  assessment · questionnaire · monitoring (24h alerts)           │
 ├──────────────┬──────────────┬──────────────────────────────────┤
-│   Qdrant     │   MongoDB    │           Redis                  │
+│   Qdrant     │  PostgreSQL  │           Redis                  │
 │   (Vectors)  │   (Data)     │       (Cache / Queue)            │
 └──────────────┴──────────────┴──────────────────────────────────┘
 ```

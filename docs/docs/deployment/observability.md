@@ -65,9 +65,14 @@ The `beforeSend` hook in `backend/instrument.js` silently drops events where `er
 
 ---
 
-## Netdata
+## Netdata (legacy host monitoring)
 
-Netdata is a real-time system monitoring agent running directly on the production DigitalOcean droplet. It collects metrics every second for CPU, memory, disk, network, and Docker containers.
+> **Note:** production observability now runs on **Prometheus + Grafana** (cluster/RED metrics) and
+> **Langfuse** (LLM traces + cost) on the minicloud platform. The Netdata setup below is the earlier
+> single-host monitoring and is kept for reference only.
+
+Netdata is a real-time system monitoring agent (host-level: CPU, memory, disk, network, containers),
+collecting metrics every second.
 
 ### Connecting to Netdata Cloud
 

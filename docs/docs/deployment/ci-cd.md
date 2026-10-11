@@ -6,6 +6,13 @@ sidebar_position: 4
 
 The project uses GitHub Actions for continuous integration and continuous deployment.
 
+:::warning Deployment model changed (GitOps, not SSH-to-server)
+Production now runs on the self-hosted **minicloud k3s** cluster via **GitOps**: CI builds + signs the
+image (cosign + SBOM), **Kargo** promotes it dev→prod, and **ArgoCD** reconciles the cluster — there is
+**no SSH-to-server deploy** and no DigitalOcean. The `cd.yml` / SSH-to-droplet flow described below is
+the **legacy DigitalOcean-era** pipeline, kept for historical reference.
+:::
+
 ## Overview
 
 ```
@@ -97,7 +104,7 @@ The CI job spins up MongoDB and Redis as service containers and sets test-specif
 ```yaml
 env:
   NODE_ENV: test
-  MONGODB_URI: mongodb://localhost:27017/test_db
+  DATABASE_URL: postgres://localhost:5432/test_db
   REDIS_URL: redis://localhost:6378
   JWT_ACCESS_SECRET: <test-secret>
   JWT_REFRESH_SECRET: <test-secret>
@@ -222,7 +229,7 @@ Never commit plaintext `.env` files. Only `.enc` (encrypted) files belong in the
           └─────────┘    └─────────┘  └─────────┘
 ```
 
-All services run on a single **DigitalOcean droplet** via `docker-compose.production.yml`.
+*(Legacy single-host topology.)* Today all services run **in-cluster on minicloud k3s** (GitOps via ArgoCD + Kargo).
 
 ### Nginx Reverse Proxy
 

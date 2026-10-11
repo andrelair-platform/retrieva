@@ -44,7 +44,7 @@ ENCRYPTION_KEY=your-32-byte-hex-key
 │                                                                          │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  Database Layer                                                  │   │
-│   │  • Mongoose tenant isolation plugin                              │   │
+│   │  • Drizzle entityScopeCondition (tenant isolation)               │   │
 │   │  • Automatic query filtering                                     │   │
 │   │  • Cross-tenant detection                                        │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
@@ -61,7 +61,12 @@ ENCRYPTION_KEY=your-32-byte-hex-key
 
 ### Database Isolation
 
+> **Current mechanism (Drizzle/PostgreSQL):** every tenant-scoped table carries `organization_id`, and
+> queries compose `entityScopeCondition(organizationId)` (tenant scope from `db/tenantContext.ts`) under
+> `ENTITY_ISOLATION_MODE=enforce`. The Mongoose snippet below is a **legacy** illustration of the intent.
+
 ```javascript
+// LEGACY (Mongoose) — replaced by Drizzle entityScopeCondition
 // Every document is tagged with workspaceId
 const conversationSchema = new Schema({
   workspaceId: {
@@ -160,7 +165,7 @@ async function deleteWorkspace(workspaceId) {
     }
   });
 
-  // 2. Delete MongoDB documents
+  // 2. Delete PostgreSQL rows
   await Promise.all([
     Conversation.deleteMany({ workspaceId }),
     Message.deleteMany({ conversationId: { $in: conversationIds } }),
