@@ -99,6 +99,7 @@ promotes dev→prod via a **CODEOWNERS-gated PR** → **ArgoCD** reconciles
 | [prompt-management](./prompt-management) | Langfuse label-routed prompts, Git fallback | Accepted | SA |
 | deployment (gitops) | GAP wrapper chart + Kargo git-Warehouse — RTV-57 | Pending | DO/SA |
 | identity ([minicloud-gitops ADR](https://github.com/andrelair-platform/minicloud-gitops/blob/main/docs/identity-two-layer.md)) | Retrieva ships **own JWT auth**; platform workforce = Authentik | Accepted | SA/SEC |
+| ADR-AGENT-01 ([agentic-assessment-orchestrator](./agentic-assessment-orchestrator) §8) | deterministic LangGraph supervisor + a **CrewAI crew over A2A**, human-gated (Path A — amends RTV-76, keeps determinism) — RTV-77 | Accepted | SA/TL |
 
 ## 8. Risks / trade-offs
 - **Single-instance Mongo/Redis** (RWO) = no datastore HA yet → accepted for now; revisit with RTV-45.
