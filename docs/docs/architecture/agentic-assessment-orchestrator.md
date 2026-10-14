@@ -189,6 +189,10 @@ erDiagram
 ## 5. API specification
 
 ### 5.1 A2A contract — the Node ⇄ Python seam (the new surface)
+- **Libraries (pinned, ADR-AGENT-02):** crew server = **`crewai[a2a]`** (bundles the official
+  **`a2a-sdk`**), exposed via **`A2AServerConfig`**; supervisor client = **`@a2a-js/sdk`** v1.0
+  (`ClientFactory → Client`). Both implement A2A **Spec v1.0** → wire-interop; no bespoke A2A code.
+  Transport = HTTP+JSON / JSON-RPC over the internal cluster network (gRPC is Node-only, unused).
 - **Agent Card:** `GET /.well-known/agent.json` on the crew service — advertises skill
   `assess-arrangement` (input/output schema, version).
 - **Task endpoint** (A2A `message/send`): request = `{ runId, arrangementId, clauses[], evidenceRefs[],
@@ -261,7 +265,16 @@ the cert thesis; *(C)* pure LangGraph subgraph, no CrewAI — fails the hard Cre
 service with no DB access. **Supersedes:** amends RTV-76's "no second runtime / no CrewAI" non-goals;
 **preserves** its "deterministic routing / no ReAct / human-gated" constraints.
 
-> Index this ADR in the product [Solution Architecture](./solution-architecture.md) §Decision log.
+**ADR-AGENT-02 — A2A libraries (official SDKs, Spec v1.0).** *Status: Accepted (2026-10-14).*
+**Context:** the Node↔Python seam needs a real A2A implementation on both ends, not a bespoke HTTP call.
+**Decision:** crew server = **`crewai[a2a]`** (bundles the official **`a2a-sdk`**), exposed with
+**`A2AServerConfig`** (CrewAI has first-class A2A server+client since v0.80); supervisor client =
+**`@a2a-js/sdk`** v1.0 (`ClientFactory → Client`, Apache-2.0, actively maintained). Both implement A2A
+**Spec v1.0** → guaranteed wire-interop; transport HTTP+JSON/JSON-RPC over the internal network (gRPC is
+Node-only, unused). **Why:** no hand-rolled server/client; CrewAI exposes the crew with a config block.
+**Consequences:** the crew side is unblocked with zero bespoke A2A code (resolves the RTV-79 gate concern).
+
+> Index these ADRs in the product [Solution Architecture](./solution-architecture.md) §Decision log.
 
 ---
 

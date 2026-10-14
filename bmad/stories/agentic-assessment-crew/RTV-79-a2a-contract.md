@@ -21,6 +21,9 @@ against a pinned interface and an **L3 contract test** fails the build on drift.
 
 ## Context / constraints
 
+- **A2A libs pinned (ADR-AGENT-02):** crew server = **`crewai[a2a]`** (bundles official **`a2a-sdk`**)
+  via **`A2AServerConfig`**; supervisor client = **`@a2a-js/sdk`** v1.0 (`ClientFactory → Client`). Both
+  A2A **Spec v1.0** → wire-interop; the Agent Card + task schema below are pinned against Spec v1.0.
 - A2A **cluster-internal only** (no Ingress); source pinned to `retrieva-backend` by netpol + a
   short-lived service-token header. **Idempotency key = `runId + node`** (a retried delegation never double-writes).
 - Contract-first: this story ships the **schema + a mock**, not the real crew (RTV-81) or the service (RTV-80).

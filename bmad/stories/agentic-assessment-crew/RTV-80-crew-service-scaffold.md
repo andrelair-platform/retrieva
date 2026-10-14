@@ -22,6 +22,9 @@ home before its reasoning is built (RTV-81).
 
 ## Context / constraints
 
+- **A2A libs (ADR-AGENT-02):** install **`crewai[a2a]`** (bundles official **`a2a-sdk`**); expose the
+  crew as an A2A server via **`A2AServerConfig`** (no hand-rolled server). Spec v1.0 — interops with the
+  supervisor's `@a2a-js/sdk` client.
 - **New member repo** of the Retrieva product (board #2) — **make it public** so org CI/Kargo secrets
   inherit (`ci-registry.md`: private repos don't get org secrets). Standardise per `conventions.md`
   (README/LICENSE/CONTRIBUTING, About panel, release-please).
