@@ -23,6 +23,8 @@ trustworthy enough for a human to approve.
 
 ## Context / constraints
 
+- **Built on `crewai[a2a]`** (ADR-AGENT-02): the crew is CrewAI agents exposed via `A2AServerConfig`
+  (RTV-80); this story fills the `assess-arrangement` skill body — the three role-agents + their flow.
 - Implements the RTV-79 `assess-arrangement` A2A skill inside the RTV-80 service. **This is the only
   place autonomy lives** — bounded to this crew; its output is **proposed**, never authoritative (the
   supervisor's human gate, RTV-82, decides).
