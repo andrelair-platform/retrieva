@@ -144,7 +144,8 @@
       "settings": "Settings",
       "concentration": "Concentration",
       "decisionInbox": "Decision Inbox",
-      "assessmentWorkspace": "Assessment Workspace"
+      "assessmentWorkspace": "Assessment Workspace",
+      "approvalCenter": "Approval Center"
     },
     "titles": {
       "riskRegister": "Risk Register",
