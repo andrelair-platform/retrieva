@@ -101,6 +101,7 @@ promotes dev→prod via a **CODEOWNERS-gated PR** → **ArgoCD** reconciles
 | identity ([minicloud-gitops ADR](https://github.com/andrelair-platform/minicloud-gitops/blob/main/docs/identity-two-layer.md)) | Retrieva ships **own JWT auth**; platform workforce = Authentik | Accepted | SA/SEC |
 | ADR-AGENT-01 ([agentic-assessment-orchestrator](./agentic-assessment-orchestrator) §8) | deterministic LangGraph supervisor + a **CrewAI crew over A2A**, human-gated (Path A — amends RTV-76, keeps determinism) — RTV-77 | Accepted | SA/TL |
 | ADR-AGENT-02 ([agentic-assessment-orchestrator](./agentic-assessment-orchestrator) §8) | A2A libs: **`crewai[a2a]`/`a2a-sdk`** (crew server) + **`@a2a-js/sdk`** (supervisor client), Spec v1.0 — RTV-79 | Accepted | SA/TL |
+| ADR-AGENT-03 ([agentops-hitl-workspace](./agentops-hitl-workspace) §7) | **AgentOps HITL frontend** — first-class Approval Center, separated run/approval state machines, socket.io transport, backend-owned resume — RTV-84 | Accepted | SA/TL |
 
 ## 8. Risks / trade-offs
 - **Single-instance Mongo/Redis** (RWO) = no datastore HA yet → accepted for now; revisit with RTV-45.
