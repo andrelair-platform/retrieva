@@ -143,7 +143,8 @@
       "history": "History",
       "settings": "Settings",
       "concentration": "Concentration",
-      "decisionInbox": "Decision Inbox"
+      "decisionInbox": "Decision Inbox",
+      "assessmentWorkspace": "Assessment Workspace"
     },
     "titles": {
       "riskRegister": "Risk Register",
