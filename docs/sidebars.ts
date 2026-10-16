@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
         'architecture/overview',
         'architecture/solution-architecture',
         'architecture/agentic-assessment-orchestrator',
+        'architecture/agentops-hitl-workspace',
         'architecture/rag-pipeline',
         'architecture/assessment-engine',
         'architecture/semantic-chunking',
