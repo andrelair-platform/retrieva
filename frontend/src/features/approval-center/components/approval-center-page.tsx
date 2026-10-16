@@ -17,6 +17,7 @@ import {
   type RunApproval,
 } from '@/features/approval-center/api/approvals';
 import { useApprovalsQuery, useDecideApprovalMutation } from '@/features/approval-center/queries/use-approvals';
+import { useRunUpdates } from '@/shared/realtime/use-run-updates';
 
 const GATE_LABEL: Record<string, string> = {
   confirm_arrangement: 'Confirm the proposed arrangement',
@@ -44,6 +45,7 @@ function Evidence({ approval }: { approval: RunApproval }) {
 }
 
 export function ApprovalCenterPage() {
+  useRunUpdates(); // live push (falls back to polling if the socket can't connect)
   const [mine, setMine] = useState(false);
   const { data: approvals, isLoading } = useApprovalsQuery(mine);
   const decide = useDecideApprovalMutation();
