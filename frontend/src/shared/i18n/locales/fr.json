@@ -143,7 +143,8 @@
       "history": "Historique",
       "settings": "Paramètres",
       "concentration": "Concentration",
-      "decisionInbox": "Boîte de décision"
+      "decisionInbox": "Boîte de décision",
+      "assessmentWorkspace": "Espace d'évaluation"
     },
     "titles": {
       "riskRegister": "Registre des risques",
