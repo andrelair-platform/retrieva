@@ -144,7 +144,8 @@
       "settings": "Paramètres",
       "concentration": "Concentration",
       "decisionInbox": "Boîte de décision",
-      "assessmentWorkspace": "Espace d'évaluation"
+      "assessmentWorkspace": "Espace d'évaluation",
+      "approvalCenter": "Centre d'approbation"
     },
     "titles": {
       "riskRegister": "Registre des risques",
