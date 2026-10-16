@@ -19,6 +19,7 @@ import {
   useAssessmentRunsQuery,
   useStartRunMutation,
 } from '@/features/assessment-runs/queries/use-assessment-runs';
+import { useRunUpdates } from '@/shared/realtime/use-run-updates';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -86,6 +87,7 @@ function RunStages({ run }: { run: AssessmentRun }) {
 }
 
 export function AssessmentRunsPage() {
+  useRunUpdates(); // live push (falls back to polling if the socket can't connect)
   const { data: runs, isLoading } = useAssessmentRunsQuery();
   const startRun = useStartRunMutation();
   const [arrangementId, setArrangementId] = useState('');
