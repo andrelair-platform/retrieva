@@ -109,6 +109,13 @@ docker compose down -v && docker compose up   # full clean reset (wipes volumes)
 
 ## Architecture
 
+![Retrieva — C4 container view](docs/static/img/architecture/retrieva-container.png)
+
+> **C4 container view**, generated from code ([`docs/diagrams/retrieva_container.py`](docs/diagrams/retrieva_container.py) — mingrammer `diagrams` + Graphviz). Full write-up: **[Solution Architecture → C4 Container](https://andrelair-platform.github.io/retrieva/architecture/solution-architecture)**.
+
+<details>
+<summary>Text view</summary>
+
 ```
             ┌──────────────┐            ┌──────────────┐
  Reviewer ─▶│   Frontend   │ ── API ──▶ │   Backend    │   (this repo)   (retrieva-backend)
@@ -122,6 +129,8 @@ docker compose down -v && docker compose up   # full clean reset (wipes volumes)
           │ (Drizzle)  │ │ (vectors)  │ │ (queue)    │ │ (LLM+embed)│
           └────────────┘ └────────────┘ └────────────┘ └────────────┘
 ```
+
+</details>
 
 **Gap analysis:** `upload → BullMQ worker → parse → chunk → embed (bge-m3) → Qdrant → LLM gap analysis → structured report`
 **RAG Q&A:** `question → multi-query + HyDE → Qdrant (k=15) → cross-encoder re-rank (RRF) → LLM answer + citations`
