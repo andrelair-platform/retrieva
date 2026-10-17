@@ -274,6 +274,24 @@ service with no DB access. **Supersedes:** amends RTV-76's "no second runtime / 
 Node-only, unused). **Why:** no hand-rolled server/client; CrewAI exposes the crew with a config block.
 **Consequences:** the crew side is unblocked with zero bespoke A2A code (resolves the RTV-79 gate concern).
 
+**Amendment (2026-10-17, RTV-81b live QA gate) — the supervisor calls the crew via a direct JSON-RPC
+`message/send`, NOT `@a2a-js/sdk`.** The "guaranteed wire-interop" assumption did **not** hold in
+practice: the shipped crew runs `a2a-sdk` **0.3.x** (via `crewai[a2a]`), and `@a2a-js/sdk` **v1.3** does
+not interoperate with it. Empirically, against the live dev crew:
+(1) its `ClientFactory.createFromUrl` can't build a client — it reads `agentCard.supportedInterfaces`,
+but the a2a-sdk card advertises the older `preferredTransport` + top-level `url` (no
+`supportedInterfaces`) → **"No compatible transport found"**;
+(2) even constructing the transport directly and forcing `legacyCompat`, the client emits a method the
+crew rejects (**`-32601 Method not found`**), whereas a raw **`message/send`** reaches the executor.
+**Decision (amended):** the supervisor client is a **thin, direct JSON-RPC 2.0 `message/send` POST**
+over the standard A2A wire (a DataPart message), with the shared Zod/JSON-Schema contract still
+validated on both ends. This is deterministic, version-independent, fully unit-testable (injectable
+fetch), and still *the A2A protocol* — only without the SDK's broken version-negotiation layer. The
+`@a2a-js/sdk` dependency was removed. *The QA gate also surfaced three crew-runtime defects fixed the
+same day: no writable `$HOME`, a malformed CA bundle forced onto `SSL_CERT_FILE` (`[X509] PEM lib`),
+and CrewAI's sync `kickoff()` invoked inside the async A2A executor's event loop (fixed with
+`asyncio.to_thread`).*
+
 > Index these ADRs in the product [Solution Architecture](./solution-architecture.md) §Decision log.
 
 ---
