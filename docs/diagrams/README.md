@@ -19,7 +19,9 @@ The image lands in the Docusaurus `static/` tree, so the site serves it at
 
 ## Files
 
+- `retrieva_overview.py` — high-level **Architecture Overview** (layered: frontend → API → capability services → workers → datastores → governed AI platform). Embedded on the docs landing page (`docs/intro.md`).
 - `retrieva_container.py` — C4 **container** view (frontend, backend, workers, datastores, governed AI platform).
+- `embed-svg-images.py` — post-process step that inlines icon PNGs as base64 so the SVGs render standalone. **Run it after regenerating any diagram.**
 - `icons/` — brand PNGs for components with no built-in `diagrams` icon (Qdrant, Langfuse, Authentik, Ollama, BullMQ).
 
 To add a brand icon: drop a transparent PNG in `icons/` and pass `icon="name.png"` to `node()`.

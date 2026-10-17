@@ -119,7 +119,8 @@ C4Context
   Rel(be, crew, "delegate assessment", "A2A (internal)")
   Rel(crew, litellm, "LLM calls")
   Rel(crew, qdrant, "retrieve evidence")
-  Rel(be, lf, "traces"); Rel(crew, lf, "spans")
+  Rel(be, lf, "traces")
+  Rel(crew, lf, "spans")
 ```
 
 *Alt text: the compliance owner talks only to retrieva-backend; the backend delegates the assessment

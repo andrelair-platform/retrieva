@@ -34,8 +34,8 @@ The platform was built across four delivery phases:
 ### Intelligent RAG Pipeline
 
 ```
-User Question → Intent Classification → Retrieval Strategy → Document Retrieval
-     → Reranking → Context Compression → LLM Generation → Answer Validation
+User Question → Query Rephrasing → Vector Retrieval → Dedup + Reranking
+     → Context Compression → LLM Generation → Answer Validation (LLM judge)
 ```
 
 ### DORA Gap Analysis
@@ -62,27 +62,27 @@ A BullMQ repeatable job runs every 24 hours and sends email alerts to workspace 
 
 | Sheet | Content |
 |-------|---------|
-| RT.01.01 | Institution summary + vendor counts by criticality tier |
-| RT.02.01 | One row per vendor with contract, country, service type, tier, scores |
-| RT.03.01 | One row per certification per vendor |
-| RT.04.01 | One row per DORA gap from the latest complete assessment |
+| RT.01.01 Summary | Institution summary + vendor counts by criticality tier |
+| RT.02.01 ICT Providers | One row per vendor with contract, country, service type, tier, scores |
+| RT.03.01 Certifications | One row per certification per vendor |
+| RT.04.01 Gap Summary | One row per DORA gap from the latest complete assessment |
 
 ### Multi-Layer Security
 
 - JWT-based authentication with refresh tokens
-- Workspace-level authorization (RBAC — owner, admin, member, viewer)
-- Database-level tenant isolation
-- LLM output guardrails and hallucination detection
-- Encrypted OAuth tokens at rest
+- Workspace-level authorization (RBAC — owner, member, viewer)
+- Database-level tenant isolation (every query scoped to the caller's workspace)
+- LLM output guardrails and confidence-based hallucination blocking (+ PII scanning)
+- AES-256-GCM field-level encryption for sensitive data at rest
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Backend | Express 5, Node.js 20+ |
-| AI Orchestration | LangChain (LCEL chains, prompts, parsers) |
-| LLM | Ollama Cloud (default, 3-key rotation via LangChain `withFallbacks`); pluggable to OpenAI / Anthropic / Groq via `LLM_<purpose>_PROVIDER` |
-| Embeddings | Self-hosted Ollama `bge-m3:latest` (1024-dim, 8192-token context); OpenAI `text-embedding-3-small` fallback |
+| AI Orchestration | LangChain (LCEL chains, prompts, parsers) + LangGraph (agentic assessment orchestration) |
+| LLM | All calls routed through the **LiteLLM** gateway (OpenAI-compatible `/v1`); the gateway owns provider routing (Ollama Cloud, Azure OpenAI, Bedrock…), key rotation, retries/fallbacks, PII masking and budgets. Model/intent alias chosen per purpose via `LLM_MODEL` / `LLM_<purpose>_MODEL` |
+| Embeddings | Self-hosted Ollama `bge-m3:latest` (1024-dim, 8192-token context); OpenAI `text-embedding-3-small` cloud fallback |
 | Vector Store | Qdrant |
 | Database | PostgreSQL (Drizzle ORM) |
 | Cache / Queue | Redis, BullMQ |
@@ -94,23 +94,13 @@ A BullMQ repeatable job runs every 24 hours and sends email alerts to workspace 
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Frontend (Next.js 16)                      │
-│  Assessments · Questionnaires · Copilot · Analytics             │
-├─────────────────────────────────────────────────────────────────┤
-│                    API Gateway (Express 5)                      │
-├──────────────┬──────────────┬──────────────┬───────────────────┤
-│   RAG        │  Assessment  │ Questionnaire│   Workspace /     │
-│   Service    │  Service     │  Service     │   Export Service  │
-├──────────────┴──────────────┴──────────────┴───────────────────┤
-│              Background Workers (BullMQ)                        │
-│  assessment · questionnaire · monitoring (24h alerts)           │
-├──────────────┬──────────────┬──────────────────────────────────┤
-│   Qdrant     │  PostgreSQL  │           Redis                  │
-│   (Vectors)  │   (Data)     │       (Cache / Queue)            │
-└──────────────┴──────────────┴──────────────────────────────────┘
-```
+[![Retrieva architecture overview](/img/architecture/retrieva-overview.svg)](/img/architecture/retrieva-overview.svg)
+
+*Browser (SSO) → Next.js frontend → Express 5 API (JWT · RBAC · per-workspace isolation) → capability
+services (RAG/Copilot, Assessment, Questionnaire, RoI export) and BullMQ workers (ingest, questionnaire,
+24h monitoring) → datastores (Qdrant vectors · PostgreSQL · Redis). All LLM/embedding calls go through
+the governed **LiteLLM** gateway, traced in **Langfuse**. The diagram is [generated from code](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_overview.py)
+so it never drifts. For the detailed C4 container view, see [Architecture → Solution Architecture](/architecture/solution-architecture).*
 
 ## Quick Links
 
