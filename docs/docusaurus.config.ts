@@ -71,6 +71,12 @@ const config: Config = {
           label: 'API Reference',
         },
         {
+          type: 'docSidebar',
+          sidebarId: 'certificationSidebar',
+          position: 'left',
+          label: 'Certification',
+        },
+        {
           href: 'https://github.com/AndreLiar/Retrieva',
           label: 'GitHub',
           position: 'right',
