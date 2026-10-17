@@ -39,6 +39,16 @@ Langfuse + the controller MinIO (media) — enforced by a **default-deny egress 
 
 ## 3. C4 — Container (the pieces, one cluster)
 
+The view below is **generated from code** — [`docs/diagrams/retrieva_container.py`](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_container.py)
+(mingrammer `diagrams` + Graphviz). Edit the `.py` and re-run to refresh — no hand-drawn drift.
+It shows the **target** datastore (PostgreSQL, post-RTV-45) and Authentik SSO as *planned* (today the
+backend uses its own JWT auth). [Full-resolution SVG →](pathname:///img/architecture/retrieva-container.svg)
+
+[![Retrieva C4 container view](pathname:///img/architecture/retrieva-container.svg)](pathname:///img/architecture/retrieva-container.svg)
+
+<details>
+<summary>Text version</summary>
+
 ```
  ingress-nginx (retrieva.online via Cloudflare tunnel; retrieva-dev.* via Tailscale)
    │  /api,/socket.io → backend   │  / → frontend
@@ -50,6 +60,9 @@ Langfuse + the controller MinIO (media) — enforced by a **default-deny egress 
    ├─ Qdrant (ai ns) — per-tenant vector collection
    └─ LiteLLM gateway (ai ns) — generation + embeddings (EU/governed)
 ```
+
+</details>
+
 Detail: [overview](./overview) · [rag-pipeline](./rag-pipeline) · [multi-tenancy](./multi-tenancy) ·
 [concentration-graph](./concentration-graph) · [ai-infrastructure](./ai-infrastructure).
 
