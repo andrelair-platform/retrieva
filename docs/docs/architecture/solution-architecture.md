@@ -42,9 +42,9 @@ Langfuse + the controller MinIO (media) — enforced by a **default-deny egress 
 The view below is **generated from code** — [`docs/diagrams/retrieva_container.py`](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_container.py)
 (mingrammer `diagrams` + Graphviz). Edit the `.py` and re-run to refresh — no hand-drawn drift.
 It shows the **target** datastore (PostgreSQL, post-RTV-45) and Authentik SSO as *planned* (today the
-backend uses its own JWT auth). [Full-resolution SVG →](pathname:///img/architecture/retrieva-container.svg)
+backend uses its own JWT auth). [Full-resolution SVG →](/img/architecture/retrieva-container.svg)
 
-[![Retrieva C4 container view](pathname:///img/architecture/retrieva-container.svg)](pathname:///img/architecture/retrieva-container.svg)
+[![Retrieva C4 container view](/img/architecture/retrieva-container.svg)](/img/architecture/retrieva-container.svg)
 
 <details>
 <summary>Text version</summary>
