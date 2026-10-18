@@ -71,26 +71,19 @@ This is the compliance checklist rendered on every vendor overview:
 4. **Contract review** (Art. 30) — verify all 12 mandatory clauses.
 5. **Set up monitoring** — certifications + next review for automated alerts.
 
-## LLM and embedding stack (corrected)
+## LLM and embedding stack
 
-:::note Stack correction
-Earlier docs and `CLAUDE.md` mention "Azure OpenAI `gpt-4o-mini` + `text-embedding-3-small`". **This is no longer accurate.** The code in `backend/config/llmProvider.js` and `backend/config/embeddingProvider.js` is authoritative.
-:::
+**LLM (generation)** — `backend/config/llmProvider.ts`:
 
-**LLM (generation)** — `backend/config/llmProvider.js`:
+- Retrieva is a **thin OpenAI-compatible client over the platform AI gateway (LiteLLM)** — it talks to **one** endpoint (`/v1`). There is a single provider: `LLM_PROVIDERS = { LITELLM: 'litellm' }`.
+- The **gateway** owns provider routing (Ollama Cloud, Azure OpenAI, Bedrock…), key rotation, retries + fallbacks, PII masking, budgets and EU governance — so the app carries **no** per-provider clients, no `OLLAMA_API_KEY_1/2/3`, and no LangChain `withFallbacks()` chain.
+- Callers pick a **model name / intent alias** per purpose (`chat` | `analysis` | `judge` | `formatter`) via `LLM_MODEL` / `LLM_<PURPOSE>_MODEL` — e.g. `tier-premium`, `tier-standard`, `ollama-cloud`. The gateway resolves the alias to the underlying model. (There is **no** `LLM_<purpose>_PROVIDER` env.)
+- Endpoint config: `LITELLM_BASE_URL` + `LITELLM_API_KEY` (a single key; legacy `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_KEY` accepted for cutover). See [LLM Model Selection](./architecture/llm-model-selection.md).
 
-- Default: **Ollama Cloud** (`https://ollama.com`) via `LLM_PROVIDER=ollama`.
-- 3-key rotation across `OLLAMA_API_KEY_1/2/3`, chained with LangChain `withFallbacks()` — if the active key rate-limits, the next is tried automatically.
-- Per-purpose overrides via `LLM_<PURPOSE>_PROVIDER` env (`chat` | `analysis` | `judge` | `formatter`) for routing different calls to different providers without changing global config.
-- Wired alternative providers: **OpenAI**, **Anthropic**, **Groq** (fast inference). Groq defaults: chat → `llama-3.3-70b-versatile` (better prompt-following for the rephrase chain), formatter/judge → `llama-3.1-8b-instant`.
-- **Azure is no longer in the wiring.**
+**Embeddings** — `backend/config/embeddingProvider.ts`:
 
-**Embeddings** — `backend/config/embeddingProvider.js`:
-
-- Provider: **self-hosted Ollama** (`EMBEDDING_PROVIDER=ollama`). Dev base `http://localhost:11434`; under `docker compose` the backend service overrides to `http://ollama:11434` (sidecar); in prod, run Ollama beside the API.
-- Model: **`bge-m3:latest`** (1024-dim, 8192-token context — drives the chunk-size ceiling).
-- Why separate from chat: **Ollama Cloud serves chat/generate but *not* the embeddings API** (returns `unauthorized`). Embeddings have to run on a self-hosted instance.
-- Fallback: OpenAI `text-embedding-3-small` if Ollama is unavailable.
+- Default: **self-hosted Ollama `bge-m3:latest`** (1024-dim, 8192-token context — drives the chunk-size ceiling); dev base `http://localhost:11434`, sidecar `http://ollama:11434` under compose.
+- **Cloud fallback**: OpenAI `text-embedding-3-small` — the embedding layer is hybrid, with explicit cloud-consent / trust-level governance deciding when the cloud path may be used (not a pure local-only mandate).
 
 ## Scope boundaries — what Retrieva deliberately does NOT do
 

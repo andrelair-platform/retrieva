@@ -37,47 +37,41 @@ backend/
 │   ├── vectorStore.js  # Qdrant setup
 │   ├── logger.js       # Winston logger
 │   └── guardrails.js   # LLM guardrails config
-├── controllers/        # Request handlers
-│   ├── ragController.js
-│   ├── authController.js
-│   ├── conversationController.js
-│   ├── workspaceController.js
-│   ├── assessmentController.js
-│   ├── questionnaireController.js
-│   ├── exportController.js       # RoI export
-│   └── analyticsController.js
-├── middleware/         # Express middleware
-│   ├── auth.js
-│   ├── loadWorkspace.js
-│   ├── workspaceAuth.js
-│   ├── rateLimiter.js
-│   ├── validate.js
-│   └── errorHandler.js
+├── controllers/        # Request handlers (TypeScript, .ts)
+│   ├── ragController.ts · authController.ts · conversationController.ts
+│   ├── workspaceController.ts · workspaceMemberController.ts
+│   ├── assessmentController.ts · assessmentRunController.ts · approvalController.ts
+│   ├── questionnaireController.ts · publicEvidenceController.ts
+│   ├── organizationController.ts · roleAssignmentController.ts · complianceController.ts
+│   ├── billingController.ts · healthController.ts
+│   └── (+ the TPRM-domain controllers: arrangements, register, concentration, decision-queue)
+├── middleware/         # Express middleware (.ts)
+│   ├── auth.ts · optionalAuth · vendorAuth.ts        # authn
+│   ├── loadWorkspace.ts · workspaceAuth.ts · setTenantContext · setEntityContext.ts   # tenant/entity scope
+│   ├── requireActivePlan.ts                          # plan gating (Stripe)
+│   ├── authRateLimiter.ts · ragRateLimiter.ts        # rate limiting
+│   ├── fileUpload.ts · validate.ts · securitySanitizer.ts
+│   └── (errorHandler is wired inline in app.ts)
 ├── db/
 │   ├── schema/          # Drizzle tables (User, Workspace, Assessment, VendorQuestionnaire…)
 │   ├── migrations/      # drizzle-kit SQL migrations (applied on boot)
 │   └── tenantContext.ts # AsyncLocalStorage tenant scope (entityScopeCondition)
 ├── repositories/drizzle/  # typed data access (replaces Mongoose models)
-├── routes/             # API routes
-│   ├── ragRoutes.js
-│   ├── authRoutes.js
-│   ├── conversationRoutes.js
-│   ├── workspaceRoutes.js        # /workspaces + /roi-export
-│   ├── assessmentRoutes.js
-│   ├── questionnaireRoutes.js
-│   └── analyticsRoutes.js
+├── routes/             # API routes (mounted under /api/v1 in app.ts)
+│   ├── ragRoutes · authRoutes · conversationRoutes
+│   ├── workspaceRoutes           # /workspaces + /roi-export
+│   ├── assessmentRoutes · assessmentRunRoutes · approvalRoutes
+│   ├── questionnaireRoutes (+ public) · evidence (+ public portal)
+│   ├── organizationRoutes · billingRoutes · complianceRoutes
+│   └── arrangement* · registerRoutes · concentrationRoutes · decisionQueueRoutes   # TPRM domain
 ├── services/           # Business logic
-│   ├── rag.js                    # Core RAG service
-│   ├── alertMonitorService.js    # Compliance monitoring alert checks
-│   ├── roiExportService.js       # EBA RoI XLSX workbook generator
-│   ├── emailService.js           # Resend email sending
-│   ├── notificationService.js    # Dual-channel notifications
-│   ├── deadLetterQueue.js        # Failed job tracking
-│   ├── intent/                   # Intent classification
-│   ├── rag/                      # RAG sub-modules
-│   ├── memory/                   # Conversation memory
-│   ├── context/                  # Context management
-│   └── metrics/                  # Observability
+│   ├── orchestrator/             # agentic assessment supervisor (LangGraph) + crew A2A client
+│   ├── decisionQueue/ · approvals (HITL) · intake/ (contract extraction, estate import)
+│   ├── registerProjectionService · roiExportService · controlLibraryService · lifecycle/
+│   ├── concentrationService · assessment/ (engine, findings→risk, risk lifecycle)
+│   ├── rag.ts + rag/ · QuestionnaireService · alertMonitorService
+│   ├── emailService · notificationService · billing (Stripe) · auditLogService
+│   └── memory/ · context/ · metrics/
 ├── utils/              # Utilities
 │   ├── core/           # Core utilities
 │   ├── rag/            # RAG utilities
@@ -162,14 +156,22 @@ export async function createServer() {
   // Rate limiting
   app.use(rateLimiter);
 
-  // Routes
-  app.use('/api/v1/rag', ragRoutes);
+  // Routes (representative — see app.ts for the full set)
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/organizations', organizationRoutes);
+  app.use('/api/v1/billing', billingRoutes);
+  app.use('/api/v1', ragRoutes);                      // /rag, /rag/stream
   app.use('/api/v1/conversations', conversationRoutes);
   app.use('/api/v1/workspaces', workspaceRoutes);     // includes /roi-export
   app.use('/api/v1/assessments', assessmentRoutes);
+  app.use('/api/v1/assessment-runs', assessmentRunRoutes);
+  app.use('/api/v1/approvals', approvalRoutes);
   app.use('/api/v1/questionnaires', questionnaireRoutes);
-  app.use('/api/v1/analytics', analyticsRoutes);
+  app.use('/api/v1/compliance', complianceRoutes);
+  app.use('/api/v1/concentration', concentrationRoutes);
+  app.use('/api/v1/register', registerRoutes);
+  app.use('/api/v1/decision-queue', decisionQueueRoutes);
+  app.use('/api/v1/arrangements', arrangementRoutes);
 
   // Health check
   app.get('/health', healthCheck);

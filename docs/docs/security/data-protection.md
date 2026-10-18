@@ -50,7 +50,7 @@ ENCRYPTION_KEY=your-32-byte-hex-key
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │  Vector Store Layer                                              │   │
+│   │  Vector Store Layer (Qdrant)                                     │   │
 │   │  • Mandatory workspaceId filter                                  │   │
 │   │  • All chunks tagged with workspace                              │   │
 │   │  • No cross-workspace queries possible                           │   │

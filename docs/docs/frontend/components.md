@@ -12,7 +12,6 @@ Reusable React components organized by feature and functionality.
 components/
 ├── chat/           # Chat feature components
 ├── layout/         # Layout structure
-├── analytics/      # Analytics dashboard
 ├── marketing/      # Public marketing components (PricingSection)
 ├── sources/        # Data source management (file, url, confluence, MCP)
 ├── providers/      # Context providers
@@ -191,63 +190,6 @@ export function WorkspaceSwitcher() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-```
-
-## Analytics Components
-
-### StatsCards
-
-Key metrics display.
-
-```tsx
-interface StatsCardsProps {
-  stats: {
-    totalQueries: number;
-    avgResponseTime: number;
-    userSatisfaction: number;
-    documentsIndexed: number;
-  };
-}
-```
-
-### UsageChart
-
-Query volume over time (Recharts).
-
-```tsx
-interface UsageChartProps {
-  data: {
-    date: string;
-    queries: number;
-  }[];
-  period: 'day' | 'week' | 'month';
-}
-```
-
-### FeedbackChart
-
-User feedback distribution.
-
-```tsx
-interface FeedbackChartProps {
-  positive: number;
-  negative: number;
-  neutral: number;
-}
-```
-
-### PopularQuestions
-
-Most frequently asked questions.
-
-```tsx
-interface PopularQuestionsProps {
-  questions: {
-    question: string;
-    count: number;
-    avgConfidence: number;
-  }[];
 }
 ```
 

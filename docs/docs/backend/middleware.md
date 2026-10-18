@@ -6,6 +6,14 @@ sidebar_position: 4
 
 Express middleware handles cross-cutting concerns like authentication, authorization, validation, and error handling.
 
+:::note Current middleware set
+Beyond the classics documented below, the live stack (see `app.ts`) also includes:
+**`optionalAuth`** (public/authenticated hybrid routes), **`vendorAuth`** (tokenised vendor-portal access),
+**`setTenantContext` + `setEntityContext`** (per-workspace / legal-entity isolation, AsyncLocalStorage),
+**`requireActivePlan`** (Stripe plan gating), and split rate limiters **`authRateLimiter`** / **`ragRateLimiter`**.
+Error handling is wired inline in `app.ts` rather than a standalone `errorHandler` module.
+:::
+
 ## Middleware Stack
 
 ```

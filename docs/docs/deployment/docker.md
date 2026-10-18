@@ -34,8 +34,9 @@ kept only as legacy illustration — prefer the repo's compose + the [Environmen
 │  └──────────────┬──────────────────────────────────────┬───────────┘          │
 │                 │                                        │                     │
 │  ┌──────────────┴──┐  ┌────────────┐          ┌────────┴────┐                │
-│  │    MongoDB      │  │   Redis    │          │   Qdrant    │                │
-│  │   Port: 27017   │  │ Port: 6378 │          │  Port: 6333 │                │
+│  │   PostgreSQL    │  │   Redis    │          │   Qdrant    │                │
+│  │   Port: 5432    │  │ Port: 6378 │          │  Port: 6333 │                │
+│  │  (Drizzle ORM)  │  │            │          │             │                │
 │  └─────────────────┘  └────────────┘          └─────────────┘                │
 │                                                                                │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -56,13 +57,13 @@ kept only as legacy illustration — prefer the repo's compose + the [Environmen
 │                               │                                          │
 │                  ┌────────────┼────────────┐                             │
 │                  │            │            │                             │
-│           ┌──────┴─────┐ ┌───┴────┐                                     │
-│           │   Qdrant   │ │ Redis  │                                     │
-│           │ Port: 6333 │ │Port:6379│                                     │
-│           │  1G limit  │ │256MB AOF│                                     │
-│           └────────────┘ └────────┘                                     │
+│           ┌──────┴─────┐ ┌───┴────┐ ┌────────────┐                      │
+│           │   Qdrant   │ │ Redis  │ │ PostgreSQL │                      │
+│           │ Port: 6333 │ │Port:6379│ │ Port: 5432 │                      │
+│           │  1G limit  │ │256MB AOF│ │(Drizzle ORM)│                     │
+│           └────────────┘ └────────┘ └────────────┘                      │
 │                                                                          │
-│   External: MongoDB Atlas (M0)                                           │
+│   Prod on minicloud k3s: PostgreSQL (CNPG) · not MongoDB Atlas          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 

@@ -44,10 +44,11 @@ Role-based access control (RBAC) and workspace-level permissions.
 
 ## Workspace Roles
 
+The workspace-membership enum (`db/schema/enums.ts` → `workspaceMemberRoleEnum`) has exactly three roles — there is **no** workspace `admin`. Administrative roles live at the organisation level (`org_admin` / `analyst` / `viewer`) and in the domain RBAC (`role_assignments`: `platform_admin`, `entity_admin`, `ict_risk_officer`, `legal`, `dpo`, `business_owner`, `auditor`, `viewer`, `vendor_contact`).
+
 | Role | Description | Use Case |
 |------|-------------|----------|
-| `owner` | Workspace creator | Full control |
-| `admin` | Administrator | Manage members, settings |
+| `owner` | Workspace creator / administrator | Full control (incl. manage members + settings) |
 | `member` | Regular member | Query, view sources |
 | `viewer` | Read-only | Query only |
 
@@ -65,14 +66,14 @@ const permissions = {
 
 ## Role-Permission Matrix
 
-| Permission | Owner | Admin | Member | Viewer |
-|------------|:-----:|:-----:|:------:|:------:|
-| canQuery | ✅ | ✅ | ✅ | ✅ |
-| canViewSources | ✅ | ✅ | ✅ | ❌ |
-| canInvite | ✅ | ✅ | ❌ | ❌ |
-| canManageSync | ✅ | ✅ | ❌ | ❌ |
-| canEditSettings | ✅ | ❌ | ❌ | ❌ |
-| Delete Workspace | ✅ | ❌ | ❌ | ❌ |
+| Permission | Owner | Member | Viewer |
+|------------|:-----:|:------:|:------:|
+| canQuery | ✅ | ✅ | ✅ |
+| canViewSources | ✅ | ✅ | ❌ |
+| canInvite | ✅ | ❌ | ❌ |
+| canManageSync | ✅ | ❌ | ❌ |
+| canEditSettings | ✅ | ❌ | ❌ |
+| Delete Workspace | ✅ | ❌ | ❌ |
 
 ## BOLA Protection
 
