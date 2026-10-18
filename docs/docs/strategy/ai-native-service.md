@@ -29,6 +29,34 @@ The gap to a *managed service* is therefore specific, not foundational: **autono
 enterprise source systems, **external continuous surveillance**, **exit-strategy automation**,
 **contract redlining**, and the **commercial/operating model**. That is the subject of the roadmap below.
 
+## How the two repos deliver it
+
+One picture of the whole service: raw client data on the left → the autonomous agents that turn it into
+DORA artefacts (the five pillars) → a **human-in-the-loop inbox of drafts** → the DORA analyst who signs
+off → the outcomes. The trust boundary is the inbox — **agents propose, the analyst disposes**; nothing
+is auto-applied.
+
+[![How the Retrieva AI-native service works](/img/architecture/retrieva-ai-native.svg)](/img/architecture/retrieva-ai-native.svg)
+
+The work is split across two repositories that collaborate over the **A2A** protocol:
+
+- **`retrieva-backend`** — the deterministic **TypeScript supervisor** that owns the rails. Each pillar
+  is an agent (discovery + completeness, the dynamic-DDQ/contradiction/follow-up loop, the Art-30
+  contract redliner + notice/price alerts, the exit-strategy agents, CTPP surveillance incl. CVE/OSV)
+  plus the **unified DORA score engine** (`0.6·gap + 0.4·ddq − risk penalty → GREEN/AMBER/RED`). Every
+  agent writes **draft** artefacts into the HITL inbox; nothing is applied without analyst sign-off.
+- **`retrieva-assessment-crew`** — the **CrewAI (Python)** multi-agent assessment crew. The supervisor
+  delegates the deep gap analysis to it via JSON-RPC `message/send` (the `assess-arrangement` skill,
+  byte-identical vendored schemas, gated by `CREW_A2A_ENABLED`), then maps the result back into the
+  arrangement graph.
+
+Both reason **only** through the governed AI platform — every call goes through the **LiteLLM** gateway
+(routing, fallbacks, PII masking) and is traced in **Langfuse** (session-stitched across the A2A hop).
+No model is ever called directly.
+
+> Diagram-as-code: [`docs/diagrams/retrieva_ai_native.py`](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_ai_native.py)
+> — regenerate with `python retrieva_ai_native.py && python embed-svg-images.py`.
+
 ## The operating model: AI + human expertise
 
 Three commitments distinguish the service from the tool:
