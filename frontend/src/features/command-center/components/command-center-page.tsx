@@ -108,7 +108,7 @@ export function CommandCenterPage() {
   const bandStyle = BAND_STYLES[posture.band];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-5 text-foreground sm:p-6">
       {/* ── Hero — dark mission-control band ───────────────────────────────────────────── */}
       <section className="relative overflow-hidden rounded-xl bg-sidebar px-6 py-7 text-sidebar-foreground shadow-sm sm:px-8 sm:py-9">
         <div

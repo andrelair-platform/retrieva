@@ -36,7 +36,7 @@ export function AgentSurfacePlaceholder({
   const items = Array.isArray(bullets) ? (bullets as string[]) : [];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-5 sm:p-6">
+    <div className="mx-auto max-w-4xl space-y-5 p-5 text-foreground sm:p-6">
       {/* Hero */}
       <section className="relative overflow-hidden rounded-xl bg-sidebar px-6 py-7 text-sidebar-foreground sm:px-8">
         <div
