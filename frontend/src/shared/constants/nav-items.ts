@@ -12,6 +12,11 @@ import {
   Inbox,
   Activity,
   Gavel,
+  LayoutDashboard,
+  Radar,
+  Radio,
+  DoorOpen,
+  FileSignature,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -28,19 +33,27 @@ export interface NavSection {
   items: NavItem[];
 }
 
-// Grouped navigation for the desktop sidebar
+// Grouped navigation for the desktop sidebar.
+// Job-based IA (redesign 2026-10): Overview → Monitor (always-on agents) → Assess → Govern →
+// Register → Intelligence. The Monitor + Govern sections surface the autonomous agents
+// (discovery, CTPP surveillance, exit strategy, contract redliner) that the backend runs.
 export const desktopNavSections: NavSection[] = [
   {
-    label: 'nav.sections.compliance',
+    label: 'nav.sections.overview',
+    items: [{ title: 'nav.items.commandCenter', href: '/overview', icon: LayoutDashboard }],
+  },
+  {
+    label: 'nav.sections.monitor',
     items: [
       { title: 'nav.items.decisionInbox', href: '/decision-inbox', icon: Inbox },
+      { title: 'nav.items.surveillance', href: '/surveillance', icon: Radar },
+      { title: 'nav.items.discovery', href: '/discovery', icon: Radio },
+    ],
+  },
+  {
+    label: 'nav.sections.assess',
+    items: [
       { title: 'nav.items.assessmentWorkspace', href: '/assessment-runs', icon: Activity },
-      { title: 'nav.items.approvalCenter', href: '/approvals', icon: Gavel },
-      { title: 'nav.items.arrangements', href: '/arrangements', icon: Network },
-      { title: 'nav.items.concentration', href: '/concentration', icon: Share2 },
-      { title: 'nav.items.register', href: '/register-of-information', icon: BookText },
-      { title: 'nav.items.riskRegister', href: '/risk-register', icon: BarChart3 },
-      { title: 'nav.items.vendors', href: '/workspaces', icon: Building2 },
       { title: 'nav.items.gapAnalysis', href: '/assessments', icon: ShieldCheck },
       {
         title: 'nav.items.questionnaires',
@@ -48,6 +61,24 @@ export const desktopNavSections: NavSection[] = [
         icon: ClipboardList,
         workspaceRoles: ['owner', 'member'],
       },
+      { title: 'nav.items.approvalCenter', href: '/approvals', icon: Gavel },
+    ],
+  },
+  {
+    label: 'nav.sections.govern',
+    items: [
+      { title: 'nav.items.riskRegister', href: '/risk-register', icon: BarChart3 },
+      { title: 'nav.items.exitStrategy', href: '/exit-strategy', icon: DoorOpen },
+      { title: 'nav.items.contractAmendments', href: '/contract-amendments', icon: FileSignature },
+    ],
+  },
+  {
+    label: 'nav.sections.register',
+    items: [
+      { title: 'nav.items.register', href: '/register-of-information', icon: BookText },
+      { title: 'nav.items.arrangements', href: '/arrangements', icon: Network },
+      { title: 'nav.items.concentration', href: '/concentration', icon: Share2 },
+      { title: 'nav.items.vendors', href: '/workspaces', icon: Building2 },
     ],
   },
   {
@@ -63,6 +94,8 @@ export const desktopNavSections: NavSection[] = [
 export const desktopMainNavItems: NavItem[] = desktopNavSections.flatMap((s) => s.items);
 
 export const mobileMainNavItems: NavItem[] = [
+  { title: 'nav.items.commandCenter', href: '/overview', icon: LayoutDashboard },
+  { title: 'nav.items.decisionInbox', href: '/decision-inbox', icon: Inbox },
   { title: 'nav.items.gapAnalysis', href: '/assessments', icon: ShieldCheck },
   {
     title: 'nav.items.questionnaires',

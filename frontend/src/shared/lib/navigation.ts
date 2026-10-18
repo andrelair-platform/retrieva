@@ -4,7 +4,7 @@ interface RouterLike {
 }
 
 export const LOGIN_ROUTE = '/login';
-export const APP_HOME_ROUTE = '/chat';
+export const APP_HOME_ROUTE = '/overview';
 export const MARKETING_HOME_ROUTE = '/';
 export const ONBOARDING_ROUTE = '/onboarding';
 
