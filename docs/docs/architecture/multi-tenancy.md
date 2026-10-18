@@ -306,10 +306,11 @@ export function buildQdrantFilter(filters, workspaceId) {
 
 ### Workspace Roles
 
+The workspace-membership enum (`db/schema/enums.ts` → `workspaceMemberRoleEnum`) has exactly three roles — there is **no** workspace-level `admin` (administrative roles live at the organisation level, `org_admin` / `analyst` / `viewer`, and in the domain RBAC — see [Authorization Model](./authorization-model.md)):
+
 | Role | Description | Permissions |
 |------|-------------|-------------|
-| `owner` | Workspace creator | All permissions |
-| `admin` | Administrator | Manage members, sync |
+| `owner` | Workspace creator / administrator | All permissions (incl. manage members + settings) |
 | `member` | Regular member | Query, view sources |
 | `viewer` | Read-only access | Query only |
 
@@ -335,13 +336,6 @@ const ROLE_PERMISSIONS = {
     canInvite: true,
     canManageSync: true,
     canEditSettings: true,
-  },
-  admin: {
-    canQuery: true,
-    canViewSources: true,
-    canInvite: true,
-    canManageSync: true,
-    canEditSettings: false,
   },
   member: {
     canQuery: true,
