@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'strategy/product-vision',
+        'strategy/ai-native-service',
         'strategy/product-maturity',
         'strategy/unit-economics',
         'strategy/defensibility-and-moat',
