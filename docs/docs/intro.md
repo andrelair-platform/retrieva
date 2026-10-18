@@ -42,18 +42,13 @@ and risk teams:
 
 ## How an assessment flows
 
-```
-Contract / estate import → AI-proposed arrangement (human-confirmed) → Register of Information
-        │
-        ▼
-Assessment run (LangGraph supervisor):  intake → [human gate] → gap analysis (CrewAI crew over A2A)
-        │                                              │                       → findings
-        ▼                                              ▼
-Decision inbox / Approval center  ◄── AI drafts findings & risks; a human approves/edits/rejects
-        │  (separation-of-duties, resumable via Postgres checkpointer, live-monitored over Socket.io)
-        ▼
-Register projection · Risk register · Concentration graph · EBA RT.01–RT.04 export
-```
+[![How a Retrieva assessment flows](/img/architecture/retrieva-assessment-flow.svg)](/img/architecture/retrieva-assessment-flow.svg)
+
+*Build the register (AI-proposed arrangement, human-confirmed) → run the deterministic **LangGraph
+supervisor** (`intake → human gate → gap analysis via a CrewAI crew over A2A → findings`, resumable via
+a Postgres checkpointer, traced in Langfuse) → a human decides in the **decision inbox / approval
+center** (separation-of-duties, live over Socket.io) → the register projection, risk register,
+concentration graph and EBA RT.01–RT.04 export. The diagram is [generated from code](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_assessment_flow.py).*
 
 ## Key features
 
