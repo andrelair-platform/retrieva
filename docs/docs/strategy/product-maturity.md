@@ -21,13 +21,20 @@ gatekeepers — not B2C volume, not a marketplace. The self-host option (RTV-44)
 |---|---|
 | 1. Idea / Discovery | **Done** — problem is *regulator-validated* (ESA 2024 dry run: 6.5% passed all Register checks; DORA mandatory). Strongest asset. |
 | 2. PoC | **Substantially done** — RAG + multimodal ingestion + LLMOps prove "AI over compliance documents" is feasible. |
-| 3. Prototype | **Partial** — landing/brand + working chat UI exist; the DORA *workflows* (triggers, Register, concentration graph) aren't prototyped as UX yet. |
-| 4. **MVP** | **Not reached** — the assess-an-arrangement engine is RTV-28→50, all still Todo. |
+| 3. Prototype | **Done** — the DORA workflows are built and live as UX: arrangements, assessment runs, decision inbox, approval center, register of information, concentration graph. |
+| 4. **MVP** | **Reached (TPRM v1 shipped)** — the assess-an-arrangement engine (RTV-28→50) is built: arrangement graph + evidence + Register + control library + the agentic, human-approved assessment engine. |
 
-**The mismatch to correct:** infrastructure is at ~stage-8 maturity (prod-grade GitOps/Kargo/
-observability, live on `retrieva.online`), but the **product core is pre-MVP**. Classic
-strong-engineer trap — over-invested in platform, under-invested in the domain. The RTV backlog is
-the road to MVP and is correctly sequenced; the fix is to build the domain core next.
+> **Update:** this ladder originally described the product as *pre-MVP* with RTV-28→50 "all Todo".
+> That backlog has since **shipped as TPRM v1** (agentic assessment runs + human-in-the-loop governance
+> + register/arrangements domain + concentration). The lines below are kept to show the original plan;
+> the status column reflects shipped reality. The current frontier is the **AI-native service** evolution
+> — see [AI-native TPRM service](./ai-native-service.md).
+
+**The mismatch that was corrected:** infrastructure reached ~stage-8 (prod-grade GitOps/Kargo/
+observability, live) *before* the domain core — the classic strong-engineer trap (over-invest in
+platform, under-invest in domain). That gap is now closed: the RTV domain backlog was executed and the
+assess-an-arrangement engine is live. The next investment is the autonomous-discovery + surveillance +
+exit-strategy work in the AI-native roadmap, not the original MVP core.
 
 ## The maturity ladder mapped to the backlog
 

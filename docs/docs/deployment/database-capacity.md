@@ -4,7 +4,11 @@ sidebar_position: 8
 
 # Database capacity planning
 
-Operational sizing of the MongoDB Atlas cluster powering Retrieva — current state, per-entity footprint, scenarios, and upgrade thresholds.
+:::warning Legacy — MongoDB era
+Retrieva's primary datastore **migrated from MongoDB/Mongoose to PostgreSQL + Drizzle ORM** (RTV-45–49), and prod runs PostgreSQL (CNPG) on the minicloud k3s cluster. This page sizes the **old MongoDB Atlas** setup and is kept as historical reference only; the methodology (per-entity footprint, scenarios, thresholds) still transfers, but the specific tiers/limits do **not** reflect the current PostgreSQL deployment. A PostgreSQL capacity plan supersedes it.
+:::
+
+Operational sizing of the (legacy) MongoDB Atlas cluster that formerly powered Retrieva — current state, per-entity footprint, scenarios, and upgrade thresholds.
 
 ## Current state (snapshot)
 
