@@ -16,27 +16,27 @@ How the AI parts of Retrieva fit together: the language-model layer, embeddings,
             ▼            ▼                    ▼                       ▼                  │
       LLM layer     Embedding layer      Vector store           Job queue (BullMQ)      │
    (per-purpose)   (bge-m3, 1024-dim)   (Qdrant)                (Redis)                  │
-   Ollama Cloud ─┐                       ├─ workspace coll. ──┐  ├─ fileIndex            │
-   Groq        ──┤  self-hosted Ollama   │  (tenant-filtered) │  ├─ gapAnalysis          │
-   OpenAI      ──┤  ── bge-m3 sidecar    └─ compliance_kb ────┘  ├─ scoreQuestionnaire   │
-   Anthropic   ──┘     (OpenAI fallback)    (shared DORA KB)     └─ monitoring/digest    │
+   LiteLLM        ─┐                      ├─ workspace coll. ──┐  ├─ fileIndex            │
+   gateway (/v1)   │  self-hosted Ollama  │  (tenant-filtered) │  ├─ gapAnalysis          │
+   model alias   ──┤  ── bge-m3 sidecar   └─ compliance_kb ────┘  ├─ scoreQuestionnaire   │
+   per purpose    ─┘     (OpenAI fallback)    (shared DORA KB)     └─ monitoring/digest    │
             └────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 1. Language-model layer
 
-A **provider factory** (`config/llmProvider.js`) selects a provider + model **per purpose**, so each workload runs on the right speed/quality/cost tier.
+Retrieva is a **thin OpenAI-compatible client over the platform AI gateway (LiteLLM)** — `config/llmProvider.ts`. It talks to **one** endpoint (`/v1`); the *gateway* owns provider routing (Ollama Cloud, Azure OpenAI, Bedrock…), key rotation, retries + fallbacks, PII masking, budgets and EU governance — so the app carries none of that. Callers pick a **model name / intent alias** per purpose; the gateway resolves it to the right underlying model.
 
-| Purpose | Used by | Default in production |
+| Purpose | Used by | Selected via |
 |---|---|---|
-| `chat` | RAG Q&A (`rag.js`) | Groq `llama-3.3-70b-versatile` (fast, streaming) |
-| `analysis` | gap analysis, contract review (`gapAnalysisAgent.js`) | global default → Ollama `gemma3:12b` |
-| `judge` | questionnaire scoring, eval | global default → Ollama `gemma3:12b` |
-| `formatter` | JSON shaping | Groq `llama-3.1-8b-instant` |
+| `chat` | RAG Q&A (`rag.ts`) | `LLM_CHAT_MODEL` → gateway alias (e.g. `tier-standard`) |
+| `analysis` | gap analysis, contract review (`gapAnalysisAgent.ts`) | `LLM_ANALYSIS_MODEL` → gateway alias (e.g. `tier-premium`) |
+| `judge` | questionnaire scoring, eval | `LLM_JUDGE_MODEL` → gateway alias |
+| `formatter` | JSON shaping | `LLM_FORMATTER_MODEL` → gateway alias |
 
-- **Default provider**: **Ollama Cloud** (`https://ollama.com`) with **3-key rotation** (`OLLAMA_API_KEY_1/2/3`) chained via LangChain `withFallbacks()` — when one key is rate-limited, the next is tried automatically.
-- **Pluggable** per purpose via env: `LLM_<purpose>_PROVIDER` / `LLM_<purpose>_MODEL` (providers: `ollama`, `groq`, `openai`, `anthropic`). The global default is `LLM_PROVIDER` / `LLM_MODEL`.
-- **Resilience**: key rotation + provider fallback + per-call timeouts (`LLM_INVOKE_TIMEOUT`, streaming timeouts).
+- **Single provider**: `LLM_PROVIDERS = { LITELLM: 'litellm' }`. There are no per-provider clients, no `OLLAMA_API_KEY_1/2/3`, and no LangChain `withFallbacks()` chain in the app — all of that moved into the gateway (`llmProvider.ts` header: *"replaces the former multi-provider factory … all redundant now that the gateway provides it centrally"*).
+- **Model selection** per purpose via env: `LLM_<PURPOSE>_MODEL` overrides the global `LLM_MODEL`. The **values are gateway model names / intent aliases** (`tier-premium` / `tier-standard` / `ollama-cloud` …), **not** raw provider+model and **not** `LLM_<purpose>_PROVIDER` (that env var no longer exists).
+- **Endpoint**: `LITELLM_BASE_URL` + `LITELLM_API_KEY` (a single key; legacy `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_KEY` are accepted for cutover). Resilience (key rotation, `num_retries`, fallbacks) is the gateway's responsibility; the app keeps only per-call timeouts.
 
 ## 2. Embedding layer
 
