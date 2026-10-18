@@ -32,7 +32,6 @@ frontend/
 │   ├── components/
 │   │   ├── chat/               # Chat feature components
 │   │   ├── layout/             # Layout components (sidebar, header)
-│   │   ├── analytics/          # Analytics dashboard
 │   │   ├── marketing/          # Public marketing components (pricing, etc.)
 │   │   ├── providers/          # Context providers
 │   │   ├── common/             # Shared components
@@ -109,7 +108,7 @@ frontend/
 | `/copilot` | DORA compliance AI copilot (Q&A) | All members |
 | `/sources` | Data sources hub (files, Confluence, URLs) | Owner/Member |
 | `/conversations` | Conversation history | All members |
-| `/analytics` | Usage analytics | Owner/Member |
+| `/arrangements` · `/assessment-runs` · `/approvals` · `/decision-inbox` · `/concentration` · `/risk-register` · `/register-of-information` · `/evidence` | DORA TPRM domain (register, agentic runs, HITL governance, concentration, risk) | All members |
 | `/members` | Member management | Owner only |
 | `/workspaces` | Workspace management | All members |
 | `/notifications` | Notifications | All members |

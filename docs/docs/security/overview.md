@@ -113,9 +113,9 @@ The platform addresses the [OWASP Top 10 for LLM Applications](https://owasp.org
 
 ### Data Protection
 
-- AES-256-GCM encryption for sensitive tokens (OAuth access tokens, API keys)
+- AES-256-GCM field-level encryption for sensitive data at rest (PII, secrets); JWT refresh tokens are stored SHA-256-hashed, not reversibly encrypted
 - Tenant isolation at database level
-- Mandatory workspace filter on vector queries
+- Mandatory workspace filter on vector queries (Qdrant)
 - No cross-tenant data access
 
 ### LLM Security
