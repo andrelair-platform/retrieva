@@ -130,7 +130,12 @@
   "nav": {
     "sections": {
       "compliance": "Conformité",
-      "intelligence": "Intelligence"
+      "intelligence": "Intelligence",
+      "overview": "Vue d'ensemble",
+      "monitor": "Surveiller",
+      "assess": "Évaluer",
+      "govern": "Gouverner",
+      "register": "Registre"
     },
     "items": {
       "arrangements": "Arrangements",
@@ -145,7 +150,12 @@
       "concentration": "Concentration",
       "decisionInbox": "Boîte de décision",
       "assessmentWorkspace": "Espace d'évaluation",
-      "approvalCenter": "Centre d'approbation"
+      "approvalCenter": "Centre d'approbation",
+      "commandCenter": "Centre de pilotage",
+      "surveillance": "Surveillance",
+      "discovery": "Découverte",
+      "exitStrategy": "Stratégie de sortie",
+      "contractAmendments": "Avenants contractuels"
     },
     "titles": {
       "riskRegister": "Registre des risques",
@@ -162,7 +172,13 @@
       "vendorDetail": "Détail du fournisseur",
       "conversation": "Conversation",
       "questionnaire": "Questionnaire",
-      "concentration": "Concentration"
+      "concentration": "Concentration",
+      "commandCenter": "Centre de pilotage",
+      "decisionInbox": "File de décision",
+      "surveillance": "Surveillance",
+      "discovery": "Découverte",
+      "exitStrategy": "Stratégie de sortie",
+      "contractAmendments": "Avenants contractuels"
     }
   },
   "riskRegister": {
@@ -1402,5 +1418,95 @@
       "deleteConfirmDesc": "Cette action est irréversible. Elle supprimera définitivement l'espace de travail « {{name}} » et toutes les données associées, y compris les conversations, documents et accès des membres.",
       "deleteWsAction": "Supprimer l'espace de travail"
     }
+  },
+  "commandCenter": {
+    "kicker": "Votre risque tiers DORA, en direct",
+    "subtitle": "Des agents autonomes découvrent, évaluent, surveillent et rapportent — vous validez et signez.",
+    "posture": {
+      "title": "Posture de risque",
+      "subtitle": "Depuis votre file de décision",
+      "clear": "Tout est clair",
+      "clearHint": "Aucun risque ouvert ni constat en attente de décision.",
+      "needsReview": "{{count}} en attente de votre décision",
+      "critical": "Critique",
+      "high": "Élevé",
+      "medium": "Moyen",
+      "low": "Faible",
+      "findings": "Constats provisoires",
+      "risks": "Risques ouverts"
+    },
+    "needsYou": {
+      "title": "Ce qui vous attend",
+      "subtitle": "Par urgence décroissante",
+      "empty": "Rien dans votre file — les agents y feront remonter le travail.",
+      "viewAll": "Ouvrir la file de décision",
+      "finding": "Constat provisoire",
+      "risk": "Risque ouvert",
+      "review": "Examiner"
+    },
+    "agents": {
+      "title": "Vos agents permanents",
+      "subtitle": "Exécutés sur la plateforme ; les brouillons arrivent dans votre file — rien n’est appliqué automatiquement.",
+      "discovery": {
+        "name": "Découverte",
+        "desc": "Repère les prestations TIC de tiers dans vos systèmes sources et propose des entrées au registre."
+      },
+      "surveillance": {
+        "name": "Surveillance TIC critiques",
+        "desc": "Suit les incidents fournisseurs et les CVE, évalue l’impact et cartographie le rayon d’exposition."
+      },
+      "ddq": {
+        "name": "Due diligence & DDQ",
+        "desc": "Construit des questionnaires adaptés au palier, note les réponses et détecte les contradictions avec les preuves."
+      },
+      "redliner": {
+        "name": "Rédaction d’avenants",
+        "desc": "Rédige les avenants Art. 30 pour les clauses DORA manquantes et suit les fenêtres de préavis/prix."
+      },
+      "exit": {
+        "name": "Stratégie de sortie",
+        "desc": "Propose des substituts, rédige des plans de sortie et modélise la réinternalisation des fonctions critiques."
+      },
+      "score": {
+        "name": "Moteur de score DORA",
+        "desc": "Recalcule une note VERT/AMBRE/ROUGE par fournisseur à partir des écarts, questionnaires et risques ouverts."
+      },
+      "open": "Ouvrir",
+      "live": "Actif"
+    },
+    "quick": {
+      "title": "Reprendre",
+      "newAssessment": "Nouvelle évaluation",
+      "register": "Registre d’information",
+      "vendors": "Fournisseurs",
+      "askAi": "Interroger le copilote"
+    }
+  },
+  "agentSurface": {
+    "badge": "Agent permanent",
+    "hitl": "Les agents proposent, vous décidez. Tout ce que produit cet agent arrive en brouillon dans votre file de décision — rien n’est appliqué sans votre validation.",
+    "openInbox": "Ouvrir la file de décision",
+    "whatItDoes": "Ce qu’il fait",
+    "comingSoon": "Une vue dédiée est prévue. Aujourd’hui cet agent s’exécute en continu sur la plateforme et fait remonter ses résultats dans votre file de décision et le registre d’information.",
+    "surveillance": [
+      "Surveille les pages de statut et les flux d’incidents des fournisseurs.",
+      "Interroge OSV.dev pour les nouvelles CVE touchant les logiciels de chaque fournisseur suivi.",
+      "Évalue l’impact et cartographie le rayon d’exposition dans votre graphe de prestations."
+    ],
+    "discovery": [
+      "Balaie les systèmes sources connectés (Entra ID, registres SaaS, imports) à la recherche de TIC tierces.",
+      "Normalise les découvertes et propose des entrées au registre d’information.",
+      "Signale les prestations non encore suivies, avec un score de confiance."
+    ],
+    "exitStrategy": [
+      "Propose des fournisseurs de substitution vérifiés (votre registre + un catalogue curaté + l’IA).",
+      "Rédige un plan de sortie par phases avec portabilité des données et exécution en parallèle.",
+      "Modélise le coût et la difficulté de réinternalisation de chaque fonction critique ou importante."
+    ],
+    "contractAmendments": [
+      "Détecte les clauses DORA Art. 30 manquantes ou faibles dans vos contrats.",
+      "Rédige les avenants en redline pour combler chaque écart.",
+      "Suit les préavis et les fenêtres de révision tarifaire pour ne manquer aucune échéance."
+    ]
   }
 }

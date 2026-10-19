@@ -12,6 +12,12 @@ import { useUIStore } from '@/lib/stores/ui-store';
 
 // Maps route prefixes/exact paths to i18n title keys (resolved with t() below)
 const PAGE_TITLES: Record<string, string> = {
+  '/overview': 'nav.titles.commandCenter',
+  '/decision-inbox': 'nav.titles.decisionInbox',
+  '/surveillance': 'nav.titles.surveillance',
+  '/discovery': 'nav.titles.discovery',
+  '/exit-strategy': 'nav.titles.exitStrategy',
+  '/contract-amendments': 'nav.titles.contractAmendments',
   '/risk-register': 'nav.titles.riskRegister',
   '/workspaces': 'nav.titles.vendors',
   '/assessments': 'nav.titles.gapAnalysis',

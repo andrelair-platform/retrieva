@@ -54,7 +54,7 @@ export function Sidebar() {
         )}
       >
         {!sidebarCollapsed && (
-          <Link href="/assessments" className="flex items-center gap-2.5 min-w-0">
+          <Link href="/overview" className="flex items-center gap-2.5 min-w-0">
             <ShieldCheck className="h-5 w-5 shrink-0 text-sidebar-primary" />
             <span className="font-display text-lg font-semibold text-sidebar-foreground tracking-tight truncate">
               Retrieva

@@ -47,7 +47,7 @@ export default function LoginPage() {
 
   const completeLogin = (user: Parameters<typeof setUser>[0]) => {
     setUser(user);
-    router.push('/chat');
+    router.push('/overview');
   };
 
   const onSubmit = async (data: LoginFormData) => {
