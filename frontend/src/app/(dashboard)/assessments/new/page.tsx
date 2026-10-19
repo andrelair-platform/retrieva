@@ -19,6 +19,7 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Form,
   FormControl,
@@ -165,19 +166,18 @@ export default function NewAssessmentPage() {
         {t('assessments.form.back')}
       </Button>
 
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {framework === 'CONTRACT_A30'
+      <PageHeader
+        title={
+          framework === 'CONTRACT_A30'
             ? t('assessments.form.titleA30')
-            : t('assessments.form.titleDora')}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {framework === 'CONTRACT_A30'
+            : t('assessments.form.titleDora')
+        }
+        description={
+          framework === 'CONTRACT_A30'
             ? t('assessments.form.subtitleA30')
-            : t('assessments.form.subtitleDora')}
-        </p>
-      </div>
+            : t('assessments.form.subtitleDora')
+        }
+      />
 
       {/* Form */}
       <Form {...form}>

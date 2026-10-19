@@ -6,12 +6,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Loader2, User, Mail, Shield, Bell, CheckCircle, AlertCircle, Users, CreditCard } from 'lucide-react';
+import { Loader2, User, Mail, Shield, Bell, CheckCircle, AlertCircle, Users, CreditCard, Settings as SettingsIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import axios from 'axios';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Card,
   CardContent,
@@ -170,13 +171,12 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">{t('settings.title')}</h1>
-        <p className="text-muted-foreground">
-          {t('settings.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        icon={SettingsIcon}
+        title={t('settings.title')}
+        description={t('settings.subtitle')}
+      />
 
       {/* Profile Settings */}
       <Card className="mb-6">

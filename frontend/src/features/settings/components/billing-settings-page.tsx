@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Card,
   CardContent,
@@ -77,16 +78,12 @@ export function BillingSettingsPage() {
         </Button>
       </Link>
 
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="page-title flex items-center gap-2">
-          <CreditCard className="h-6 w-6" />
-          {t('settings.billingLink.title')}
-        </h1>
-        <p className="text-muted-foreground">
-          {t('settings.billingLink.desc')}
-        </p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        icon={CreditCard}
+        title={t('settings.billingLink.title')}
+        description={t('settings.billingLink.desc')}
+      />
 
       {/* Plan Status Card */}
       <Card className="mb-6">
