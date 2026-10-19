@@ -1,7 +1,7 @@
 /**
  * Frontend Tests — questionnairesApi client
  *
- * Mocks both the authenticated apiClient (via @/lib/api/client) and the
+ * Mocks both the authenticated apiClient (via @/shared/api/client) and the
  * public axios instance (via axios.create) used by getPublicForm / submitResponse.
  */
 
@@ -19,7 +19,7 @@ const { mockGet, mockPost, mockDelete, mockPublicGet, mockPublicPost } = vi.hois
 }));
 
 // Mock authenticated apiClient
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: {
     get: mockGet,
     post: mockPost,
@@ -34,7 +34,7 @@ vi.mock('axios', () => ({
   },
 }));
 
-import { questionnairesApi } from '@/lib/api/questionnaires';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
 
 // ---------------------------------------------------------------------------
 // Fixture data

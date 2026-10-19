@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { organizationsApi } from '@/lib/api/organizations';
-import { getErrorMessage } from '@/lib/api';
+import { organizationsApi } from '@/shared/api/organizations';
+import { getErrorMessage } from '@/shared/api';
 import { useAuthSession } from '@/lib/hooks';
 
 const ROLE_LABEL: Record<string, string> = {

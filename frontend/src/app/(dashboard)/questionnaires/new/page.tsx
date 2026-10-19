@@ -22,9 +22,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { questionnairesApi } from '@/lib/api/questionnaires';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
 import { useActiveWorkspace } from '@/lib/hooks';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage } from '@/shared/api';
 
 const schema = z.object({
   vendorName: z.string().min(2, 'Vendor name must be at least 2 characters').max(200),

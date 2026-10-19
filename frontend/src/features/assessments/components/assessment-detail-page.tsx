@@ -30,11 +30,11 @@ import { AssessmentProgressStepper } from '@/components/assessment/AssessmentPro
 import { GapAnalysisTable } from '@/components/assessment/GapAnalysisTable';
 import { ResidualRiskMatrix, WeightedDomainChart, FormalRiskDecision } from '@/components/assessment/RiskScoringPanel';
 import { Art30ClauseScorecardWithSignoff, NegotiationRoundBadge } from '@/components/assessment/ClauseSignoffPanel';
-import { assessmentsApi } from '@/lib/api/assessments';
-import { workspacesApi } from '@/lib/api/workspaces';
-import { questionnairesApi } from '@/lib/api/questionnaires';
-import type { Assessment, OverallRisk } from '@/lib/api/assessments';
-import type { VendorQuestionnaire } from '@/lib/api/questionnaires';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
+import { workspacesApi } from '@/features/workspaces/api/workspaces';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
+import type { Assessment, OverallRisk } from '@/features/assessments/api/assessments';
+import type { VendorQuestionnaire } from '@/features/questionnaires/api/questionnaires';
 
 const RISK_VARIANT: Record<OverallRisk, 'default' | 'secondary' | 'destructive'> = {
   Low: 'default',

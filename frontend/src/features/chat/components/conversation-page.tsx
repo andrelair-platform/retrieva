@@ -8,7 +8,7 @@ import Link from 'next/link';
 
 import { ChatInterface } from '@/components/chat';
 import { Button } from '@/components/ui/button';
-import { conversationsApi } from '@/lib/api';
+import { conversationsApi } from '@/shared/api';
 import { useActiveWorkspace, useWorkspaceListQuery } from '@/lib/hooks';
 import type { Conversation, Message } from '@/types';
 

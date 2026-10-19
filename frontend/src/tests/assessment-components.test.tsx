@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { Gap } from '@/lib/api/assessments';
+import type { Gap } from '@/features/assessments/api/assessments';
 
 // ---------------------------------------------------------------------------
 // react-dropzone mock — must be declared before component imports

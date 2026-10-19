@@ -19,9 +19,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { loginSchema, type LoginFormData } from '@/lib/utils/validation';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage } from '@/shared/api';
 
 export default function LoginPage() {
   const { t } = useTranslation();

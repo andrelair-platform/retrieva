@@ -67,7 +67,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { workspacesApi } from '@/lib/api';
+import { workspacesApi } from '@/shared/api';
 import { inviteMemberSchema, type InviteMemberFormData } from '@/lib/utils/validation';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useWorkspaceQuery } from '@/lib/hooks';

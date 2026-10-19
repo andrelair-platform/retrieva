@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { useAuthStore } from '@/state/auth-store';
 import type { User } from '@/types';
 

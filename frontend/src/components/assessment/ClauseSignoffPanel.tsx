@@ -19,8 +19,8 @@ import { CheckCircle2, XCircle, AlertTriangle, MinusCircle, ChevronDown, Chevron
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { assessmentsApi } from '@/lib/api/assessments';
-import type { Assessment, Gap, ClauseSignoff, ClauseSignoffStatus } from '@/lib/api/assessments';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
+import type { Assessment, Gap, ClauseSignoff, ClauseSignoffStatus } from '@/features/assessments/api/assessments';
 
 // ── Art. 30 clauses constant (must match gapAnalysisAgent.js) ─────────────────
 

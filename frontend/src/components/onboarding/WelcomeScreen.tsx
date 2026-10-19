@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Building2, Users, BookOpen, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { useUIStore, MODAL_IDS } from '@/lib/stores/ui-store';
 
 export function WelcomeScreen() {

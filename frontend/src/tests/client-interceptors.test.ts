@@ -24,7 +24,7 @@ vi.mock('@/lib/auth-events', () => ({
   dispatchSecureLogout: mockDispatchSecureLogout,
 }));
 
-import apiClient, { getErrorMessage } from '@/lib/api/client';
+import apiClient, { getErrorMessage } from '@/shared/api/client';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 
 export function UserNav() {
   const router = useRouter();

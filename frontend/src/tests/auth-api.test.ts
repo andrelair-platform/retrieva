@@ -18,7 +18,7 @@ const { mockGet, mockPost, mockPatch } = vi.hoisted(() => ({
   mockPatch: vi.fn(),
 }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: {
     get: mockGet,
     post: mockPost,
@@ -26,7 +26,7 @@ vi.mock('@/lib/api/client', () => ({
   },
 }));
 
-import { authApi } from '@/lib/api/auth';
+import { authApi } from '@/shared/api/auth';
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -18,7 +18,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { authApi, getErrorMessage } from '@/lib/api';
+import { authApi, getErrorMessage } from '@/shared/api';
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/utils/validation';
 
 function ResetPasswordForm() {

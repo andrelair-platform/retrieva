@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { MfaSection } from '@/features/settings/components/mfa-section';
 

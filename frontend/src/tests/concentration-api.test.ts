@@ -10,7 +10,7 @@ const { mockGet, mockPost, mockPatch, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: { get: mockGet, post: mockPost, patch: mockPatch, delete: mockDelete },
   getErrorMessage: (e: unknown) => String(e),
 }));

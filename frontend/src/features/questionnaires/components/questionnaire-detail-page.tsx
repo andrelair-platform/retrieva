@@ -36,8 +36,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { questionnairesApi } from '@/lib/api/questionnaires';
-import type { VendorQuestionnaire, QuestionnaireQuestion, QuestionnaireStatus, GapLevel } from '@/lib/api/questionnaires';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
+import type { VendorQuestionnaire, QuestionnaireQuestion, QuestionnaireStatus, GapLevel } from '@/features/questionnaires/api/questionnaires';
 
 const STEP_KEYS = ['draft', 'sent', 'responding', 'scoring', 'complete'] as const;
 
