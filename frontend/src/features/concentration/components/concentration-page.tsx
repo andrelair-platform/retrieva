@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getErrorMessage } from '@/lib/api/client';
+import { getErrorMessage } from '@/shared/api/client';
 import {
   concentrationApi,
   type FunctionCriticality,

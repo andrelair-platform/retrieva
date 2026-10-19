@@ -20,9 +20,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { registerSchema, type RegisterFormData } from '@/lib/utils/validation';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage } from '@/shared/api';
 
 // Password requirement checker
 // A11Y FIX: Added role="status" and aria-live for screen reader announcements

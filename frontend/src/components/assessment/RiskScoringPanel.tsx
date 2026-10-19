@@ -25,8 +25,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { assessmentsApi } from '@/lib/api/assessments';
-import type { Assessment, OverallRisk, RiskDecision, RiskDecisionValue } from '@/lib/api/assessments';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
+import type { Assessment, OverallRisk, RiskDecision, RiskDecisionValue } from '@/features/assessments/api/assessments';
 import type { WorkspaceWithMembership } from '@/types';
 import {
   DOMAIN_WEIGHTS,

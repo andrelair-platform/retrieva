@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { authApi, getErrorMessage } from '@/lib/api';
+import { authApi, getErrorMessage } from '@/shared/api';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/utils/validation';
 
 export default function ForgotPasswordPage() {

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, Check, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { authApi, getErrorMessage } from '@/lib/api';
+import { authApi, getErrorMessage } from '@/shared/api';
 
 function VerifyEmailContent() {
   const { t } = useTranslation();

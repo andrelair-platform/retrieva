@@ -18,7 +18,7 @@ const { mockGet, mockPost, mockPatch, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: {
     get: mockGet,
     post: mockPost,
@@ -27,7 +27,7 @@ vi.mock('@/lib/api/client', () => ({
   },
 }));
 
-import { conversationsApi } from '@/lib/api/conversations';
+import { conversationsApi } from '@/features/chat/api/conversations';
 
 // ---------------------------------------------------------------------------
 // Fixtures

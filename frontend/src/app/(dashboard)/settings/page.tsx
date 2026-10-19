@@ -34,7 +34,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),

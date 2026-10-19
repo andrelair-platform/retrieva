@@ -32,9 +32,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { assessmentsApi } from '@/lib/api/assessments';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
 import { useActiveWorkspace, useAssessmentListQuery } from '@/lib/hooks';
-import type { Assessment, OverallRisk, AssessmentStatus } from '@/lib/api/assessments';
+import type { Assessment, OverallRisk, AssessmentStatus } from '@/features/assessments/api/assessments';
 
 const STATUS_VARIANT: Record<AssessmentStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending: 'outline',

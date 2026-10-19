@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
-import { questionnairesApi } from '@/lib/api/questionnaires';
-import type { QuestionnaireQuestion } from '@/lib/api/questionnaires';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
+import type { QuestionnaireQuestion } from '@/features/questionnaires/api/questionnaires';
 
 // The 8 DORA categories in display order
 const CATEGORY_ORDER = [

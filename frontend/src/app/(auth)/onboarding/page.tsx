@@ -27,8 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { organizationsApi } from '@/lib/api/organizations';
-import { getErrorMessage } from '@/lib/api';
+import { organizationsApi } from '@/shared/api/organizations';
+import { getErrorMessage } from '@/shared/api';
 import { useAuthSession } from '@/lib/hooks';
 
 const onboardingSchema = z.object({

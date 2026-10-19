@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { authApi, getErrorMessage } from '@/lib/api';
+import { authApi, getErrorMessage } from '@/shared/api';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { MfaSetupResponse } from '@/types';
 

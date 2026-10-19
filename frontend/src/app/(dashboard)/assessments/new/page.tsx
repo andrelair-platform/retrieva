@@ -30,9 +30,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { FileUploadZone } from '@/components/assessment/FileUploadZone';
-import { assessmentsApi } from '@/lib/api/assessments';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
 import { useActiveWorkspace } from '@/lib/hooks';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage } from '@/shared/api';
 
 const schema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters').max(120),

@@ -27,14 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { assessmentsApi } from '@/lib/api/assessments';
-import { questionnairesApi } from '@/lib/api/questionnaires';
-import { workspacesApi } from '@/lib/api/workspaces';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
+import { workspacesApi } from '@/features/workspaces/api/workspaces';
 import { useWorkspaceListQuery } from '@/lib/hooks';
 import { buildRiskMatrix } from '@/lib/risk-scoring';
 import type { RiskMatrixResult } from '@/lib/risk-scoring';
-import type { Assessment, OverallRisk } from '@/lib/api/assessments';
-import type { VendorQuestionnaire } from '@/lib/api/questionnaires';
+import type { Assessment, OverallRisk } from '@/features/assessments/api/assessments';
+import type { VendorQuestionnaire } from '@/features/questionnaires/api/questionnaires';
 import type { WorkspaceWithMembership } from '@/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getErrorMessage } from '@/lib/api/client';
+import { getErrorMessage } from '@/shared/api/client';
 import {
   arrangementsApi,
   type ArrangementProposal,

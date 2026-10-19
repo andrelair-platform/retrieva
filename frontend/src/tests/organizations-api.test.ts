@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { OrgMember, OrganizationData } from '@/lib/api/organizations';
+import type { OrgMember, OrganizationData } from '@/shared/api/organizations';
 
 // ---------------------------------------------------------------------------
 // Mock apiClient BEFORE importing organizationsApi
@@ -17,11 +17,11 @@ const { mockGet, mockPost, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: { get: mockGet, post: mockPost, delete: mockDelete },
 }));
 
-import { organizationsApi } from '@/lib/api/organizations';
+import { organizationsApi } from '@/shared/api/organizations';
 
 // ---------------------------------------------------------------------------
 // Fixtures

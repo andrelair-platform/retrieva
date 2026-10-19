@@ -59,7 +59,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { organizationsApi, type OrgMember } from '@/lib/api/organizations';
+import { organizationsApi, type OrgMember } from '@/shared/api/organizations';
 
 // ── Role config ───────────────────────────────────────────────────────────────
 

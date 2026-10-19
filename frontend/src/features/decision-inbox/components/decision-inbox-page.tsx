@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { getErrorMessage } from '@/lib/api/client';
+import { getErrorMessage } from '@/shared/api/client';
 import { VerdictBadge, RiskSeverityBadge } from '@/features/arrangements/components/badges';
 import { isVerdictOverride, type DecisionItem } from '@/features/decision-inbox/api/decision-inbox';
 import {

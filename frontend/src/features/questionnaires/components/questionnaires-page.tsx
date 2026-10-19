@@ -32,10 +32,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { questionnairesApi } from '@/lib/api/questionnaires';
-import { workspacesApi } from '@/lib/api/workspaces';
+import { questionnairesApi } from '@/features/questionnaires/api/questionnaires';
+import { workspacesApi } from '@/features/workspaces/api/workspaces';
 import { useActiveWorkspace, useQuestionnaireListQuery } from '@/lib/hooks';
-import type { VendorQuestionnaire, QuestionnaireStatus } from '@/lib/api/questionnaires';
+import type { VendorQuestionnaire, QuestionnaireStatus } from '@/features/questionnaires/api/questionnaires';
 
 const STATUS_VARIANT: Record<QuestionnaireStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   draft: 'outline',

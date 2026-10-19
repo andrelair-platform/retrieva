@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Gap, GapLevel } from '@/lib/api/assessments';
+import type { Gap, GapLevel } from '@/features/assessments/api/assessments';
 
 const GAP_VARIANT: Record<GapLevel, 'default' | 'secondary' | 'destructive'> = {
   covered: 'default',

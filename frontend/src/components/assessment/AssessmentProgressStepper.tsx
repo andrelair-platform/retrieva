@@ -3,7 +3,7 @@
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AssessmentStatus } from '@/lib/api/assessments';
+import type { AssessmentStatus } from '@/features/assessments/api/assessments';
 
 interface Step {
   key: AssessmentStatus;

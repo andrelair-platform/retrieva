@@ -1,6 +1,6 @@
 'use client';
 
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { useAuthStore } from '@/state/auth-store';
 
 export function useAuthSession() {

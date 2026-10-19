@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Assessment, AssessmentListResponse } from '@/lib/api/assessments';
+import type { Assessment, AssessmentListResponse } from '@/features/assessments/api/assessments';
 
 // ---------------------------------------------------------------------------
 // Mock apiClient BEFORE importing assessmentsApi
@@ -18,7 +18,7 @@ const { mockGet, mockPost, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: {
     get: mockGet,
     post: mockPost,
@@ -26,7 +26,7 @@ vi.mock('@/lib/api/client', () => ({
   },
 }));
 
-import { assessmentsApi } from '@/lib/api/assessments';
+import { assessmentsApi } from '@/features/assessments/api/assessments';
 
 // ---------------------------------------------------------------------------
 // Fixtures

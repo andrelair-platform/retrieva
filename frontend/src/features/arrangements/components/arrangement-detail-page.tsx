@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getErrorMessage } from '@/lib/api/client';
+import { getErrorMessage } from '@/shared/api/client';
 import { arrangementsApi } from '@/features/arrangements/api/arrangements';
 import {
   useArrangementQuery,

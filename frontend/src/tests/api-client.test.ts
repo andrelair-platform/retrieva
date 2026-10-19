@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios, { AxiosError } from 'axios';
-import { getErrorMessage } from '@/lib/api/client';
+import { getErrorMessage } from '@/shared/api/client';
 
 // Create mock AxiosError helper
 function createAxiosError(

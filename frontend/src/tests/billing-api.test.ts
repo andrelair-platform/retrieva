@@ -11,11 +11,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn() }));
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@/shared/api/client', () => ({
   default: { post: mockPost },
 }));
 
-import { billingApi } from '@/lib/api/billing';
+import { billingApi } from '@/shared/api/billing';
 
 // ---------------------------------------------------------------------------
 // Tests

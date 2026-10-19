@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import type { Assessment } from '@/lib/api/assessments';
+import type { Assessment } from '@/features/assessments/api/assessments';
 import type { WorkspaceWithMembership } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/lib/api/assessments', () => ({
+vi.mock('@/features/assessments/api/assessments', () => ({
   assessmentsApi: {
     setRiskDecision: vi.fn().mockResolvedValue({ status: 'success' }),
   },

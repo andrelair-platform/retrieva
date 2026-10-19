@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Check, X, Building2, ShieldCheck, ClipboardList, Users, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/shared/api';
 import { useUIStore, MODAL_IDS } from '@/lib/stores/ui-store';
 import type { OnboardingChecklist } from '@/types';
 import { cn } from '@/lib/utils';

@@ -23,8 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { billingApi } from '@/lib/api/billing';
-import { organizationsApi } from '@/lib/api/organizations';
+import { billingApi } from '@/shared/api/billing';
+import { organizationsApi } from '@/shared/api/organizations';
 import { navigateWindowTo } from '@/lib/navigation';
 
 function getDaysLeft(trialEndsAt: string | null | undefined): number | null {
