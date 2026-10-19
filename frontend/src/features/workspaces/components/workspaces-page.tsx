@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GettingStartedChecklist } from '@/components/onboarding/GettingStartedChecklist';
@@ -100,23 +101,21 @@ export function WorkspacesPage() {
   }, [searchParams, router, queryClient, t]);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="page-container mx-auto max-w-7xl">
       {onboardingChecklist && !onboardingCompleted && !onboardingChecklist.dismissed && (
         <GettingStartedChecklist checklist={onboardingChecklist} />
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="page-title">{t('workspaces.title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t('workspaces.subtitle')}
-          </p>
-        </div>
-        <Button onClick={() => openModal(MODAL_IDS.CREATE_WORKSPACE)}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('workspaces.newVendor')}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('workspaces.title')}
+        description={t('workspaces.subtitle')}
+        actions={
+          <Button onClick={() => openModal(MODAL_IDS.CREATE_WORKSPACE)}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t('workspaces.newVendor')}
+          </Button>
+        }
+      />
 
       {workspaces.length === 0 ? (
         <EmptyState

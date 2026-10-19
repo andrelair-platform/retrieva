@@ -9,6 +9,7 @@ import { Plus, ClipboardList, Trash2, Copy, Check, Loader2, AlertCircle, FileSpr
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/onboarding/EmptyState';
@@ -114,34 +115,32 @@ export function QuestionnairesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            <ClipboardList className="h-6 w-6" />
-            {t('questionnaires.title')}
-          </h1>
-          <p className="text-muted-foreground mt-1">{t('questionnaires.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => exportMutation.mutate()}
-            disabled={exportMutation.isPending}
-          >
-            {exportMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-            )}
-            {t('questionnaires.exportRoi')}
-          </Button>
-          <Button onClick={() => router.push('/questionnaires/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('questionnaires.send')}
-          </Button>
-        </div>
-      </div>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        icon={ClipboardList}
+        title={t('questionnaires.title')}
+        description={t('questionnaires.subtitle')}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => exportMutation.mutate()}
+              disabled={exportMutation.isPending}
+            >
+              {exportMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+              )}
+              {t('questionnaires.exportRoi')}
+            </Button>
+            <Button onClick={() => router.push('/questionnaires/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('questionnaires.send')}
+            </Button>
+          </>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-3">

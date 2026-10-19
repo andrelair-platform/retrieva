@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Activity, CheckCircle2, CircleDashed, Loader2, OctagonX, Pause, Play } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -113,16 +114,12 @@ export function AssessmentRunsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center gap-3">
-        <Activity className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-xl font-semibold">Assessment workspace</h1>
-          <p className="text-sm text-muted-foreground">
-            Start a DORA assessment and watch the agents work. You approve the key decisions.
-          </p>
-        </div>
-      </header>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        icon={Activity}
+        title="Assessment workspace"
+        description="Start a DORA assessment and watch the agents work. You approve the key decisions."
+      />
 
       <Card className="p-4">
         <label className="text-sm font-medium" htmlFor="arrangement-id">
