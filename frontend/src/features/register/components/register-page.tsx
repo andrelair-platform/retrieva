@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { BookText, FileDown, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -66,20 +67,17 @@ export function RegisterPage() {
   const templateKeys = register ? Object.keys(register.templates).filter((k) => k in TEMPLATE_LABELS) : [];
 
   return (
-    <div className="page-container max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title flex items-center gap-2"><BookText className="h-5 w-5" /> Register of Information</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            DORA RT.02.01 — generated on demand from the arrangement graph{register ? ` · ${register.version}` : ''}.
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        icon={BookText}
+        title="Register of Information"
+        description={<>DORA RT.02.01 — generated on demand from the arrangement graph{register ? ` · ${register.version}` : ''}.</>}
+        actions={
           <Button size="sm" variant="outline" onClick={() => registerApi.export('xlsx')}>
             <FileDown className="h-4 w-4 mr-2" /> Export XLSX
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>

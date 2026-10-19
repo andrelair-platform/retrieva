@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -246,20 +247,19 @@ export function RiskRegisterPage() {
   }, [rows]);
 
   return (
-    <div className="page-container max-w-7xl mx-auto">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">{t('riskRegister.title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('riskRegister.subtitle')}</p>
-        </div>
-        <Link href="/questionnaires">
-          <Button variant="outline" size="sm">
-            <FileDown className="h-4 w-4 mr-2" />
-            {t('riskRegister.exportRoi')}
-          </Button>
-        </Link>
-      </div>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        title={t('riskRegister.title')}
+        description={t('riskRegister.subtitle')}
+        actions={
+          <Link href="/questionnaires">
+            <Button variant="outline" size="sm">
+              <FileDown className="h-4 w-4 mr-2" />
+              {t('riskRegister.exportRoi')}
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">

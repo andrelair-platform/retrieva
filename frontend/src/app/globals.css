@@ -254,9 +254,9 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* Consistent page container */
+  /* Consistent page container (matches PageShell + the Command Center) */
   .page-container {
-    @apply p-6 space-y-6 animate-fade-in;
+    @apply p-5 sm:p-6 space-y-6 animate-fade-in;
   }
 
   /* Consistent page header */

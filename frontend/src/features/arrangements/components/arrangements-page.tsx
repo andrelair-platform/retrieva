@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Network, Building2, ExternalLink, Plus, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -60,25 +61,23 @@ export function ArrangementsPage() {
   );
 
   return (
-    <div className="page-container max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">ICT Arrangements</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The DORA contractual arrangements — the core object risk is tracked against.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setIntakeOpen(true)}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Import from contract
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New arrangement
-          </Button>
-        </div>
-      </div>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        title="ICT Arrangements"
+        description="The DORA contractual arrangements — the core object risk is tracked against."
+        actions={
+          <>
+            <Button size="sm" onClick={() => setIntakeOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Import from contract
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New arrangement
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border p-4 text-center">

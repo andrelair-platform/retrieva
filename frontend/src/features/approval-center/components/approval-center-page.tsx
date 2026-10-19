@@ -6,6 +6,7 @@ import { AxiosError } from 'axios';
 import { ShieldCheck, Check, X, RotateCcw, Inbox, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -81,21 +82,17 @@ export function ApprovalCenterPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-xl font-semibold">Approval center</h1>
-            <p className="text-sm text-muted-foreground">
-              Review what the agents propose and decide. You stay accountable for every verdict.
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setMine((m) => !m)}>
-          {mine ? 'All' : 'Assigned to me'}
-        </Button>
-      </header>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        icon={ShieldCheck}
+        title="Approval center"
+        description="Review what the agents propose and decide. You stay accountable for every verdict."
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setMine((m) => !m)}>
+            {mine ? 'All' : 'Assigned to me'}
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card className="p-4">

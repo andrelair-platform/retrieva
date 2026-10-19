@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Inbox, Check, X, SkipForward, ShieldCheck, Sparkles, FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -166,22 +167,18 @@ export function DecisionInboxPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Inbox className="h-6 w-6" /> Decision Inbox
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Everything the AI concluded that awaits your decision — least-confident first. The AI
-            drafts; you decide.
-          </p>
-        </div>
-        <Button onClick={onAcceptHigh} disabled={acceptHigh.isPending || !items.length} variant="outline">
-          <Sparkles className="h-4 w-4 mr-1.5" />
-          Accept all high-confidence
-        </Button>
-      </div>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        icon={Inbox}
+        title="Decision Inbox"
+        description="Everything the AI concluded that awaits your decision — least-confident first. The AI drafts; you decide."
+        actions={
+          <Button onClick={onAcceptHigh} disabled={acceptHigh.isPending || !items.length} variant="outline">
+            <Sparkles className="h-4 w-4 mr-1.5" />
+            Accept all high-confidence
+          </Button>
+        }
+      />
 
       {data && (
         <div className="flex gap-2 text-xs">

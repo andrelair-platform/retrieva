@@ -9,6 +9,7 @@ import { Plus, ShieldCheck, Trash2, FileDown, AlertCircle, Loader2 } from 'lucid
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/onboarding/EmptyState';
@@ -87,19 +88,17 @@ export function AssessmentsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="page-title">{t('assessments.title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t('assessments.subtitle')}
-          </p>
-        </div>
-        <Button onClick={() => router.push('/assessments/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('assessments.newButton')}
-        </Button>
-      </div>
+    <div className="page-container mx-auto max-w-7xl">
+      <PageHeader
+        title={t('assessments.title')}
+        description={t('assessments.subtitle')}
+        actions={
+          <Button onClick={() => router.push('/assessments/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t('assessments.newButton')}
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">

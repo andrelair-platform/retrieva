@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Network, AlertTriangle, Layers, GitBranch, Plus, Trash2, Check, ScanSearch } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -140,14 +141,12 @@ export function ConcentrationPage() {
   const spofs = analysis?.singlePointsOfFailure ?? [];
 
   return (
-    <div className="page-container max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="page-title flex items-center gap-2"><Network className="h-5 w-5" /> Concentration &amp; nth-party graph</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Firm-wide ICT concentration and sub-provider dependencies (DORA Art. 29). Spans every provider —
-          not scoped to one vendor.
-        </p>
-      </div>
+    <div className="page-container mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        icon={Network}
+        title="Concentration & nth-party graph"
+        description="Firm-wide ICT concentration and sub-provider dependencies (DORA Art. 29). Spans every provider — not scoped to one vendor."
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
