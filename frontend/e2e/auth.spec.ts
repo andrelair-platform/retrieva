@@ -13,7 +13,7 @@ import {
  *
  * Covers:
  *  - Login page rendering and form validation
- *  - Successful login → redirect to /chat
+ *  - Successful login → redirect to /overview (the Command Center home)
  *  - Failed login → error message shown
  *  - Register page rendering
  *  - Navigation between auth pages
@@ -60,7 +60,7 @@ test.describe('Login page', () => {
     await expect(page.getByText('Invalid email or password')).toBeVisible();
   });
 
-  test('successful login redirects to /chat', async ({ page }) => {
+  test('successful login redirects to /overview', async ({ page }) => {
     await mockLoginSuccess(page);
     // After login, the auth provider calls /auth/me and workspace store calls /workspaces/my-workspaces
     await mockAuthenticatedUser(page);
@@ -71,7 +71,7 @@ test.describe('Login page', () => {
     await page.getByLabel('Password').fill('ValidPass1!');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
-    await expect(page).toHaveURL(/\/chat/);
+    await expect(page).toHaveURL(/\/overview/);
   });
 
   test('password toggle shows/hides password', async ({ page }) => {

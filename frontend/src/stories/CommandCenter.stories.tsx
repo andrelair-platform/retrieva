@@ -32,7 +32,7 @@ const MOCK_QUEUE: DecisionQueue = {
     {
       kind: 'finding', id: 'f2', arrangementId: 'a5', providerName: 'MailRelay',
       businessFunctionName: 'Notifications', controlId: 'DORA-11.1', urgency: 40,
-      createdAt: '2026-10-18T08:00:00Z', verdict: 'missing', confidence: 0.48,
+      createdAt: '2026-10-18T08:00:00Z', verdict: 'non_compliant', confidence: 0.48,
     },
   ],
 };

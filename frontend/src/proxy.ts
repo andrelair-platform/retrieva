@@ -50,12 +50,13 @@ export function proxy(request: NextRequest) {
   const authOnlyPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
   const isAuthOnlyPath = authOnlyPaths.some((path) => pathname.startsWith(path));
 
-  // If on auth page (login, register, etc.) and user is authenticated, redirect to chat
+  // If on auth page (login, register, etc.) and user is authenticated, redirect to the app home
+  // (the Command Center). Keep in sync with APP_HOME_ROUTE in shared/lib/navigation.
   if (isAuthOnlyPath && accessToken) {
     const payload = decodeJWTPayload(accessToken);
     // Only redirect if token is not expired
     if (payload?.exp && payload.exp * 1000 > Date.now()) {
-      return NextResponse.redirect(new URL('/chat', request.url));
+      return NextResponse.redirect(new URL('/overview', request.url));
     }
   }
 
