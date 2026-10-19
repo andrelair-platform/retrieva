@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -200,14 +201,15 @@ export function TeamSettingsPage() {
 
   return (
     <div className="page-container max-w-3xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="page-title">{t('settings.team.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {org.name} · {t('settings.team.subActiveMembers', { count: activeMembers.length })}
-          {pendingMembers.length > 0 && ` · ${t('settings.team.subPending', { count: pendingMembers.length })}`}
-        </p>
-      </div>
+      <PageHeader
+        title={t('settings.team.title')}
+        description={
+          <>
+            {org.name} · {t('settings.team.subActiveMembers', { count: activeMembers.length })}
+            {pendingMembers.length > 0 && ` · ${t('settings.team.subPending', { count: pendingMembers.length })}`}
+          </>
+        }
+      />
 
       {/* Role legend */}
       <Card>

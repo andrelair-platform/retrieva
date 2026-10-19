@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle, Send, Copy, Ban } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
@@ -248,20 +249,20 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         <ArrowLeft className="h-4 w-4" /> Arrangements
       </button>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">{arrangement.providerName} · {arrangement.businessFunctionName}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{arrangement.legalEntityName}</p>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => assess.mutate()}
-          disabled={assess.isPending || (assessing && findings.length === 0)}
-        >
-          <Play className="h-4 w-4 mr-2" />
-          {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
-        </Button>
-      </div>
+      <PageHeader
+        title={`${arrangement.providerName} · ${arrangement.businessFunctionName}`}
+        description={arrangement.legalEntityName}
+        actions={
+          <Button
+            size="sm"
+            onClick={() => assess.mutate()}
+            disabled={assess.isPending || (assessing && findings.length === 0)}
+          >
+            <Play className="h-4 w-4 mr-2" />
+            {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
+          </Button>
+        }
+      />
 
       {/* Lifecycle (RTV-31) — current state + the valid next transitions (approval moves = primary) */}
       {lifecycle && (

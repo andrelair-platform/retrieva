@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Card,
   CardContent,
@@ -101,16 +102,12 @@ export default function SecuritySettingsPage() {
         </Button>
       </Link>
 
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-semibold tracking-tight flex items-center gap-2">
-          <Shield className="h-6 w-6" />
-          {t('settings.security.title')}
-        </h1>
-        <p className="text-muted-foreground">
-          {t('settings.security.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        icon={Shield}
+        title={t('settings.security.title')}
+        description={t('settings.security.subtitle')}
+      />
 
       {/* Account Info */}
       <Card className="mb-6">
