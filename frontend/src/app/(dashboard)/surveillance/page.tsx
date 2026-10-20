@@ -1,13 +1,5 @@
-import { Radar } from 'lucide-react';
-import { AgentSurfacePlaceholder } from '@/features/command-center/components/agent-surface-placeholder';
+import { SurveillancePage } from '@/features/surveillance/components/surveillance-page';
 
 export default function Page() {
-  return (
-    <AgentSurfacePlaceholder
-      agentKey="surveillance"
-      bulletsKey="surveillance"
-      icon={Radar}
-      accent="text-chart-3"
-    />
-  );
+  return <SurveillancePage />;
 }
