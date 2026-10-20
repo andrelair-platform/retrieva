@@ -152,7 +152,7 @@ export function Scene00Intro() {
         {/* Stat pills */}
         <div style={{ display: 'flex', gap: 16 }}>
           <StatPill value="&lt; 48h"  label="First gap report"  delay={30} color={COLORS.blue} />
-          <StatPill value="150+"  label="Vendors managed"  delay={38} color={COLORS.green} />
+          <StatPill value="95%"   label="Done by agents"    delay={38} color={COLORS.green} />
           <StatPill value="28"    label="DORA articles"    delay={46} color={COLORS.purple} />
         </div>
 
