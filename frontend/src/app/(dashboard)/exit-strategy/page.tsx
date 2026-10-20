@@ -1,13 +1,5 @@
-import { DoorOpen } from 'lucide-react';
-import { AgentSurfacePlaceholder } from '@/features/command-center/components/agent-surface-placeholder';
+import { ExitStrategyPage } from '@/features/exit-strategy/components/exit-strategy-page';
 
 export default function Page() {
-  return (
-    <AgentSurfacePlaceholder
-      agentKey="exit"
-      bulletsKey="exitStrategy"
-      icon={DoorOpen}
-      accent="text-chart-5"
-    />
-  );
+  return <ExitStrategyPage />;
 }

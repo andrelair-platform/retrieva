@@ -1481,32 +1481,5 @@
       "vendors": "Vendors",
       "askAi": "Ask the copilot"
     }
-  },
-  "agentSurface": {
-    "badge": "Always-on agent",
-    "hitl": "Agents propose, you dispose. Everything this agent produces lands as a draft in your Decision Inbox — nothing is applied without your sign-off.",
-    "openInbox": "Open decision inbox",
-    "whatItDoes": "What it does",
-    "comingSoon": "A dedicated live view is on the roadmap. Today this agent runs continuously on the platform and surfaces its output in your Decision Inbox and the Register of Information.",
-    "surveillance": [
-      "Watches provider status pages and incident feeds for outages and degradations.",
-      "Queries OSV.dev for new CVEs affecting each tracked provider’s software.",
-      "Scores impact and maps the blast radius across your arrangement graph."
-    ],
-    "discovery": [
-      "Sweeps connected source systems (Entra ID, SaaS registries, uploads) for third-party ICT.",
-      "Normalises findings and proposes Register of Information entries.",
-      "Flags arrangements you don’t yet track, with a confidence score."
-    ],
-    "exitStrategy": [
-      "Proposes verified substitute providers (your Register + a curated catalog + AI).",
-      "Drafts a phased exit blueprint with data-portability and parallel-run plans.",
-      "Models reintegration cost and difficulty for each critical-or-important function."
-    ],
-    "contractAmendments": [
-      "Detects missing or weak DORA Art. 30 clauses in your contracts.",
-      "Drafts redline amendments to close each gap.",
-      "Tracks notice periods and price-review windows so deadlines don’t slip."
-    ]
   }
 }

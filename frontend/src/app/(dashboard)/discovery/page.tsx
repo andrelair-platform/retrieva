@@ -1,13 +1,5 @@
-import { Radio } from 'lucide-react';
-import { AgentSurfacePlaceholder } from '@/features/command-center/components/agent-surface-placeholder';
+import { DiscoveryPage } from '@/features/discovery/components/discovery-page';
 
 export default function Page() {
-  return (
-    <AgentSurfacePlaceholder
-      agentKey="discovery"
-      bulletsKey="discovery"
-      icon={Radio}
-      accent="text-chart-1"
-    />
-  );
+  return <DiscoveryPage />;
 }
