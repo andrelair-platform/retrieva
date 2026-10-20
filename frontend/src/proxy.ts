@@ -9,7 +9,10 @@ const publicPaths = [
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/pricing', // public marketing — must be reachable without an account
+  '/contact', // public marketing — must be reachable without an account
   '/q', // public vendor questionnaire form (no auth required)
+  '/v', // public vendor evidence-upload form (token-based, no auth required)
 ];
 
 // Admin-only paths

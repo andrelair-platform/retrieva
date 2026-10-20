@@ -25,6 +25,10 @@ import {
   ShieldCheck,
   Upload,
   UserCheck,
+  Radio,
+  Radar,
+  DoorOpen,
+  FileSignature,
   Check,
   Minus,
   X,
@@ -100,6 +104,67 @@ export function LandingPageContent() {
         </div>
       </section>
 
+      {/* The agents — the supervised AI workforce (the core differentiator) */}
+      <section className="border-y border-border/60 bg-card/40 py-24">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-xs font-medium text-primary mb-4">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+              </span>
+              {t('landing.agents.tag')}
+            </div>
+            <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-3">
+              {t('landing.agents.heading')}
+            </h2>
+            <p className="text-muted-foreground text-lg">{t('landing.agents.subtitle')}</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              { k: 'roi', icon: <Radio className="h-6 w-6" /> },
+              { k: 'dd', icon: <ClipboardCheck className="h-6 w-6" /> },
+              { k: 'contracts', icon: <FileSignature className="h-6 w-6" /> },
+              { k: 'exit', icon: <DoorOpen className="h-6 w-6" /> },
+              { k: 'surveillance', icon: <Radar className="h-6 w-6" /> },
+            ].map(({ k, icon }) => (
+              <div key={k} className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    {icon}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-success">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+                    </span>
+                    {t('landing.agents.tag')}
+                  </span>
+                </div>
+                <h3 className="font-display font-semibold text-lg mb-2 tracking-tight">
+                  {t(`landing.agents.${k}.title`)}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {t(`landing.agents.${k}.desc`)}
+                </p>
+              </div>
+            ))}
+            {/* The trust boundary — the human sign-off completes the workforce. */}
+            <div className="rounded-2xl border border-primary/30 bg-primary/[0.04] p-6">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
+                <UserCheck className="h-6 w-6" />
+              </span>
+              <h3 className="font-display font-semibold text-lg mb-2 tracking-tight">
+                {t('landing.features.humanReview.title')}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {t('landing.features.humanReview.desc')}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <VideoHero />
 
       {/* By the numbers — regulator-proven market validation */}
@@ -125,7 +190,7 @@ export function LandingPageContent() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground/70 mt-12 max-w-2xl mx-auto">{t('landing.stats.footnote')}</p>
+          <p className="text-xs text-muted-foreground mt-12 max-w-2xl mx-auto">{t('landing.stats.footnote')}</p>
         </div>
       </section>
 
@@ -233,10 +298,10 @@ export function LandingPageContent() {
             {t('landing.howItWorksHeading')}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 max-w-6xl mx-auto">
-            <StepCard number="1" icon={<Database className="h-6 w-6" />} title={t('landing.steps.index.title')} description={t('landing.steps.index.desc')} />
-            <StepCard number="2" icon={<ShieldCheck className="h-6 w-6" />} title={t('landing.steps.assess.title')} description={t('landing.steps.assess.desc')} />
-            <StepCard number="3" icon={<ClipboardCheck className="h-6 w-6" />} title={t('landing.steps.invite.title')} description={t('landing.steps.invite.desc')} />
-            <StepCard number="4" icon={<Bot className="h-6 w-6" />} title={t('landing.steps.ask.title')} description={t('landing.steps.ask.desc')} />
+            <StepCard number="1" icon={<Upload className="h-6 w-6" />} title={t('landing.steps.index.title')} description={t('landing.steps.index.desc')} />
+            <StepCard number="2" icon={<Bot className="h-6 w-6" />} title={t('landing.steps.assess.title')} description={t('landing.steps.assess.desc')} />
+            <StepCard number="3" icon={<FileText className="h-6 w-6" />} title={t('landing.steps.invite.title')} description={t('landing.steps.invite.desc')} />
+            <StepCard number="4" icon={<UserCheck className="h-6 w-6" />} title={t('landing.steps.ask.title')} description={t('landing.steps.ask.desc')} />
             <StepCard number="5" icon={<FileSpreadsheet className="h-6 w-6" />} title={t('landing.steps.export.title')} description={t('landing.steps.export.desc')} />
           </div>
         </div>
