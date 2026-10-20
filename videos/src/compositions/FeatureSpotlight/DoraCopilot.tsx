@@ -66,10 +66,10 @@ function Intro() {
       <div style={{ textAlign:'center' }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:'0 0 8px',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600 }}>Feature Spotlight</p>
         <h1 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES['3xl'],fontWeight:800,color:COLORS.text,letterSpacing:'-0.03em',margin:0 }}>
-          DORA{' '}<span style={{ color:ACCENT }}>AI Copilot</span>
+          Ask the{' '}<span style={{ color:ACCENT }}>Agent Workforce</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          Ask compliance questions in plain English. Get instant answers grounded in your docs and DORA articles.
+          Ask the agents anything — answers grounded in your evidence and the DORA articles, every claim cited.
         </p>
       </div>
     </div>
@@ -138,12 +138,12 @@ function Demo() {
 
       {/* Right panel: key stats */}
       <div style={{ display:'flex',flexDirection:'column',gap:20,flexShrink:0,width:240 }}>
-        <h3 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,fontWeight:700,color:COLORS.text,margin:0 }}>Why AI Copilot?</h3>
+        <h3 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,fontWeight:700,color:COLORS.text,margin:0 }}>Why the agent workforce?</h3>
         {[
-          { icon:'⚡', text:'Instant answers — no waiting for your legal team' },
-          { icon:'📚', text:'Grounded in your docs + DORA articles' },
-          { icon:'🎯', text:'Confidence score on every response' },
-          { icon:'🔗', text:'Source citations with page references' },
+          { icon:'⚡', text:'Agents answer instantly — no waiting on your legal team' },
+          { icon:'📚', text:'Grounded in your evidence + DORA articles' },
+          { icon:'🎯', text:'Confidence score on every answer' },
+          { icon:'🔗', text:'Every claim cited with page references' },
         ].map(({icon,text}, i) => {
           const o = computeSpring(frame, fps, 40+i*20, 'smooth', 0, 1);
           const x = computeSpring(frame, fps, 40+i*20, 'smooth', 20, 0);
@@ -174,7 +174,7 @@ function CTA() {
   return (
     <div style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,opacity:o,position:'relative' }}>
       <Logo delay={0} size="sm" position="center" />
-      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Try the AI Copilot free at</p>
+      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Meet the agent workforce free at</p>
       <div style={{ display:'flex',alignItems:'center',padding:'14px 32px',background:`${ACCENT}12`,border:`1.5px solid ${ACCENT}55`,borderRadius:RADIUS.xl,boxShadow:glow,transform:`scale(${s})` }}>
         <span style={{ fontFamily:FONTS.mono,fontSize:FONT_SIZES.xl,fontWeight:700,color:ACCENT }}>retrieva.online</span>
         <span style={{ display:'inline-block',width:'0.5em',height:'1em',background:ACCENT,marginLeft:4,verticalAlign:'text-bottom',opacity:cur }} />

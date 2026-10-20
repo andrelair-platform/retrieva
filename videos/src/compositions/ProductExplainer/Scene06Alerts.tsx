@@ -9,26 +9,26 @@ const ALERTS = [
   {
     type: 'cert',
     color: COLORS.orange,
-    title: 'Certificate Expiry — 30 days',
-    vendor: 'Acme Corp · ISO 27001',
-    badge: 'Expiring Soon',
-    detail: 'Cert valid until Jan 15, 2025',
+    title: 'Provider incident — major outage',
+    vendor: 'Azure · EU region',
+    badge: 'Critical',
+    detail: 'Full outage affecting a critical function',
   },
   {
     type: 'contract',
     color: COLORS.blue,
-    title: 'Contract Renewal — 90 days',
-    vendor: 'Beta Systems · MSA',
-    badge: 'Action Required',
-    detail: 'Contract ends Mar 31, 2025',
+    title: 'New CVE — auth bypass',
+    vendor: 'NimbusPay · payments SDK',
+    badge: 'High',
+    detail: 'CVE-2026-1234 on a tracked dependency',
   },
   {
     type: 'overdue',
     color: COLORS.red,
-    title: 'Annual Review Overdue',
-    vendor: 'Gamma SaaS · DORA Assessment',
-    badge: 'Overdue',
-    detail: 'Last assessed 14 months ago',
+    title: 'Concentration shift',
+    vendor: 'Shared sub-processor',
+    badge: 'Review',
+    detail: 'Three providers now depend on one substrate',
   },
 ];
 
@@ -50,12 +50,12 @@ export function Scene06Alerts() {
       }}
     >
       <SectionTitle
-        title="Monitoring Alerts"
-        accentWord="Alerts"
+        title="Continuous surveillance"
+        accentWord="surveillance"
         accentColor={COLORS.orange}
         delay={0}
         fontSize={FONT_SIZES.xl}
-        subline="Never miss a certification deadline or renewal window"
+        subline="Agents watch provider incidents and CVEs, score the impact, and map the blast radius"
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', maxWidth: 700 }}>

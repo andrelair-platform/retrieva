@@ -38,7 +38,7 @@ export function Scene05Register() {
         accentColor={COLORS.green}
         delay={0}
         fontSize={FONT_SIZES.xl}
-        subline="EBA Art. 28(3) compliant — XLSX export in one click"
+        subline="Kept current by the agents — EBA RT.01–RT.04, export in one click"
       />
 
       {/* Mini spreadsheet */}

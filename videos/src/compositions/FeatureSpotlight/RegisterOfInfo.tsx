@@ -1,7 +1,7 @@
 /**
  * FeatureSpotlight — Register of Information
  * 750f / 25s, 1920×1080
- * Story: EBA Art. 28(3) XLSX in one click — no consultant needed.
+ * Story: The Register the agents keep current — EBA RT.01–RT.04, exported in one click.
  */
 import React from 'react';
 import { Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
@@ -45,7 +45,7 @@ function Intro() {
           Register of{' '}<span style={{ color:ACCENT }}>Information</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          EBA Article 28(3) XLSX — RT.01.01 through RT.04.01 — generated automatically. Ready to submit to your NCA.
+          The Register the agents keep current — EBA RT.01.01 through RT.04.01, filled autonomously. Exported in one click, ready for your NCA.
         </p>
       </div>
       <div style={{ opacity:computeSpring(frame,fps,30,'smooth',0,1),padding:'8px 20px',background:`${COLORS.blue}0d`,border:`1px solid ${COLORS.blue}33`,borderRadius:RADIUS.full }}>
@@ -69,7 +69,7 @@ function Demo() {
       {/* Left: vendor table */}
       <div style={{ flex:1,display:'flex',flexDirection:'column',gap:0,minWidth:0 }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 10px',opacity:computeSpring(frame,fps,0,'smooth',0,1) }}>
-          ICT Third-party Vendor Register
+          Register — Kept Current by Agents
         </p>
         <div style={{ background:COLORS.surface,borderRadius:RADIUS.lg,border:`1px solid ${COLORS.border}`,overflow:'hidden',boxShadow:SHADOWS.card }}>
           {/* Header */}
@@ -116,7 +116,7 @@ function Demo() {
 
         {/* Export section */}
         <div style={{ opacity:exportProgress,transform:`scale(${exportScale})` }}>
-          <GlowBar value={100} delay={360} color={ACCENT} width={260} label="Generating all 4 sheets…" height={10} />
+          <GlowBar value={100} delay={360} color={ACCENT} width={260} label="Agents assembling all 4 sheets…" height={10} />
         </div>
 
         <div style={{ display:'flex',flexDirection:'column',gap:12,opacity:computeSpring(frame,fps,400,'bounce',0,1) }}>
@@ -137,7 +137,7 @@ function Demo() {
         </div>
 
         <div style={{ display:'flex',flexDirection:'column',gap:10,opacity:computeSpring(frame,fps,440,'smooth',0,1) }}>
-          <StatPill value="4"     label="EBA sheets auto-filled" delay={440} color={ACCENT} />
+          <StatPill value="4"     label="Sheets agents auto-fill" delay={440} color={ACCENT} />
           <StatPill value="1"     label="Click to export"        delay={452} color={COLORS.blue} />
         </div>
       </div>
@@ -156,7 +156,7 @@ function CTA() {
   return (
     <div style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,opacity:o,position:'relative' }}>
       <Logo delay={0} size="sm" position="center" />
-      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Generate your EBA RoI free at</p>
+      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Let agents keep your Register current — free at</p>
       <div style={{ display:'flex',alignItems:'center',padding:'14px 32px',background:`${ACCENT}12`,border:`1.5px solid ${ACCENT}55`,borderRadius:RADIUS.xl,boxShadow:glow,transform:`scale(${s})` }}>
         <span style={{ fontFamily:FONTS.mono,fontSize:FONT_SIZES.xl,fontWeight:700,color:ACCENT }}>retrieva.online</span>
         <span style={{ display:'inline-block',width:'0.5em',height:'1em',background:ACCENT,marginLeft:4,verticalAlign:'text-bottom',opacity:cur }} />

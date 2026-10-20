@@ -73,9 +73,9 @@ export function Scene03GapAnalysis() {
       padding: '32px 80px',
     }}>
       <SectionTitle
-        title="Automated Gap Analysis"
-        subline="AI maps your vendor documentation across all 28 DORA articles in minutes."
-        accentWord="Gap Analysis"
+        title="Agents assess every vendor"
+        subline="An agent grades each provider against all 28 DORA articles — evidence cited, gaps flagged for your sign-off."
+        accentWord="assess"
         accentColor={COLORS.blue}
         delay={0}
         fontSize={FONT_SIZES.xl}

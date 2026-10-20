@@ -1,7 +1,7 @@
 /**
  * FeatureSpotlight — Monitoring & Alerts
  * 750f / 25s, 1920×1080
- * Story: Never miss a cert expiry or contract renewal — automated alerts keep you ahead.
+ * Story: Agents watch provider incidents and CVEs — impact scored, blast radius mapped.
  */
 import React from 'react';
 import { Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
@@ -21,10 +21,10 @@ const ALERTS = [
     urgency: 'critical',
     color: COLORS.red,
     emoji: '🔴',
-    title: 'ISO 27001 Certificate Expiring',
+    title: 'Provider Incident — Service Outage',
     vendor: 'Acme Corp',
-    detail: 'Expires in 7 days — Jan 22, 2025',
-    badge: '7 DAYS',
+    detail: 'Detected 2h ago — blast radius mapped',
+    badge: 'ACTIVE',
     dora: 'Art. 28(2)(d)',
     delay: 0,
   },
@@ -32,10 +32,10 @@ const ALERTS = [
     urgency: 'warning',
     color: COLORS.orange,
     emoji: '🟠',
-    title: 'MSA Contract Renewal Due',
+    title: 'New CVE Affecting Provider Stack',
     vendor: 'Beta Systems',
-    detail: 'Renewal window opens Mar 31, 2025',
-    badge: '90 DAYS',
+    detail: 'CVE-2025-xxxx — impact scored High',
+    badge: 'CVE',
     dora: 'Art. 30(2)',
     delay: 60,
   },
@@ -43,20 +43,20 @@ const ALERTS = [
     urgency: 'info',
     color: COLORS.blue,
     emoji: '🔵',
-    title: 'Annual DORA Assessment Overdue',
+    title: 'Concentration Shift Detected',
     vendor: 'Gamma SaaS',
-    detail: 'Last assessed 14 months ago',
-    badge: 'OVERDUE',
+    detail: 'Fourth-party dependency changed',
+    badge: 'SHIFT',
     dora: 'Art. 28(1)(a)',
     delay: 120,
   },
 ];
 
 const TIMELINE = [
-  { label: '90 days', event: 'Contract renewal window', color: COLORS.blue },
-  { label: '30 days', event: 'Certificate expiry warning', color: COLORS.orange },
-  { label: '7 days',  event: 'Critical cert alert',      color: COLORS.red },
-  { label: 'Day 0',  event: 'Auto-escalation to CISO',  color: COLORS.red },
+  { label: 'Detect', event: 'Agent spots incident / CVE', color: COLORS.blue },
+  { label: 'Score',  event: 'Impact & severity assessed', color: COLORS.orange },
+  { label: 'Map',    event: 'Blast radius across providers', color: COLORS.red },
+  { label: 'Escalate', event: 'Surfaced for human sign-off', color: COLORS.red },
 ];
 
 function Intro() {
@@ -73,10 +73,10 @@ function Intro() {
       <div style={{ textAlign:'center' }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:'0 0 8px',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600 }}>Feature Spotlight</p>
         <h1 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES['3xl'],fontWeight:800,color:COLORS.text,letterSpacing:'-0.03em',margin:0 }}>
-          Monitoring{' '}<span style={{ color:ACCENT }}>&amp; Alerts</span>
+          Continuous{' '}<span style={{ color:ACCENT }}>Surveillance</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          Automated 24-hour alerts for cert expiry (90/30/7 days), contract renewals, and overdue annual assessments.
+          Agents watch provider incidents and CVEs around the clock — impact scored, blast radius mapped, surfaced for your sign-off.
         </p>
       </div>
     </div>
@@ -94,7 +94,7 @@ function Demo() {
 
       {/* Alert cards */}
       <div style={{ flex:1,display:'flex',flexDirection:'column',gap:18 }}>
-        <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 4px',opacity:computeSpring(frame,fps,0,'smooth',0,1) }}>Active Alerts</p>
+        <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 4px',opacity:computeSpring(frame,fps,0,'smooth',0,1) }}>Surveillance Events</p>
         {ALERTS.map((alert) => {
           const o = computeSpring(frame, fps, alert.delay, 'smooth', 0, 1);
           const x = computeSpring(frame, fps, alert.delay, 'snappy', 80, 0);
@@ -140,7 +140,7 @@ function Demo() {
       {/* Right panel: timeline + stats */}
       <div style={{ display:'flex',flexDirection:'column',gap:24,flexShrink:0,width:260 }}>
         <div>
-          <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 14px' }}>Alert Timeline</p>
+          <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 14px' }}>Agent Response Flow</p>
           <div style={{ display:'flex',flexDirection:'column',gap:0,position:'relative' }}>
             {/* Vertical line */}
             <div style={{ position:'absolute',left:6,top:8,bottom:8,width:1,background:COLORS.border }} />
@@ -160,9 +160,9 @@ function Demo() {
         </div>
 
         <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
-          <StatPill value="24h"  label="Alert frequency"     delay={220} color={ACCENT} />
-          <StatPill value="3"    label="Alert thresholds"    delay={232} color={COLORS.blue} />
-          <StatPill value="100%" label="Vendor coverage"     delay={244} color={COLORS.green} />
+          <StatPill value="24/7" label="Agent surveillance"   delay={220} color={ACCENT} />
+          <StatPill value="3"    label="Event types tracked" delay={232} color={COLORS.blue} />
+          <StatPill value="100%" label="Provider coverage"   delay={244} color={COLORS.green} />
         </div>
       </div>
     </div>
@@ -180,7 +180,7 @@ function CTA() {
   return (
     <div style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,opacity:o,position:'relative' }}>
       <Logo delay={0} size="sm" position="center" />
-      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Never miss a deadline — start free at</p>
+      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Let agents watch your providers — start free at</p>
       <div style={{ display:'flex',alignItems:'center',padding:'14px 32px',background:`${ACCENT}12`,border:`1.5px solid ${ACCENT}55`,borderRadius:RADIUS.xl,boxShadow:glow,transform:`scale(${s})` }}>
         <span style={{ fontFamily:FONTS.mono,fontSize:FONT_SIZES.xl,fontWeight:700,color:ACCENT }}>retrieva.online</span>
         <span style={{ display:'inline-block',width:'0.5em',height:'1em',background:ACCENT,marginLeft:4,verticalAlign:'text-bottom',opacity:cur }} />
