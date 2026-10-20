@@ -58,6 +58,24 @@ function describe(violations: Awaited<ReturnType<typeof analyze>>) {
 test.describe('Accessibility (RGAA / WCAG 2.1 AA)', () => {
   test.describe.configure({ timeout: 90_000 });
 
+  test('landing page has no serious/critical violations', async ({ page }) => {
+    await mockUnauthenticated(page);
+    await gotoStable(page, '/');
+    await page.getByRole('heading', { level: 1 }).waitFor({ timeout: 30_000 });
+    await page.waitForTimeout(1200); // let framer-motion entrance fades settle (else axe sees mid-fade text)
+    const v = await analyze(page);
+    expect(v, `\n${describe(v)}`).toEqual([]);
+  });
+
+  test('pricing page has no serious/critical violations', async ({ page }) => {
+    await mockUnauthenticated(page);
+    await gotoStable(page, '/pricing');
+    await page.getByRole('heading', { name: /outcome/i }).waitFor({ timeout: 30_000 });
+    await page.waitForTimeout(1200); // let the pricing-card whileInView animations settle
+    const v = await analyze(page);
+    expect(v, `\n${describe(v)}`).toEqual([]);
+  });
+
   test('login page has no serious/critical violations', async ({ page }) => {
     await mockUnauthenticated(page);
     await gotoStable(page, '/login');

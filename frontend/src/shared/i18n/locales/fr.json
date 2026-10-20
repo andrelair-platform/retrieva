@@ -366,9 +366,9 @@
   },
   "landing": {
     "badge": "Règlement DORA (UE) 2022/2554",
-    "heroTitle": "Voyez où un seul fournisseur fait tomber l’activité.",
-    "heroSubtitle": "Retrieva cartographie chaque prestataire et ses sous-traitants dans un seul graphe — la concentration et les points uniques de défaillance que votre Registre ne montre pas. Déposez un contrat, obtenez une évaluation fondée sur les preuves, et transformez les écarts en risques suivis et attribués. Pour une entité unique ou tout un groupe transfrontalier.",
-    "featuresHeading": "Tout ce qu'il faut pour respecter vos obligations DORA",
+    "heroTitle": "Votre risque tiers DORA, piloté par des agents IA — validé par vous.",
+    "heroSubtitle": "Des agents autonomes découvrent vos prestataires TIC, les évaluent au regard de DORA, récupèrent les preuves, surveillent les incidents et rédigent le registre, les avenants et les plans de sortie. Votre responsable des risques examine chaque brouillon et le valide — vous gardez la responsabilité, et vous obtenez un résultat prêt pour l’audit plutôt qu’un outil de plus à remplir.",
+    "featuresHeading": "Chaque capacité DORA — pilotée par les agents, supervisée par vous",
     "features": {
       "gapAnalysis": {
         "title": "Évaluation fondée sur les preuves",
@@ -440,24 +440,24 @@
     "howItWorksHeading": "Comment ça marche",
     "steps": {
       "index": {
-        "title": "Indexer la documentation",
-        "desc": "Téléversez les contrats fournisseurs, les politiques TIC et les rapports d'audit. Retrieva les analyse, les découpe et les indexe automatiquement."
+        "title": "Confiez vos données",
+        "desc": "Connectez vos systèmes sources ou déposez contrats et preuves. Pas de tableur, pas de saisie — les agents prennent le relais."
       },
       "assess": {
-        "title": "Lancer l'évaluation DORA",
-        "desc": "L'IA analyse les documents au regard de chaque article DORA et classe la couverture en : couverte, partielle ou manquante."
+        "title": "Les agents se mettent au travail",
+        "desc": "Ils découvrent vos prestataires TIC, les évaluent au regard de chaque article DORA et récupèrent les preuves que vous n’avez pas déjà."
       },
       "invite": {
-        "title": "Inviter les fournisseurs",
-        "desc": "Envoyez des questionnaires de due diligence tokenisés et recevez des réponses notées, sans connexion fournisseur."
+        "title": "Les agents rédigent les artefacts",
+        "desc": "Le registre, les avenants, les plans de sortie et les événements de surveillance — rédigés en continu à mesure que votre périmètre évolue."
       },
       "ask": {
-        "title": "Interroger le copilote",
-        "desc": "Interrogez votre base de connaissances en langage naturel et obtenez des réponses sourcées, ancrées dans votre propre documentation."
+        "title": "Vous examinez et validez",
+        "desc": "Chaque brouillon arrive dans votre file de décision. Les agents proposent ; vous décidez — et assumez le verdict, avec séparation des rôles et piste d’audit complète."
       },
       "export": {
-        "title": "Exporter les preuves",
-        "desc": "Générez des livrables prêts pour le régulateur, dont le Registre d'information et les artefacts de remédiation des écarts."
+        "title": "Des résultats livrés",
+        "desc": "Un registre d’information prêt pour l’audit, des contrats conformes à DORA et des stratégies de sortie testées — défendables lors d’un contrôle."
       }
     },
     "problem": {
@@ -577,6 +577,31 @@
       "fail": "93,5 %",
       "failLabel": "ont échoué — le tableur ne modélise pas le graphe",
       "footnote": "Échecs les plus fréquents : données de contrat incomplètes, informations sous-traitants (nème-partie) manquantes, classification FCI erronée. Source : synthèse EBA 2024 DORA Dry Run."
+    },
+    "agents": {
+      "heading": "Vos agents permanents",
+      "subtitle": "Une main-d’œuvre IA supervisée qui gère le risque tiers de bout en bout. Les agents proposent ; votre analyste décide — rien n’est appliqué sans validation humaine.",
+      "tag": "Actif en continu",
+      "roi": {
+        "title": "Moteur de registre autonome",
+        "desc": "Découvre les prestataires TIC dans vos systèmes sources et maintient à jour le registre d’information EBA (RT.01–RT.04) — il découle du graphe, sans tableur à entretenir."
+      },
+      "dd": {
+        "title": "Due diligence & DDQ intelligentes",
+        "desc": "Évalue chaque fournisseur au regard de DORA, note les preuves disponibles, détecte les contradictions et relance ce qui manque via des questionnaires à jeton — sans compte fournisseur."
+      },
+      "contracts": {
+        "title": "Rédaction d’avenants (Art. 30)",
+        "desc": "Lit chaque contrat TIC et rédige les clauses d’avenant Art. 30 pour chaque obligation DORA manquante ou faible — et suit les préavis et fenêtres de révision tarifaire."
+      },
+      "exit": {
+        "title": "Stratégie de sortie dynamique",
+        "desc": "Propose des fournisseurs de substitution vérifiés et rédige des plans de sortie et modèles de réinternalisation testés pour vos fonctions critiques ou importantes."
+      },
+      "surveillance": {
+        "title": "Surveillance TIC critiques continue",
+        "desc": "Suit les incidents fournisseurs et les CVE, évalue l’impact et cartographie le rayon d’exposition de votre portefeuille — pour informer votre vue du risque, jamais pour noter automatiquement."
+      }
     }
   },
   "assessments": {

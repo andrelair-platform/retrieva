@@ -1,105 +1,90 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, UserCheck, Bot, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type Billing = 'monthly' | 'annual';
-
+// Service-ladder pricing (redesign 2026-10) — Retrieva is an AI-native SERVICE, not a SaaS tool.
+// The client hands over raw data; the agents do ~95%; the tier chooses WHO reviews/signs off/defends
+// and what outcome is guaranteed. Priced by the estate + the outcome, never by seats.
 interface Plan {
   name: string;
-  monthly: string;
-  annual: string;
-  monthlyRaw: number | null;
-  annualRaw: number | null;
-  vendors: string;
-  members: string;
-  support: string;
-  trial: string;
+  tagline: string;
+  price: string;
+  priceNote: string;
+  /** who reviews the AI's output and signs off / defends the register. */
+  reviewer: string;
+  /** the outcome guarantee for the tier. */
+  sla: string;
+  estate: string;
+  onboarding: string;
   highlighted: boolean;
   badge?: string;
+  /** the managed-service promise (Managed/Enterprise only). */
+  managedNote?: string;
   ctaLabel: string;
   ctaHref: string;
 }
 
-// The ONLY axes that actually vary by plan — vendors + seats are enforced by config/stripe.ts
-// PLAN_LIMITS (Stripe-wired); support + trial are the ops differences. Every capability below the
-// cards is included on all plans, so we don't fake feature gates that the product doesn't enforce.
 const PLANS: Plan[] = [
   {
-    name: 'Starter',
-    monthly: '€199',
-    annual: '€159',
-    monthlyRaw: 199,
-    annualRaw: 159,
-    vendors: 'Up to 10',
-    members: '3',
-    support: 'Email',
-    trial: '20-day free trial',
+    name: 'Supervised',
+    tagline: 'The AI agent workforce — your team reviews and signs off',
+    price: 'From €499',
+    priceNote: '/mo · scales with your estate',
+    estate: 'Scales with your third-party estate',
+    reviewer: 'Your ICT risk officer',
+    sla: 'Self-managed — you own the sign-off',
+    onboarding: '20-day free trial',
     highlighted: false,
     ctaLabel: 'Start free trial',
     ctaHref: '/register',
   },
   {
-    name: 'Professional',
-    monthly: '€499',
-    annual: '€399',
-    monthlyRaw: 499,
-    annualRaw: 399,
-    vendors: 'Up to 50',
-    members: '10',
-    support: 'Priority email',
-    trial: '20-day free trial',
+    name: 'Managed',
+    tagline: 'AI + our DORA experts — the outcome, guaranteed',
+    price: "Let's scope it",
+    priceNote: 'outcome-based engagement',
+    estate: 'Scales with your third-party estate',
+    reviewer: 'Our DORA Compliance Analysts',
+    sla: 'Audit-ready Register of Information',
+    onboarding: 'Guided onboarding',
     highlighted: true,
-    badge: 'Most Popular',
-    ctaLabel: 'Start free trial',
-    ctaHref: '/register',
+    badge: 'Managed service',
+    managedNote:
+      'You hand over raw data; the agents do ~95%. Our DORA analysts and legal experts review every output, sign off on your risk ratings, and defend your Register in a regulatory audit. You buy the outcome — a compliant register, contracts and exit strategies — not a licence.',
+    ctaLabel: 'Talk to us',
+    ctaHref: '/contact',
   },
   {
-    name: 'Business',
-    monthly: '€999',
-    annual: '€799',
-    monthlyRaw: 999,
-    annualRaw: 799,
-    vendors: 'Up to 150',
-    members: '30',
-    support: 'Slack + SLA',
-    trial: '20-day free trial',
+    name: 'Enterprise / Group',
+    tagline: 'Multi-entity groups, with legal audit defense',
+    price: 'Custom',
+    priceNote: 'annual engagement',
+    estate: 'Unlimited · multi-entity, cross-border',
+    reviewer: 'Dedicated analyst team + legal counsel',
+    sla: 'Custom SLA + in-audit defense',
+    onboarding: 'Guided proof-of-concept',
     highlighted: false,
-    ctaLabel: 'Start free trial',
-    ctaHref: '/register',
-  },
-  {
-    name: 'Enterprise',
-    monthly: 'Custom',
-    annual: 'Custom',
-    monthlyRaw: null,
-    annualRaw: null,
-    vendors: 'Unlimited',
-    members: 'Unlimited',
-    support: 'Dedicated CSM',
-    trial: 'Guided POC',
-    highlighted: false,
-    ctaLabel: 'Contact Sales',
+    managedNote:
+      'For insurance/banking groups running DORA across country entities: a dedicated analyst team, consolidated and per-entity registers, and legal experts who stand with you in front of the regulator.',
+    ctaLabel: 'Talk to us',
     ctaHref: '/contact',
   },
 ];
 
-// "Included on every plan" — each item is a capability that actually ships today (verified in the
-// codebase). Priced by the size of the estate, not by locking capabilities behind higher tiers.
+// The AI workforce runs on EVERY tier — these are real, shipped capabilities (verified in the
+// codebase). What changes up the ladder is WHO reviews/signs off/defends and the outcome SLA.
 const INCLUDED: { title: string; detail: string }[] = [
-  { title: 'Unlimited DORA gap assessments', detail: 'Art. 28/30 controls, evidence-grounded verdicts' },
-  { title: 'Register of Information export', detail: 'EBA RT.02.01 template (XLSX & CSV), gaps sheet' },
-  { title: 'Vendor questionnaires', detail: 'DORA due-diligence, scored automatically' },
-  { title: 'Vendor evidence portal', detail: 'Vendors upload requested documents — no account needed' },
-  { title: 'Nth-party dependency mapping', detail: 'Subcontractor chains, not just direct providers' },
-  { title: 'Concentration-risk analysis', detail: 'Spot single points of failure across the estate' },
-  { title: 'AI Copilot', detail: 'Ask your evidence base in plain language (RAG, cited)' },
-  { title: 'Certificate & contract alerts', detail: 'Expiry warnings before they lapse' },
+  { title: 'Autonomous discovery & assessment', detail: 'Agents find your ICT third parties and grade them against DORA' },
+  { title: 'Register of Information', detail: 'EBA RT.01–RT.04, kept current from the live graph' },
+  { title: 'Contract redlining (Art. 30)', detail: 'Draft amendment clauses for every missing obligation' },
+  { title: 'Exit strategies', detail: 'Substitute providers + tested exit blueprints for CIFs' },
+  { title: 'Continuous CTPP surveillance', detail: 'Provider incidents + CVEs, blast-radius mapped' },
+  { title: 'Vendor due-diligence & DDQs', detail: 'Tokenized questionnaires, scored — no vendor account' },
+  { title: 'Nth-party & concentration graph', detail: 'Subcontractor chains and single points of failure' },
   { title: 'Maker-checker + immutable audit', detail: 'Segregation of duties, append-only trail' },
-  { title: 'Role-based access control', detail: 'Scoped permissions per team member' },
 ];
 
 interface FeatureRowProps {
@@ -109,55 +94,29 @@ interface FeatureRowProps {
 
 function FeatureRow({ label, value }: FeatureRowProps) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
+    <div className="flex items-start justify-between gap-3 border-b border-border/60 py-2.5 last:border-0">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xs font-medium text-right max-w-[55%]">{value}</span>
+      <span className="text-right text-xs font-medium text-foreground">{value}</span>
     </div>
   );
 }
 
 export function PricingSection() {
-  const [billing, setBilling] = useState<Billing>('monthly');
-
   return (
     <section className="container mx-auto px-4 py-24">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold mb-4">Simple, transparent pricing</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-          Every capability on every plan — you only pay for the size of your third-party estate.
-          20-day free trial, no credit card required to start.
+      <div className="text-center mb-14">
+        <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-4">
+          Priced around the outcome, not seats
+        </h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          You hand over raw data; the AI agents do ~95% of the work. Choose how much you want to own —
+          supervise the agents yourself, or let our DORA experts review, sign off, and defend your
+          Register. You pay for the outcome and the size of your estate, never per seat.
         </p>
-
-        {/* Billing toggle */}
-        <div className="inline-flex items-center rounded-full border p-1 bg-muted/50">
-          <button
-            onClick={() => setBilling('monthly')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              billing === 'monthly'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setBilling('annual')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
-              billing === 'annual'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Annual
-            <span className="text-xs font-semibold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-full">
-              -20%
-            </span>
-          </button>
-        </div>
       </div>
 
-      {/* 4-card grid — cards show ONLY what varies by plan */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 3 service tiers — the ladder from supervised-platform to fully-managed. */}
+      <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
         {PLANS.map((plan, index) => (
           <motion.div
             key={plan.name}
@@ -165,7 +124,7 @@ export function PricingSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
-            className={`relative rounded-xl p-6 flex flex-col ${
+            className={`relative rounded-2xl p-6 flex flex-col ${
               plan.highlighted ? 'ring-2 ring-primary bg-card shadow-lg' : 'border bg-card'
             }`}
           >
@@ -175,41 +134,45 @@ export function PricingSection() {
               </span>
             )}
 
-            <h3 className="font-semibold text-lg mb-1">{plan.name}</h3>
+            <h3 className="font-display font-semibold text-lg mb-0.5">{plan.name}</h3>
+            <p className="text-xs text-muted-foreground mb-5 min-h-8">{plan.tagline}</p>
 
-            <div className="mb-6">
-              {plan.monthlyRaw === null ? (
-                <div className="text-4xl font-bold">Custom</div>
-              ) : (
-                <>
-                  <div className="text-4xl font-bold">
-                    {billing === 'monthly' ? plan.monthly : plan.annual}
-                    <span className="text-base font-normal text-muted-foreground">/mo</span>
-                  </div>
-                  {billing === 'annual' && (
-                    <p className="text-xs text-muted-foreground mt-1">billed annually</p>
-                  )}
-                </>
-              )}
+            <div className="mb-5">
+              <div className="font-display text-3xl font-bold tracking-tight">{plan.price}</div>
+              <p className="text-xs text-muted-foreground mt-1">{plan.priceNote}</p>
             </div>
 
-            <div className="flex-1 space-y-0">
-              <FeatureRow label="Vendors managed" value={plan.vendors} />
-              <FeatureRow label="Team members" value={plan.members} />
-              <FeatureRow label="Support" value={plan.support} />
-              <FeatureRow label="Onboarding" value={plan.trial} />
+            <div className="flex-1">
+              <FeatureRow
+                label="Reviews & signs off"
+                value={
+                  <span className="inline-flex items-center gap-1.5">
+                    {plan.name === 'Supervised' ? (
+                      <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <UserCheck className="h-3.5 w-3.5 text-primary" />
+                    )}
+                    {plan.reviewer}
+                  </span>
+                }
+              />
+              <FeatureRow label="Outcome SLA" value={plan.sla} />
+              <FeatureRow label="Estate" value={plan.estate} />
+              <FeatureRow label="Onboarding" value={plan.onboarding} />
             </div>
 
-            <p className="text-[11px] text-muted-foreground mt-3 mb-1">
-              + every capability below, included
+            {plan.managedNote && (
+              <p className="mt-4 rounded-lg bg-primary/[0.05] border border-primary/15 p-3 text-xs text-muted-foreground leading-relaxed">
+                {plan.managedNote}
+              </p>
+            )}
+
+            <p className="text-[11px] text-muted-foreground mt-4 mb-1">
+              + the full AI agent workforce, below
             </p>
 
             <Link href={plan.ctaHref} className="mt-3">
-              <Button
-                size="lg"
-                variant={plan.highlighted ? 'default' : 'outline'}
-                className="w-full"
-              >
+              <Button size="lg" variant={plan.highlighted ? 'default' : 'outline'} className="w-full">
                 {plan.ctaLabel}
               </Button>
             </Link>
@@ -217,13 +180,18 @@ export function PricingSection() {
         ))}
       </div>
 
-      {/* Everything included — the real capability set, on every plan */}
-      <div className="mt-14 rounded-xl border bg-card/50 p-8">
-        <h3 className="text-lg font-semibold text-center mb-1">Included on every plan</h3>
-        <p className="text-sm text-muted-foreground text-center mb-8 max-w-xl mx-auto">
-          No feature paywalls. Starter and Enterprise run the same DORA platform — the difference is
-          how many third parties you manage and the support you need.
-        </p>
+      {/* The AI workforce — included on every tier; the ladder only changes the human layer. */}
+      <div className="mt-14 rounded-2xl border bg-card/50 p-8 max-w-6xl mx-auto">
+        <div className="text-center mb-8 max-w-2xl mx-auto">
+          <ShieldCheck className="h-8 w-8 text-primary mx-auto mb-3" />
+          <h3 className="font-display text-lg font-semibold mb-1">Every tier runs the full AI agent workforce</h3>
+          <p className="text-sm text-muted-foreground">
+            The agents — discovery, assessment, DDQs, contract redlining, exit strategy, surveillance —
+            run on every tier. <span className="text-foreground font-medium">Managed and Enterprise add
+            DORA analysts and legal experts</span> who review, sign off, and defend. You never lose a
+            capability by running a smaller estate.
+          </p>
+        </div>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
           {INCLUDED.map((f) => (
             <div key={f.title} className="flex items-start gap-3">

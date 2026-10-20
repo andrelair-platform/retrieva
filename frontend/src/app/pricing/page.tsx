@@ -8,20 +8,29 @@ import { PricingSection } from '@/components/marketing/pricing-section';
 
 const FAQ_ITEMS = [
   {
-    question: 'Can I change plans later?',
-    answer: 'Yes, you can upgrade or downgrade your plan at any time from your billing settings. Changes take effect immediately.',
+    question: 'Is Retrieva software or a service?',
+    answer:
+      'Both, and you choose which. On Supervised you run the AI agent workforce yourself and your ICT risk officer signs off. On Managed and Enterprise it becomes a service: the agents still do ~95% of the work, and our DORA Compliance Analysts and legal experts review every output, sign off on the risk ratings, and defend your Register in a regulatory audit.',
   },
   {
-    question: 'What happens after the trial?',
-    answer: "At the end of your 20-day trial you'll be prompted to add a payment method to continue. We never auto-charge — your data stays safe until you decide.",
+    question: 'What do I actually hand over?',
+    answer:
+      'Raw data — contracts, invoices, vendor lists, or just read-only access to your source systems. There is no data-entry burden: the agents parse, map, assess, and draft. You stay accountable for every provider; we make the gaps explicit and tracked.',
   },
   {
-    question: 'Is there an annual discount?',
-    answer: 'Yes — all paid plans are 20% cheaper when billed annually. You can switch between monthly and annual billing at any time from your billing settings.',
+    question: 'What does the outcome SLA guarantee?',
+    answer:
+      'On Managed and Enterprise you buy an outcome, not a licence: an audit-ready Register of Information (EBA RT.01–RT.04), DORA-compliant contract amendments, and tested exit strategies for your critical-or-important functions — reviewed and signed off by our experts and defensible in front of the regulator.',
   },
   {
-    question: 'How does the Enterprise POC work?',
-    answer: 'Contact our sales team and we will scope a proof-of-concept tailored to your organisation. No commitment required — the POC is designed to validate fit before you sign.',
+    question: 'Who signs off on the risk ratings?',
+    answer:
+      'On Supervised, your own ICT risk officer — the AI drafts, your team decides. On Managed and Enterprise, our DORA analysts review and sign off, with your management body retaining ultimate accountability (maker-checker and an immutable audit trail apply on every tier).',
+  },
+  {
+    question: 'Can I start without talking to sales?',
+    answer:
+      'Yes. Supervised has a 20-day free trial — no credit card to start. Move up to Managed when you want our experts to own the review and guarantee the outcome.',
   },
 ];
 
@@ -83,9 +92,7 @@ export default function PricingPage() {
         <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
           <p>
             &copy; {new Date().getFullYear()} Retrieva.{' '}
-            <span className="opacity-60">
-              Built for DORA (Regulation EU 2022/2554) compliance.
-            </span>
+            <span>Built for DORA (Regulation EU 2022/2554) compliance.</span>
           </p>
         </div>
       </footer>

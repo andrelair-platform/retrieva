@@ -366,9 +366,9 @@
   },
   "landing": {
     "badge": "DORA Regulation (EU) 2022/2554",
-    "heroTitle": "See where a single vendor takes the business down.",
-    "heroSubtitle": "Retrieva maps every vendor and its subprocessors into one graph — the concentration and single points of failure your Register can’t show. Drop in a contract, get an evidence-grounded assessment, and turn gaps into tracked, owned risk. For a single entity or a whole group across borders.",
-    "featuresHeading": "Everything you need to meet DORA obligations",
+    "heroTitle": "Your DORA third-party risk, run by AI agents — signed off by you.",
+    "heroSubtitle": "Autonomous agents discover your ICT providers, assess them against DORA, chase the evidence, watch for incidents, and draft the Register, contract amendments and exit plans. Your risk officer reviews each draft and signs off — you keep accountability, and you get an audit-ready outcome instead of another tool to fill in.",
+    "featuresHeading": "Every DORA capability — run by the agents, supervised by you",
     "features": {
       "gapAnalysis": {
         "title": "Evidence-grounded assessment",
@@ -440,24 +440,24 @@
     "howItWorksHeading": "How It Works",
     "steps": {
       "index": {
-        "title": "Index Documentation",
-        "desc": "Upload vendor contracts, ICT policies, and audit reports. Retrieva parses, chunks, and embeds them automatically."
+        "title": "Hand over your data",
+        "desc": "Connect your source systems or drop in contracts and evidence. No spreadsheets, no data entry — the agents take it from here."
       },
       "assess": {
-        "title": "Run DORA Assessment",
-        "desc": "AI analyses documents against each DORA article and classifies coverage as covered, partial, or missing."
+        "title": "Agents go to work",
+        "desc": "They discover your ICT providers, assess each against every DORA article, and chase the evidence you don’t already have."
       },
       "invite": {
-        "title": "Invite Vendors",
-        "desc": "Send tokenised due diligence questionnaires and get scored responses back without vendor logins."
+        "title": "Agents draft the artefacts",
+        "desc": "The Register, contract amendments, exit plans and surveillance events — drafted continuously as your estate changes."
       },
       "ask": {
-        "title": "Ask the Copilot",
-        "desc": "Query your knowledge base in natural language and get cited answers grounded in your own documentation."
+        "title": "You review & sign off",
+        "desc": "Every draft lands in your decision inbox. Agents propose; you dispose — and own the verdict, with maker-checker and a full audit trail."
       },
       "export": {
-        "title": "Export Evidence",
-        "desc": "Generate regulator-ready outputs including the Register of Information and gap remediation artefacts."
+        "title": "Outcomes delivered",
+        "desc": "An audit-ready Register of Information, DORA-compliant contracts and tested exit strategies — defensible in a regulator review."
       }
     },
     "problem": {
@@ -577,6 +577,31 @@
       "fail": "93.5%",
       "failLabel": "failed — spreadsheets can’t model the graph",
       "footnote": "Top failures: incomplete contract data, missing subcontractor (nth-party) info, wrong CIF classification. Source: EBA 2024 DORA Dry Run summary."
+    },
+    "agents": {
+      "heading": "Your always-on agents",
+      "subtitle": "A supervised AI workforce that runs third-party risk end to end. Agents propose; your analyst disposes — nothing is applied without a human sign-off.",
+      "tag": "Always on",
+      "roi": {
+        "title": "Autonomous Register engine",
+        "desc": "Discovers the ICT third parties across your source systems and keeps the EBA Register of Information (RT.01–RT.04) current — it falls out of the graph, no spreadsheet to maintain."
+      },
+      "dd": {
+        "title": "Intelligent due diligence & DDQs",
+        "desc": "Assesses each vendor against DORA, scores the evidence you have, flags contradictions, and chases what’s missing with tokenized questionnaires — no vendor account needed."
+      },
+      "contracts": {
+        "title": "Contract redliner (Art. 30)",
+        "desc": "Reads each ICT contract and drafts the Art. 30 amendment clauses for every missing or weak DORA obligation — and tracks notice periods and price-review windows."
+      },
+      "exit": {
+        "title": "Dynamic exit strategy",
+        "desc": "Proposes verified substitute providers and drafts tested exit blueprints and reintegration models for your critical-or-important functions."
+      },
+      "surveillance": {
+        "title": "Continuous CTPP surveillance",
+        "desc": "Watches provider incidents and CVEs, scores the impact, and maps the blast radius across your portfolio — informing your risk view, never auto-rating."
+      }
     }
   },
   "assessments": {
