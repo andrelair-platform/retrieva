@@ -6,10 +6,10 @@ import { SectionTitle } from '../../components/SectionTitle';
 import { Badge } from '../../components/Badge';
 
 const PILLARS = [
-  { icon: '🔒', title: 'Workspace Isolation', sub: 'Strict multi-tenant data separation' },
-  { icon: '🕵️', title: 'PII Detection', sub: 'Automatic redaction before indexing' },
-  { icon: '📋', title: 'Audit Logging', sub: 'Full immutable activity trail' },
-  { icon: '🗝️', title: 'Encrypted Secrets', sub: 'SOPS + age key management' },
+  { icon: '🧑‍⚖️', title: 'Human-in-the-loop', sub: 'Agents propose; your officer signs off (maker-checker)' },
+  { icon: '📎', title: 'Every verdict cited', sub: 'Grounded in your evidence, never faked' },
+  { icon: '📋', title: 'Immutable audit trail', sub: 'Every decision logged, append-only' },
+  { icon: '🕵️', title: 'PII masking + isolation', sub: 'Redacted before indexing; strict tenant separation' },
 ];
 
 export function Scene07Security() {
@@ -34,8 +34,8 @@ export function Scene07Security() {
       }}
     >
       <SectionTitle
-        title="Enterprise-Grade Security"
-        accentWord="Security"
+        title="Responsible AI, by design"
+        accentWord="Responsible"
         accentColor={COLORS.green}
         delay={0}
         fontSize={FONT_SIZES.xl}

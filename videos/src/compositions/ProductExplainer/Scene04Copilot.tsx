@@ -6,11 +6,11 @@ import { SectionTitle } from '../../components/SectionTitle';
 import { CodeLine } from '../../components/CodeLine';
 import { Badge } from '../../components/Badge';
 
-const Q1 = 'What DORA articles cover third-party ICT risk?';
-const A1 = 'Articles 28-44 cover ICT third-party risk, including due diligence, contractual provisions, and the Register of Information under Art. 28(3).';
+const Q1 = 'What DORA articles did the agents review for third-party ICT risk?';
+const A1 = 'The agents assessed Articles 28-44 on ICT third-party risk, covering due diligence, contractual provisions, and the Register of Information under Art. 28(3).';
 
-const Q2 = 'Is our vendor Acme Corp covered for Art. 11?';
-const A2 = 'Based on the uploaded ICT BCP, Acme Corp partially covers Art. 11. Missing: recovery time objectives documentation.';
+const Q2 = 'What did the agents find for vendor Acme Corp on Art. 11?';
+const A2 = 'The agents flagged Acme Corp as partially covering Art. 11, based on its uploaded ICT BCP. Missing: recovery time objectives documentation.';
 
 export function Scene04Copilot() {
   const frame = useCurrentFrame();
@@ -33,8 +33,8 @@ export function Scene04Copilot() {
       }}
     >
       <SectionTitle
-        title="DORA AI Copilot"
-        accentWord="AI"
+        title="Ask the agent workforce"
+        accentWord="agent"
         accentColor={COLORS.green}
         delay={0}
         fontSize={FONT_SIZES.xl}

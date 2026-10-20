@@ -143,9 +143,9 @@ export function Scene09CTA() {
             lineHeight: 1.05,
             margin: 0,
           }}>
-            Start compliant.{' '}
+            Hand over your vendors.{' '}
             <span style={{ color: COLORS.blue, textShadow: `0 0 40px ${COLORS.blueGlow}` }}>
-              Stay compliant.
+              Keep the sign-off.
             </span>
           </h2>
         </div>

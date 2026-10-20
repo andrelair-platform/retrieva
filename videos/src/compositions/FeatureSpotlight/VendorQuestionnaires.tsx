@@ -36,10 +36,10 @@ function Intro() {
       <div style={{ textAlign:'center' }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:'0 0 8px',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600 }}>Feature Spotlight</p>
         <h1 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES['3xl'],fontWeight:800,color:COLORS.text,letterSpacing:'-0.03em',margin:0 }}>
-          Vendor{' '}<span style={{ color:ACCENT }}>Questionnaires</span>
+          The Due-Diligence{' '}<span style={{ color:ACCENT }}>Agent</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          Replace 3–8 week email chains with AI-scored questionnaires. Vendors respond in a portal. You get scored results instantly.
+          The agent chases the evidence — tokenized due-diligence questionnaires, scored automatically, no vendor account.
         </p>
       </div>
       {/* Before/after badge */}
@@ -104,8 +104,8 @@ function Demo() {
 
         {/* Risk flags */}
         <div style={{ padding:'12px 16px',background:`${COLORS.orange}08`,border:`1px solid ${COLORS.orange}30`,borderRadius:RADIUS.lg,opacity:computeSpring(frame,fps,300,'smooth',0,1) }}>
-          <p style={{ fontFamily:FONTS.sans,fontSize:12,color:COLORS.textMuted,margin:'0 0 8px',fontWeight:600 }}>⚠ Risk flags detected</p>
-          <p style={{ fontFamily:FONTS.sans,fontSize:12,color:COLORS.textMuted,margin:0,lineHeight:1.45 }}>Art. 26 TLPT gap — score 45%. Recommend remediation before next supervisory review.</p>
+          <p style={{ fontFamily:FONTS.sans,fontSize:12,color:COLORS.textMuted,margin:'0 0 8px',fontWeight:600 }}>⚠ Agent flagged for sign-off</p>
+          <p style={{ fontFamily:FONTS.sans,fontSize:12,color:COLORS.textMuted,margin:0,lineHeight:1.45 }}>Art. 26 TLPT gap — score 45%. Agent drafted remediation for your review before next supervisory review.</p>
         </div>
       </div>
     </div>
@@ -123,7 +123,7 @@ function CTA() {
   return (
     <div style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,opacity:o,position:'relative' }}>
       <Logo delay={0} size="sm" position="center" />
-      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Send your first questionnaire free at</p>
+      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Put the agent to work free at</p>
       <div style={{ display:'flex',alignItems:'center',padding:'14px 32px',background:`${ACCENT}12`,border:`1.5px solid ${ACCENT}55`,borderRadius:RADIUS.xl,boxShadow:glow,transform:`scale(${s})` }}>
         <span style={{ fontFamily:FONTS.mono,fontSize:FONT_SIZES.xl,fontWeight:700,color:ACCENT }}>retrieva.online</span>
         <span style={{ display:'inline-block',width:'0.5em',height:'1em',background:ACCENT,marginLeft:4,verticalAlign:'text-bottom',opacity:cur }} />

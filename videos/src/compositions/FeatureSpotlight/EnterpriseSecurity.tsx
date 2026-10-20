@@ -1,7 +1,7 @@
 /**
- * FeatureSpotlight — Enterprise-Grade Security
+ * FeatureSpotlight — Responsible AI, Human-in-the-Loop
  * 750f / 25s, 1920×1080
- * Story: Built for regulated industries. Every layer hardened.
+ * Story: Agents propose, you dispose — every verdict cited, every decision audited.
  */
 import React from 'react';
 import { Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
@@ -17,17 +17,17 @@ import { StatPill } from '../../components/StatPill';
 const ACCENT = COLORS.blue;
 
 const PILLARS = [
-  { icon:'🔒', title:'Workspace Isolation',   sub:'Strict multi-tenant data separation. No cross-workspace data leakage possible.',      color:COLORS.blue,   check:'✓' },
-  { icon:'🕵️', title:'PII Auto-detection',    sub:'Personal data identified and redacted before embedding into the vector store.',        color:COLORS.purple, check:'✓' },
-  { icon:'📋', title:'Immutable Audit Log',   sub:'Every query, upload, and export logged with timestamps. 5-year retention.',             color:COLORS.green,  check:'✓' },
-  { icon:'🗝️', title:'Encrypted Secrets',    sub:'SOPS + age encryption. Zero plaintext secrets in code or environment variables.',      color:COLORS.orange, check:'✓' },
+  { icon:'🔒', title:'Data Isolation',        sub:'Your data stays yours. Strict tenant separation — no cross-client leakage possible.',  color:COLORS.blue,   check:'✓' },
+  { icon:'🕵️', title:'PII Auto-masking',      sub:'Personal data identified and redacted before any agent reasons over it.',             color:COLORS.purple, check:'✓' },
+  { icon:'📋', title:'Every Decision Audited', sub:'Each agent proposal and human sign-off logged with timestamps. 5-year retention.',    color:COLORS.green,  check:'✓' },
+  { icon:'🗝️', title:'Every Verdict Cited',  sub:'Agents show their evidence — no claim without a traceable source. You review, you decide.', color:COLORS.orange, check:'✓' },
 ];
 
 const CERTIFICATIONS = [
-  { label:'SOC 2 Ready',         color:COLORS.green  },
-  { label:'GDPR Compliant',      color:COLORS.blue   },
+  { label:'Human-in-the-Loop',   color:COLORS.green  },
+  { label:'Cited & Traceable',   color:COLORS.blue   },
   { label:'DORA Art. 9 Aligned', color:COLORS.blue   },
-  { label:'ISO 27001 Ready',     color:COLORS.purple },
+  { label:'PII-Masked',          color:COLORS.purple },
 ];
 
 function Intro() {
@@ -48,10 +48,10 @@ function Intro() {
       <div style={{ textAlign:'center' }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:'0 0 8px',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600 }}>Feature Spotlight</p>
         <h1 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES['3xl'],fontWeight:800,color:COLORS.text,letterSpacing:'-0.03em',margin:0 }}>
-          Enterprise-Grade{' '}<span style={{ color:ACCENT }}>Security</span>
+          Agents Propose,{' '}<span style={{ color:ACCENT }}>You Dispose</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          Built for regulated industries. Every layer is hardened, logged, and encrypted.
+          Every verdict cited, every decision audited, data isolated and PII-masked. A human reviews and signs off.
         </p>
       </div>
     </div>
@@ -99,7 +99,7 @@ function Demo() {
           })}
         </div>
 
-        <StatPill value="0" label="Breaches since launch" delay={140} color={COLORS.green} />
+        <StatPill value="100%" label="Decisions human-signed" delay={140} color={COLORS.green} />
       </div>
 
       {/* Security pillars */}
@@ -149,7 +149,7 @@ function CTA() {
   return (
     <div style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,opacity:o,position:'relative' }}>
       <Logo delay={0} size="sm" position="center" />
-      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Enterprise security, starter price. Try at</p>
+      <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:0 }}>Agents propose, you dispose. Try at</p>
       <div style={{ display:'flex',alignItems:'center',padding:'14px 32px',background:`${ACCENT}12`,border:`1.5px solid ${ACCENT}55`,borderRadius:RADIUS.xl,boxShadow:glow,transform:`scale(${s})` }}>
         <span style={{ fontFamily:FONTS.mono,fontSize:FONT_SIZES.xl,fontWeight:700,color:ACCENT }}>retrieva.online</span>
         <span style={{ display:'inline-block',width:'0.5em',height:'1em',background:ACCENT,marginLeft:4,verticalAlign:'text-bottom',opacity:cur }} />

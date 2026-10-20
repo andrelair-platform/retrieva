@@ -81,9 +81,9 @@ function HookSegment() {
           opacity: line2O,
           transform: `translateY(${line2Y}px)`,
         }}>
-          Is your ICT risk register
+          Let AI agents run your
           <br />
-          ready for regulators?
+          third-party risk.
         </h2>
       </div>
 
@@ -140,10 +140,10 @@ function ProofSegment() {
     }}>
       <div style={{ opacity: titleO, textAlign: 'center' }}>
         <p style={{ fontFamily: FONTS.sans, fontSize: 22, color: COLORS.textMuted, margin: 0 }}>
-          Retrieva shows you exactly
+          Agents assess. You just
         </p>
         <h2 style={{ fontFamily: FONTS.sans, fontSize: 44, fontWeight: 800, color: COLORS.text, letterSpacing: '-0.03em', margin: '6px 0 0' }}>
-          where you stand.
+          sign off.
         </h2>
       </div>
 
@@ -180,9 +180,9 @@ function FeaturesSegment() {
   const { fps } = useVideoConfig();
 
   const FEATURES = [
-    { icon: '🔍', title: 'Automated Gap Analysis',      sub: 'AI maps your docs to all 28 DORA articles', color: COLORS.blue,   delay: 0  },
-    { icon: '🤖', title: 'AI Copilot',                  sub: 'Ask compliance questions in plain language',  color: COLORS.green,  delay: 30 },
-    { icon: '📋', title: 'EBA Register of Information', sub: 'Art. 28(3) XLSX export — one click',          color: COLORS.purple, delay: 60 },
+    { icon: '🔍', title: 'Agents Discover & Assess',    sub: 'Providers mapped to DORA — gaps drafted for you', color: COLORS.blue,   delay: 0  },
+    { icon: '🤖', title: 'Agents Draft, You Approve',   sub: 'Register, amendments, exit plans — proposed',     color: COLORS.green,  delay: 30 },
+    { icon: '📋', title: 'Agents Keep It Current',      sub: 'Incidents & CVEs surveilled — Register live',     color: COLORS.purple, delay: 60 },
   ];
 
   return (
@@ -198,10 +198,10 @@ function FeaturesSegment() {
     }}>
       <div style={{ opacity: computeSpring(frame, fps, 0, 'smooth', 0, 1), textAlign: 'center' }}>
         <h2 style={{ fontFamily: FONTS.sans, fontSize: 48, fontWeight: 800, color: COLORS.text, letterSpacing: '-0.03em', margin: 0 }}>
-          Everything you need.
+          Agents do ~95%.
         </h2>
         <p style={{ fontFamily: FONTS.sans, fontSize: 22, color: COLORS.textMuted, margin: '8px 0 0' }}>
-          Nothing you don't.
+          You just sign off.
         </p>
       </div>
 
@@ -242,9 +242,9 @@ function StatsSegment() {
   const { fps } = useVideoConfig();
 
   const STATS = [
-    { value: 150, suffix: '+', label: 'Vendors managed',    color: COLORS.blue,   delay: 0  },
-    { value: 28,  suffix: '',  label: 'DORA articles',       color: COLORS.green,  delay: 15 },
-    { value: 48,  suffix: 'h', label: 'To first gap report', color: COLORS.purple, delay: 30 },
+    { value: 95,  suffix: '%', label: 'Done by the agents',   color: COLORS.blue,   delay: 0  },
+    { value: 28,  suffix: '',  label: 'DORA articles covered', color: COLORS.green,  delay: 15 },
+    { value: 48,  suffix: 'h', label: 'To first agent report', color: COLORS.purple, delay: 30 },
   ];
 
   return (
@@ -326,7 +326,7 @@ function CTASegment() {
     }}>
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontFamily: FONTS.sans, fontSize: 26, color: COLORS.textMuted, margin: '0 0 8px' }}>
-          Start your free trial at
+          Put the agents to work at
         </p>
         <div style={{
           display: 'flex',

@@ -42,10 +42,10 @@ function Intro() {
       <div style={{ textAlign:'center' }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.base,color:COLORS.textMuted,margin:'0 0 8px',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600 }}>Feature Spotlight</p>
         <h1 style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES['3xl'],fontWeight:800,color:COLORS.text,letterSpacing:'-0.03em',margin:0 }}>
-          Automated{' '}<span style={{ color:ACCENT }}>Gap Analysis</span>
+          The Assessment{' '}<span style={{ color:ACCENT }}>Agent</span>
         </h1>
         <p style={{ fontFamily:FONTS.sans,fontSize:FONT_SIZES.md,color:COLORS.textMuted,margin:'12px 0 0',lineHeight:1.5 }}>
-          AI maps your vendor documentation across all 28 DORA articles in minutes, not weeks.
+          Agents assess every vendor against all 28 DORA articles — evidence cited, gaps flagged for your sign-off.
         </p>
       </div>
     </div>
@@ -65,7 +65,7 @@ function Demo() {
       {/* Article list */}
       <div style={{ display:'flex',flexDirection:'column',gap:12,flex:1 }}>
         <p style={{ fontFamily:FONTS.sans,fontSize:12,fontWeight:600,color:COLORS.textDim,textTransform:'uppercase',letterSpacing:'0.1em',margin:'0 0 4px',opacity:computeSpring(frame,fps,0,'smooth',0,1) }}>
-          DORA Article Coverage
+          Agent-Assessed DORA Coverage
         </p>
         {CLAUSES.map((c, i) => {
           const delay = i * STAGGER;
@@ -97,7 +97,7 @@ function Demo() {
 
         {/* Key stats */}
         <div style={{ display:'flex',flexDirection:'column',gap:12,width:'100%' }}>
-          <StatPill value="&lt; 2 min" label="Analysis time"  delay={200} color={ACCENT} />
+          <StatPill value="&lt; 2 min" label="Agent assessment"  delay={200} color={ACCENT} />
           <StatPill value="28"     label="DORA articles"  delay={215} color={COLORS.green} />
           <StatPill value="100%"   label="EBA-ready XLSX" delay={230} color={COLORS.purple} />
         </div>
