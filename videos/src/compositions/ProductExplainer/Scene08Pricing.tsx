@@ -4,31 +4,25 @@ import { COLORS, FONTS, FONT_SIZES, RADIUS, SHADOWS } from '../../lib/brand';
 import { computeSpring } from '../../lib/spring';
 import { SectionTitle } from '../../components/SectionTitle';
 
+// Service ladder — priced around the outcome, not seats (mirrors the site, 2026-10).
 const TIERS = [
   {
-    name: 'Starter',
-    price: 'Free',
-    features: ['3 vendors', '5 docs', 'Gap analysis', 'Community support'],
+    name: 'Supervised',
+    price: 'From €499',
+    period: '/mo',
+    features: ['The AI agent workforce', 'Your team reviews & signs off', 'Scales with your estate', '20-day free trial'],
     highlight: false,
   },
   {
-    name: 'Professional',
-    price: '€99',
-    period: '/mo',
-    features: ['50 vendors', 'Unlimited docs', 'AI Copilot', 'RoI export', 'Email alerts'],
+    name: 'Managed',
+    price: "Let's scope it",
+    features: ['AI + our DORA experts', 'Experts review, sign off & defend', 'Audit-ready Register SLA', 'Guided onboarding'],
     highlight: true,
   },
   {
-    name: 'Business',
-    price: '€299',
-    period: '/mo',
-    features: ['Unlimited vendors', 'Priority support', 'Custom integrations', 'SSO'],
-    highlight: false,
-  },
-  {
-    name: 'Enterprise',
+    name: 'Enterprise / Group',
     price: 'Custom',
-    features: ['Dedicated instance', 'SLA', 'Onboarding', 'SIEM integration'],
+    features: ['Multi-entity, cross-border', 'Legal defense in audits', 'Dedicated analyst team', 'Custom SLA'],
     highlight: false,
   },
 ];
@@ -50,7 +44,7 @@ export function Scene08Pricing() {
         padding: '0 80px',
       }}
     >
-      <SectionTitle title="Simple Pricing" delay={0} fontSize={FONT_SIZES.xl} />
+      <SectionTitle title="Priced around the outcome" delay={0} fontSize={FONT_SIZES.xl} />
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'stretch', width: '100%', maxWidth: 1200 }}>
         {TIERS.map((tier, i) => {
@@ -98,7 +92,7 @@ export function Scene08Pricing() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Most Popular
+                  Managed service
                 </div>
               )}
 

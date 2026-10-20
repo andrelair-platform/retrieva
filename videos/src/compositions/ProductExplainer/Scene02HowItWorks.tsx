@@ -4,12 +4,13 @@ import { COLORS, FONTS, FONT_SIZES, RADIUS, SHADOWS } from '../../lib/brand';
 import { computeSpring } from '../../lib/spring';
 import { SectionTitle } from '../../components/SectionTitle';
 
+// The AI-native flow: agents do the work, you review & sign off, outcomes are delivered.
 const STEPS = [
-  { num: '1', title: 'Index Docs', sub: 'Upload vendor contracts, policies, and audit reports.' },
-  { num: '2', title: 'Run Assessment', sub: 'AI maps each doc to DORA articles automatically.' },
-  { num: '3', title: 'Send Questionnaire', sub: 'Vendors respond; LLM scores compliance instantly.' },
-  { num: '4', title: 'Monitor Alerts', sub: 'Cert expiry, renewal, and overdue review alerts.' },
-  { num: '5', title: 'Export RoI', sub: 'One-click EBA Article 28(3) XLSX export.' },
+  { num: '1', title: 'Hand over data', sub: 'Connect your systems or drop in contracts — no data entry.' },
+  { num: '2', title: 'Agents assess', sub: 'They discover providers and grade each against DORA.' },
+  { num: '3', title: 'Agents draft', sub: 'Register, Art-30 amendments and exit plans — continuously.' },
+  { num: '4', title: 'You sign off', sub: 'Every draft hits your inbox; agents propose, you dispose.' },
+  { num: '5', title: 'Outcome delivered', sub: 'An audit-ready Register of Information, defensible in review.' },
 ];
 
 export function Scene02HowItWorks() {
