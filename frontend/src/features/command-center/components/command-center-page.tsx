@@ -117,13 +117,13 @@ export function CommandCenterPage() {
         />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/50">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/85">
               {t('commandCenter.kicker')}
             </p>
             <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
               {t('nav.titles.commandCenter')}
             </h1>
-            <p className="max-w-xl text-sm text-sidebar-foreground/70">
+            <p className="max-w-xl text-sm text-sidebar-foreground/90">
               {t('commandCenter.subtitle')}
             </p>
           </div>
@@ -145,7 +145,7 @@ export function CommandCenterPage() {
                 />
                 <span className={cn('relative inline-flex h-2.5 w-2.5 rounded-full', bandStyle.dot)} />
               </span>
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/60">
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/85">
                 {t('commandCenter.posture.title')}
               </span>
             </div>
@@ -158,7 +158,7 @@ export function CommandCenterPage() {
             ) : (
               <p className="mt-2 font-display text-xl font-semibold">
                 <span className={bandStyle.label}>{posture.total}</span>{' '}
-                <span className="text-sidebar-foreground/70 text-sm font-normal">
+                <span className="text-sidebar-foreground/90 text-sm font-normal">
                   {t('commandCenter.posture.needsReview', { count: posture.total })}
                 </span>
               </p>
@@ -168,7 +168,7 @@ export function CommandCenterPage() {
               {SEVERITY_ORDER.filter((s) => posture.bySeverity[s] > 0).map((s) => (
                 <span
                   key={s}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-sidebar/60 px-2 py-1 font-mono text-[11px] text-sidebar-foreground/80"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-sidebar/60 px-2 py-1 font-mono text-[11px] text-sidebar-foreground/90"
                 >
                   <span className={cn('h-1.5 w-1.5 rounded-full', SEVERITY_DOT[s])} />
                   {posture.bySeverity[s]} {t(`commandCenter.posture.${s}`)}

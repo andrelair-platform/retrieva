@@ -66,7 +66,7 @@ export function Header() {
       )}
 
       {pageTitleKey && (
-        <span className="text-sm font-medium text-foreground/60 tracking-tight">
+        <span className="text-sm font-medium text-foreground/80 tracking-tight">
           {t(pageTitleKey)}
         </span>
       )}

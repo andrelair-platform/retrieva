@@ -82,7 +82,7 @@ export function Sidebar() {
       {!sidebarCollapsed && (
         <div className="px-4 pt-3 pb-3 border-b border-sidebar-border space-y-2">
           {user?.organization && (
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/30 truncate">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70 truncate">
               {user.organization.name}
             </p>
           )}
@@ -101,7 +101,7 @@ export function Sidebar() {
               <div key={section.label} className={cn(idx > 0 && 'mt-4')}>
                 {/* Section label — hidden when collapsed */}
                 {!sidebarCollapsed && (
-                  <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/25 select-none">
+                  <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70 select-none">
                     {t(section.label)}
                   </p>
                 )}
@@ -175,7 +175,7 @@ function NavLink({
         collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
         isActive
           ? 'nav-item-active bg-sidebar-accent text-sidebar-foreground font-medium'
-          : 'text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground/80'
+          : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
       )}
     >
       <item.icon className="h-4 w-4 shrink-0" aria-hidden />
