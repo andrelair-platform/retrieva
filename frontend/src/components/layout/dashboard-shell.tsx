@@ -34,12 +34,21 @@ export function DashboardShell({ children, initialUser: user }: DashboardShellPr
 
   return (
     <div className="flex h-screen overflow-hidden isolate">
+      {/* RGAA — keyboard bypass block: first focusable element jumps past the chrome to the content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       {!isMobile && <Sidebar />}
       <MobileSidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
+          {children}
+        </main>
       </div>
 
       <ModalOutlet />
