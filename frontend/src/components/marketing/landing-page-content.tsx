@@ -307,6 +307,10 @@ export function LandingPageContent() {
         </div>
       </section>
 
+      {/* See it work — <ProductTour/> is built + ready (src/components/marketing/ProductTour.tsx);
+          re-enable here once the ProductExplainer is re-rendered (the committed render predates the
+          agent reframe). `cd videos && npm run render:explainer` → drop into /public/videos. */}
+
       {/* Regulatory credibility */}
       <section className="container mx-auto px-4 py-24 max-w-3xl">
         <ScrollText className="h-9 w-9 text-primary mb-4" />

@@ -432,7 +432,7 @@
     "ingestionCardTitle": "Preuves multi-sources",
     "ingestionCardSubtitle": "Aucun téléversement unique requis",
     "ingestionItems": {
-      "files": "Téléversez ce que vous avez — contrats, SOC 2, ISO, DPA (PDF/DOCX/XLSX), ou récupérés depuis les portails de confiance des fournisseurs",
+      "files": "Téléversez ce que vous avez — contrats, SOC 2, ISO, DPA (PDF/DOCX/XLSX).",
       "questionnaire": "Documents indisponibles ? Envoyez au fournisseur un questionnaire à jeton (sans compte) — il s’auto-atteste, Retrieva le note",
       "gap": "Le fournisseur ne fournit rien ? Cela devient un constat — « contrôle non vérifié » — inscrit comme risque dans votre Registre"
     },
@@ -513,7 +513,7 @@
         },
         "selfHosted": {
           "title": "Embeddings auto-hébergés",
-          "desc": "Vos documents sont vectorisés en interne — ils ne sont pas envoyés à une API d'embeddings tierce."
+          "desc": "Vos documents sont vectorisés en interne par un modèle auto-hébergé (bge-m3), et non par une API d'embeddings tierce."
         },
         "encryption": {
           "title": "Chiffré & durci",
@@ -602,6 +602,12 @@
         "title": "Surveillance TIC critiques continue",
         "desc": "Suit les incidents fournisseurs et les CVE, évalue l’impact et cartographie le rayon d’exposition de votre portefeuille — pour informer votre vue du risque, jamais pour noter automatiquement."
       }
+    },
+    "tour": {
+      "heading": "Voyez les agents à l’œuvre",
+      "subtitle": "Un tour de 90 secondes — vos données brutes en entrée, les agents découvrent, évaluent, rédigent et surveillent, vous examinez et validez, et un registre prêt pour l’audit en ressort.",
+      "play": "Voir la démo produit",
+      "duration": "90 secondes"
     }
   },
   "assessments": {
