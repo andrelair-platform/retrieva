@@ -432,7 +432,7 @@
     "ingestionCardTitle": "Multi-source evidence",
     "ingestionCardSubtitle": "No single upload required",
     "ingestionItems": {
-      "files": "Upload what you have — contracts, SOC 2, ISO, DPA (PDF/DOCX/XLSX), or pulled from vendor trust portals",
+      "files": "Upload what you have — contracts, SOC 2, ISO, DPA (PDF/DOCX/XLSX).",
       "questionnaire": "Can’t get the documents? Send the vendor a tokenized questionnaire (no account) — they self-attest, Retrieva scores it",
       "gap": "Vendor provides nothing? That becomes a finding — “control unverified” — recorded as risk in your Register"
     },
@@ -513,7 +513,7 @@
         },
         "selfHosted": {
           "title": "Self-hosted embeddings",
-          "desc": "Your documents are vectorised in-house — they are not sent to a third-party embedding API."
+          "desc": "Your documents are vectorised in-house by a self-hosted model (bge-m3), not a third-party embedding API."
         },
         "encryption": {
           "title": "Encrypted & hardened",
@@ -602,6 +602,12 @@
         "title": "Continuous CTPP surveillance",
         "desc": "Watches provider incidents and CVEs, scores the impact, and maps the blast radius across your portfolio — informing your risk view, never auto-rating."
       }
+    },
+    "tour": {
+      "heading": "See the agents at work",
+      "subtitle": "A 90-second tour — raw data in, the agents discover, assess, draft and surveil, you review and sign off, and an audit-ready Register comes out.",
+      "play": "Watch the product tour",
+      "duration": "90 seconds"
     }
   },
   "assessments": {
