@@ -22,7 +22,7 @@ const TIERS = [
   {
     name: 'Enterprise / Group',
     price: 'Custom',
-    features: ['Multi-entity, cross-border', 'SSO + self-hosting', 'Dedicated success manager', 'Custom SLA'],
+    features: ['Multi-entity, cross-border', 'Self-hosting · BYO data', 'Dedicated success manager', 'Custom SLA'],
     highlight: false,
   },
 ];
