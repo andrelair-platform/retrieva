@@ -16,13 +16,13 @@ const TIERS = [
   {
     name: 'Managed',
     price: "Let's scope it",
-    features: ['AI + our DORA experts', 'Experts review, sign off & defend', 'Audit-ready Register SLA', 'Guided onboarding'],
+    features: ['AI agents + your expert', 'You review & sign off', 'Guided onboarding + SLA', 'Dedicated success manager'],
     highlight: true,
   },
   {
     name: 'Enterprise / Group',
     price: 'Custom',
-    features: ['Multi-entity, cross-border', 'Legal defense in audits', 'Dedicated analyst team', 'Custom SLA'],
+    features: ['Multi-entity, cross-border', 'SSO + self-hosting', 'Dedicated success manager', 'Custom SLA'],
     highlight: false,
   },
 ];
@@ -92,7 +92,7 @@ export function Scene08Pricing() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Managed service
+                  Hands-on
                 </div>
               )}
 
