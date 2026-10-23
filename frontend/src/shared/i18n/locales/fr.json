@@ -400,7 +400,7 @@
       },
       "security": {
         "title": "Sécurité de niveau entreprise",
-        "desc": "SSO/MFA, RBAC à moindre privilège avec isolation par entité, détection de PII, secrets chiffrés et journal d’audit complet — conçu pour les entités financières réglementées."
+        "desc": "MFA, RBAC à moindre privilège avec isolation par entité, détection de PII, secrets chiffrés et journal d’audit complet — conçu pour les entités financières réglementées."
       },
       "concentration": {
         "title": "Graphe de concentration & nème-partie",

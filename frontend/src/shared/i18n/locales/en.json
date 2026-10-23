@@ -400,7 +400,7 @@
       },
       "security": {
         "title": "Enterprise-grade security",
-        "desc": "SSO/MFA, least-privilege RBAC with entity isolation, PII detection, encrypted secrets, and a full audit log — built for regulated financial entities."
+        "desc": "MFA, least-privilege RBAC with entity isolation, PII detection, encrypted secrets, and a full audit log — built for regulated financial entities."
       },
       "concentration": {
         "title": "Concentration & nth-party graph",
