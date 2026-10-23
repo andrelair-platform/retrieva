@@ -5,17 +5,18 @@ import { motion } from 'framer-motion';
 import { Check, UserCheck, Bot, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Service-ladder pricing (redesign 2026-10) — Retrieva is an AI-native SERVICE, not a SaaS tool.
-// The client hands over raw data; the agents do ~95%; the tier chooses WHO reviews/signs off/defends
-// and what outcome is guaranteed. Priced by the estate + the outcome, never by seats.
+// Service-ladder pricing (redesign 2026-10; experts-claim corrected 2026-10) — Retrieva is an
+// AI-native SERVICE, not a SaaS tool. The client hands over raw data; the agents do ~95%; the
+// client's OWN DORA/ICT-risk officer always signs off (there is no Retrieva-staffed expert team).
+// The tier chooses the SERVICE LEVEL (self-serve → hands-on → enterprise). Priced by the estate.
 interface Plan {
   name: string;
   tagline: string;
   price: string;
   priceNote: string;
-  /** who reviews the AI's output and signs off / defends the register. */
+  /** who reviews the AI's output and signs off — always the CLIENT's own officer. */
   reviewer: string;
-  /** the outcome guarantee for the tier. */
+  /** the service-level SLA for the tier (onboarding/support/availability — not a compliance outcome). */
   sla: string;
   estate: string;
   onboarding: string;
@@ -43,32 +44,32 @@ const PLANS: Plan[] = [
   },
   {
     name: 'Managed',
-    tagline: 'AI + our DORA experts — the outcome, guaranteed',
+    tagline: 'AI agents + your expert — we set it up and run it with you',
     price: "Let's scope it",
-    priceNote: 'outcome-based engagement',
+    priceNote: 'hands-on engagement',
     estate: 'Scales with your third-party estate',
-    reviewer: 'Our DORA Compliance Analysts',
-    sla: 'Audit-ready Register of Information',
+    reviewer: 'Your DORA / ICT-risk officer',
+    sla: 'Guided onboarding + priority SLA',
     onboarding: 'Guided onboarding',
     highlighted: true,
-    badge: 'Managed service',
+    badge: 'Hands-on',
     managedNote:
-      'You hand over raw data; the agents do ~95%. Our DORA analysts and legal experts review every output, sign off on your risk ratings, and defend your Register in a regulatory audit. You buy the outcome — a compliant register, contracts and exit strategies — not a licence.',
+      'You hand over raw data; the agents do ~95%. We set Retrieva up for your estate, wire your source systems, and run it with you — guided onboarding, a dedicated success manager, and priority support. Your own DORA / ICT-risk officer reviews and signs off; you keep accountability.',
     ctaLabel: 'Talk to us',
     ctaHref: '/contact',
   },
   {
     name: 'Enterprise / Group',
-    tagline: 'Multi-entity groups, with legal audit defense',
+    tagline: 'Multi-entity groups, with SSO and self-hosting',
     price: 'Custom',
     priceNote: 'annual engagement',
     estate: 'Unlimited · multi-entity, cross-border',
-    reviewer: 'Dedicated analyst team + legal counsel',
-    sla: 'Custom SLA + in-audit defense',
+    reviewer: 'Your team + a dedicated CSM',
+    sla: 'Custom SLA · SSO · self-hosting',
     onboarding: 'Guided proof-of-concept',
     highlighted: false,
     managedNote:
-      'For insurance/banking groups running DORA across country entities: a dedicated analyst team, consolidated and per-entity registers, and legal experts who stand with you in front of the regulator.',
+      'For insurance/banking groups running DORA across country entities: consolidated and per-entity registers, SSO, self-hosting options, a dedicated customer success manager, and a custom SLA. Your team keeps the sign-off.',
     ctaLabel: 'Talk to us',
     ctaHref: '/contact',
   },
@@ -110,8 +111,8 @@ export function PricingSection() {
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           You hand over raw data; the AI agents do ~95% of the work. Choose how much you want to own —
-          supervise the agents yourself, or let our DORA experts review, sign off, and defend your
-          Register. You pay for the outcome and the size of your estate, never per seat.
+          run the agents yourself, or have us set Retrieva up and run it with you. Your own DORA /
+          ICT-risk officer always keeps the sign-off. You pay for the size of your estate, never per seat.
         </p>
       </div>
 
@@ -188,8 +189,8 @@ export function PricingSection() {
           <p className="text-sm text-muted-foreground">
             The agents — discovery, assessment, DDQs, contract redlining, exit strategy, surveillance —
             run on every tier. <span className="text-foreground font-medium">Managed and Enterprise add
-            DORA analysts and legal experts</span> who review, sign off, and defend. You never lose a
-            capability by running a smaller estate.
+            hands-on onboarding, a dedicated success manager and a priority SLA</span> — we help you run
+            it; your own officer keeps the sign-off. You never lose a capability by running a smaller estate.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">

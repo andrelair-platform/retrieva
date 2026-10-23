@@ -10,7 +10,7 @@ const FAQ_ITEMS = [
   {
     question: 'Is Retrieva software or a service?',
     answer:
-      'Both, and you choose which. On Supervised you run the AI agent workforce yourself and your ICT risk officer signs off. On Managed and Enterprise it becomes a service: the agents still do ~95% of the work, and our DORA Compliance Analysts and legal experts review every output, sign off on the risk ratings, and defend your Register in a regulatory audit.',
+      'Both, and you choose which. On Supervised you run the AI agent workforce yourself. On Managed and Enterprise it becomes a hands-on service: the agents still do ~95% of the work, and we set Retrieva up for your estate, wire your source systems, and run it with you — guided onboarding, a dedicated success manager, and a priority SLA. Your own DORA / ICT-risk officer always reviews and signs off.',
   },
   {
     question: 'What do I actually hand over?',
@@ -18,19 +18,19 @@ const FAQ_ITEMS = [
       'Raw data — contracts, invoices, vendor lists, or just read-only access to your source systems. There is no data-entry burden: the agents parse, map, assess, and draft. You stay accountable for every provider; we make the gaps explicit and tracked.',
   },
   {
-    question: 'What does the outcome SLA guarantee?',
-    answer:
-      'On Managed and Enterprise you buy an outcome, not a licence: an audit-ready Register of Information (EBA RT.01–RT.04), DORA-compliant contract amendments, and tested exit strategies for your critical-or-important functions — reviewed and signed off by our experts and defensible in front of the regulator.',
-  },
-  {
     question: 'Who signs off on the risk ratings?',
     answer:
-      'On Supervised, your own ICT risk officer — the AI drafts, your team decides. On Managed and Enterprise, our DORA analysts review and sign off, with your management body retaining ultimate accountability (maker-checker and an immutable audit trail apply on every tier).',
+      'Always your own ICT risk officer — the AI drafts, your team decides and owns the verdict, with maker-checker and an immutable audit trail on every tier. Retrieva does not sign off on your behalf; Managed and Enterprise add hands-on help running the platform, not a substitute for your accountability.',
+  },
+  {
+    question: 'What does the Managed / Enterprise SLA cover?',
+    answer:
+      'A service SLA — onboarding timelines, support response, and platform availability — plus a dedicated success manager who helps you keep the Register of Information (EBA RT.01–RT.04), contract amendments and exit strategies current. The agents draft and keep it audit-ready; your officer reviews and signs off.',
   },
   {
     question: 'Can I start without talking to sales?',
     answer:
-      'Yes. Supervised has a 20-day free trial — no credit card to start. Move up to Managed when you want our experts to own the review and guarantee the outcome.',
+      'Yes. Supervised has a 20-day free trial — no credit card to start. Move up to Managed when you want us to set it up and run it with you, with a dedicated success manager and a priority SLA.',
   },
 ];
 
