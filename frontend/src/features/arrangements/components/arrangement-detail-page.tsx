@@ -53,6 +53,7 @@ import {
   RiskSeverityBadge,
   RiskStatusBadge,
 } from './badges';
+import { OnboardingPanel } from './onboarding-panel';
 
 // Human labels for the state-machine transitions (the backend returns transition names).
 const TRANSITION_LABEL: Record<string, string> = {
@@ -304,6 +305,10 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         <Field label="Data classes" value={arrangement.dataClasses?.length ? arrangement.dataClasses.join(', ') : '—'} />
         <Field label="CIF" value={arrangement.criticalOrImportant ? <Badge variant="destructive" className="text-xs">Yes</Badge> : 'No'} />
       </div>
+
+      {/* Pre-contract onboarding (ADR-0002): decision pack + DORA Art. 30 clause pack + draft gap-check.
+          Renders only while the arrangement is still being onboarded (prospect / due_diligence). */}
+      <OnboardingPanel id={id} lifecycleStatus={lifecycle?.status} />
 
       {/* Evidence */}
       <div>
