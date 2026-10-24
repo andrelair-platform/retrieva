@@ -132,6 +132,7 @@
       "compliance": "Compliance",
       "intelligence": "Intelligence",
       "overview": "Overview",
+      "onboard": "Onboard",
       "monitor": "Monitor",
       "assess": "Assess",
       "govern": "Govern",
@@ -155,7 +156,8 @@
       "surveillance": "Surveillance",
       "discovery": "Discovery",
       "exitStrategy": "Exit Strategy",
-      "contractAmendments": "Contract Amendments"
+      "contractAmendments": "Contract Amendments",
+      "onboardTool": "Onboard a Tool"
     },
     "titles": {
       "riskRegister": "Risk Register",
