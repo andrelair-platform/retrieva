@@ -83,14 +83,6 @@ export interface ProviderDependency {
   confirmed: boolean;
 }
 
-export interface UpsertCriticalFunctionInput {
-  id?: string;
-  name: string;
-  criticality: FunctionCriticality;
-  description?: string;
-  dependsOn?: string[];
-}
-
 // Result of AI sub-provider extraction (POST /concentration/extract/:workspaceId).
 export interface SubProviderExtractionResult {
   created: number;
@@ -108,16 +100,10 @@ export const concentrationApi = {
     const res = await apiClient.get<ApiResponse<ConcentrationGraph>>(`${BASE}/graph`);
     return res.data;
   },
+  // Concentration functions are DERIVED from the register's business functions + arrangements
+  // (ADR-0001 Phase 2) — this list is read-only; there is no create/update/delete here anymore.
   listFunctions: async () => {
     const res = await apiClient.get<ApiResponse<{ functions: CriticalFunction[] }>>(`${BASE}/functions`);
-    return res.data;
-  },
-  saveFunction: async (body: UpsertCriticalFunctionInput) => {
-    const res = await apiClient.post<ApiResponse<{ function: CriticalFunction }>>(`${BASE}/functions`, body);
-    return res.data;
-  },
-  deleteFunction: async (id: string) => {
-    const res = await apiClient.delete<ApiResponse<{ id: string }>>(`${BASE}/functions/${id}`);
     return res.data;
   },
   listDependencies: async () => {

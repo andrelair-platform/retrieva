@@ -38,18 +38,11 @@ describe('concentrationApi (RTV-60)', () => {
     expect(mockGet.mock.calls[0][0]).toBe('/concentration/graph');
   });
 
-  it('saveFunction POSTs /concentration/functions with the payload', async () => {
-    mockPost.mockResolvedValue({ data: { data: { function: { id: 'cf1' } } } });
-    await concentrationApi.saveFunction({ name: 'Claims', criticality: 'critical', dependsOn: ['w1'] });
-    const [url, body] = mockPost.mock.calls[0];
-    expect(url).toBe('/concentration/functions');
-    expect(body).toMatchObject({ name: 'Claims', criticality: 'critical', dependsOn: ['w1'] });
-  });
-
-  it('deleteFunction DELETEs /concentration/functions/:id', async () => {
-    mockDelete.mockResolvedValue({ data: { data: { id: 'cf1' } } });
-    await concentrationApi.deleteFunction('cf1');
-    expect(mockDelete.mock.calls[0][0]).toBe('/concentration/functions/cf1');
+  it('listFunctions GETs /concentration/functions (read-only — derived from the register)', async () => {
+    mockGet.mockResolvedValue({ data: { data: { functions: [{ id: 'bf1', name: 'Claims' }] } } });
+    const res = await concentrationApi.listFunctions();
+    expect(mockGet.mock.calls[0][0]).toBe('/concentration/functions');
+    expect(res.data?.functions[0].id).toBe('bf1');
   });
 
   it('confirmDependency PATCHes /concentration/dependencies/:id with { confirmed }', async () => {
