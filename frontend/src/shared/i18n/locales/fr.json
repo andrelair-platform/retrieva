@@ -132,6 +132,7 @@
       "compliance": "Conformité",
       "intelligence": "Intelligence",
       "overview": "Vue d'ensemble",
+      "onboard": "Intégrer",
       "monitor": "Surveiller",
       "assess": "Évaluer",
       "govern": "Gouverner",
@@ -155,7 +156,8 @@
       "surveillance": "Surveillance",
       "discovery": "Découverte",
       "exitStrategy": "Stratégie de sortie",
-      "contractAmendments": "Avenants contractuels"
+      "contractAmendments": "Avenants contractuels",
+      "onboardTool": "Intégrer un outil"
     },
     "titles": {
       "riskRegister": "Registre des risques",

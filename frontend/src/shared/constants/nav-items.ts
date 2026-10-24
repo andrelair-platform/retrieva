@@ -17,6 +17,7 @@ import {
   Radio,
   DoorOpen,
   FileSignature,
+  PackageSearch,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -41,6 +42,10 @@ export const desktopNavSections: NavSection[] = [
   {
     label: 'nav.sections.overview',
     items: [{ title: 'nav.items.commandCenter', href: '/overview', icon: LayoutDashboard }],
+  },
+  {
+    label: 'nav.sections.onboard',
+    items: [{ title: 'nav.items.onboardTool', href: '/evaluations', icon: PackageSearch }],
   },
   {
     label: 'nav.sections.monitor',
