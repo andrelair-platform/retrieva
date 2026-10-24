@@ -3,16 +3,15 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Network, AlertTriangle, Layers, GitBranch, Plus, Trash2, Check, ScanSearch } from 'lucide-react';
+import Link from 'next/link';
+import { Network, AlertTriangle, Layers, GitBranch, Check, ScanSearch } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -22,10 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getErrorMessage } from '@/shared/api/client';
-import {
-  concentrationApi,
-  type FunctionCriticality,
-} from '@/features/concentration/api/concentration';
+import { concentrationApi } from '@/features/concentration/api/concentration';
 import {
   useConcentrationAnalysisQuery,
   useConcentrationGraphQuery,
@@ -90,42 +86,10 @@ export function ConcentrationPage() {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  // ── critical-function create ──────────────────────────────────────────────────
-  const [cfOpen, setCfOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [criticality, setCriticality] = useState<FunctionCriticality>('critical');
-  const [description, setDescription] = useState('');
-  const [dependsOn, setDependsOn] = useState<string[]>([]);
-  // provider choices from the graph (id `w:<wsId>`); dependsOn stores the bare workspace id.
+  // provider choices from the graph (id `w:<wsId>`), used by the sub-provider extract dialog.
   const providerChoices = (graph?.nodes ?? [])
     .filter((n) => n.type === 'provider')
     .map((n) => ({ id: n.id.replace(/^w:/, ''), label: n.label }));
-
-  const resetCf = () => {
-    setName('');
-    setCriticality('critical');
-    setDescription('');
-    setDependsOn([]);
-    setCfOpen(false);
-  };
-  const saveCf = useMutation({
-    mutationFn: () =>
-      concentrationApi.saveFunction({ name: name.trim(), criticality, description: description.trim(), dependsOn }),
-    onSuccess: () => {
-      toast.success('Critical function saved');
-      resetCf();
-      invalidateAll();
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-  const deleteCf = useMutation({
-    mutationFn: (id: string) => concentrationApi.deleteFunction(id),
-    onSuccess: () => {
-      toast.success('Critical function deleted');
-      invalidateAll();
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
 
   if (isLoading) {
     return (
@@ -168,7 +132,8 @@ export function ConcentrationPage() {
           <ConcentrationGraph nodes={graph.nodes} edges={graph.edges} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            No graph yet — add critical functions and map their providers, then confirm nth-party edges.
+            No graph yet — map business functions to their providers in the{' '}
+            <Link href="/register" className="underline underline-offset-2">Register</Link>, then confirm nth-party edges.
           </p>
         )}
       </Card>
@@ -286,14 +251,23 @@ export function ConcentrationPage() {
         )}
       </div>
 
-      {/* Critical functions (firm-owned governance) */}
+      {/* Critical / important functions — derived from the Register (read-only) */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold">Critical functions ({functions.length})</h2>
-          <Button size="sm" variant="outline" onClick={() => setCfOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
+          <h2 className="text-sm font-semibold">Critical &amp; important functions ({functions.length})</h2>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/register">Manage in Register</Link>
+          </Button>
         </div>
+        <p className="text-xs text-muted-foreground mb-2">
+          Functions and their providers are derived from the register&apos;s business functions and their
+          contractual arrangements — manage them in the Register, not here.
+        </p>
         {functions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No critical functions defined. Add one and map the providers it depends on.</p>
+          <p className="text-sm text-muted-foreground">
+            No critical or important functions yet. Define business functions and their arrangements in the{' '}
+            <Link href="/register" className="underline underline-offset-2">Register</Link>.
+          </p>
         ) : (
           <div className="rounded-md border divide-y">
             {functions.map((f) => (
@@ -301,11 +275,8 @@ export function ConcentrationPage() {
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{f.name}</span>
                   <Badge variant={f.criticality === 'critical' ? 'destructive' : 'outline'} className="text-[10px] capitalize">{f.criticality}</Badge>
-                  <span className="text-xs text-muted-foreground">{f.dependsOn?.length ?? 0} provider(s)</span>
                 </div>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" disabled={deleteCf.isPending} onClick={() => deleteCf.mutate(f.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <span className="text-xs text-muted-foreground">{f.dependsOn?.length ?? 0} provider(s)</span>
               </div>
             ))}
           </div>
@@ -352,60 +323,6 @@ export function ConcentrationPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add critical function dialog */}
-      <Dialog open={cfOpen} onOpenChange={(o) => (o ? setCfOpen(true) : resetCf())}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Add critical function</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Name *</Label>
-              <Input placeholder="e.g. Claims processing" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Criticality</Label>
-              <div className="flex gap-2">
-                {(['critical', 'important'] as FunctionCriticality[]).map((c) => (
-                  <Button key={c} type="button" size="sm" variant={criticality === c ? 'default' : 'outline'} className="capitalize" onClick={() => setCriticality(c)}>
-                    {c}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea rows={2} placeholder="Optional" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Depends on providers</Label>
-              {providerChoices.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No providers yet — add vendors first.</p>
-              ) : (
-                <div className="max-h-40 overflow-y-auto rounded-md border divide-y">
-                  {providerChoices.map((p) => {
-                    const checked = dependsOn.includes(p.id);
-                    return (
-                      <label key={p.id} className="flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setDependsOn((prev) => (checked ? prev.filter((x) => x !== p.id) : [...prev, p.id]))
-                          }
-                        />
-                        {p.label}
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={resetCf}>Cancel</Button>
-            <Button disabled={!name.trim() || saveCf.isPending} onClick={() => saveCf.mutate()}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
