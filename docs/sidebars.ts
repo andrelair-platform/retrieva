@@ -89,6 +89,7 @@ const sidebars: SidebarsConfig = {
         'deployment/production-checklist',
         'deployment/database-capacity',
         'deployment/ci-cd',
+        'deployment/product-release',
         'deployment/email-service',
         'deployment/observability',
       ],
