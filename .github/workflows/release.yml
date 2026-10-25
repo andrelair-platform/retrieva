@@ -5,6 +5,12 @@
 # package.json + CHANGELOG.md from conventional commits. Merging that PR creates
 # the git tag (vX.Y.Z) + a GitHub Release. Zero manual steps — replaces the old
 # manual tag-triggered flow that left releases stale (v1.0.0 for 4 months).
+#
+# Token: the default GITHUB_TOKEN cannot open the release PR — the org disables
+# "Allow GitHub Actions to create and approve pull requests", so release-please
+# failed every run at the PR-creation step. Use the GITOPS_TOKEN PAT (the org's
+# house pattern for Actions that open PRs, as BMAD-sync does). A PAT-created PR
+# also triggers its CI on open, unlike a GITHUB_TOKEN one.
 name: Release
 
 on:
@@ -22,6 +28,6 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITOPS_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
