@@ -50,14 +50,40 @@ describe('arrangementsApi intake (RTV-34)', () => {
     expect(res.data?.proposal.providerName).toBe('Microsoft');
   });
 
-  it('confirms the validated proposal to /arrangements/intake/confirm', async () => {
-    mockPost.mockResolvedValue({ data: { data: { arrangement: { id: 'arr-1' } } } });
+  it('submits the validated proposal for governed review', async () => {
+    mockPost.mockResolvedValue({ data: { data: { proposal: { id: 'proposal-1', status: 'submitted' } } } });
 
     const res = await arrangementsApi.confirmIntake(PROPOSAL, 'c.pdf');
 
     const [url, body] = mockPost.mock.calls[0];
     expect(url).toBe('/arrangements/intake/confirm');
     expect(body).toEqual({ proposal: PROPOSAL, sourceFileName: 'c.pdf' });
-    expect(res.data?.arrangement.id).toBe('arr-1');
+    expect(res.data?.proposal.id).toBe('proposal-1');
+    expect(res.data?.proposal.status).toBe('submitted');
+  });
+
+  it('posts versioned checker and approver decisions', async () => {
+    mockPost.mockResolvedValue({ data: { data: { proposal: { id: 'proposal-1' } } } });
+    await arrangementsApi.checkIntakeProposal('proposal-1', {
+      expectedVersion: 1,
+      decision: 'approve',
+      justification: 'Evidence checked',
+    });
+    expect(mockPost).toHaveBeenLastCalledWith('/arrangements/intake/proposals/proposal-1/check', {
+      expectedVersion: 1,
+      decision: 'approve',
+      justification: 'Evidence checked',
+    });
+
+    await arrangementsApi.approveIntakeProposal('proposal-1', {
+      expectedVersion: 2,
+      decision: 'approve',
+      justification: 'Accountability accepted',
+    });
+    expect(mockPost).toHaveBeenLastCalledWith('/arrangements/intake/proposals/proposal-1/approve', {
+      expectedVersion: 2,
+      decision: 'approve',
+      justification: 'Accountability accepted',
+    });
   });
 });

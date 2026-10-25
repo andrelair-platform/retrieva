@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { UploadCloud, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
@@ -44,13 +43,11 @@ interface Props {
 const NONE = '__none__';
 
 export function IntakeDialog({ open, onOpenChange }: Props) {
-  const router = useRouter();
   const qc = useQueryClient();
   const [proposal, setProposal] = useState<ArrangementProposal | null>(null);
   const [source, setSource] = useState<string>('');
   const [confidence, setConfidence] = useState(0);
   const [touchpoints, setTouchpoints] = useState<ControlTouchpoint[]>([]);
-  const [file, setFile] = useState<File | null>(null);
   const [trigger, setTrigger] = useState<Trigger>('new');
 
   const set = <K extends keyof ArrangementProposal>(k: K, v: ArrangementProposal[K]) =>
@@ -71,15 +68,11 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
 
   const confirm = useMutation({
     mutationFn: () => arrangementsApi.confirmIntake(proposal as ArrangementProposal, source, trigger),
-    onSuccess: async (res) => {
-      toast.success('Arrangement created from contract');
-      qc.invalidateQueries({ queryKey: ['arrangements'] });
-      const id = res.data?.arrangement?.id;
-      // Index the contract text so the assessment can cite real passages (best-effort).
-      if (id && file) await arrangementsApi.ingestEvidence(id, file).catch(() => {});
+    onSuccess: async () => {
+      toast.success('Arrangement proposal submitted for independent review');
+      qc.invalidateQueries({ queryKey: ['arrangement-proposals'] });
       onOpenChange(false);
       reset();
-      if (id) router.push(`/arrangements/${id}`);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -89,7 +82,6 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     setSource('');
     setConfidence(0);
     setTouchpoints([]);
-    setFile(null);
     setTrigger('new');
   };
 
@@ -102,7 +94,6 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     },
     onDrop: (files) => {
       if (files[0]) {
-        setFile(files[0]);
         extract.mutate(files[0]);
       }
     },
@@ -242,7 +233,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
                   <ShieldCheck className="h-3.5 w-3.5" /> DORA controls this contract touches ({touchpoints.length})
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  A deterministic clause→control preview — the full evidence-grounded assessment runs after you confirm.
+                  A deterministic clause→control preview — the full assessment runs after independent approval.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {touchpoints.map((t) => (
@@ -265,7 +256,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
           <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
           {proposal && (
             <Button disabled={!canConfirm} onClick={() => confirm.mutate()}>
-              {confirm.isPending ? 'Creating…' : 'Confirm & create'}
+              {confirm.isPending ? 'Submitting…' : 'Submit for review'}
             </Button>
           )}
         </DialogFooter>
