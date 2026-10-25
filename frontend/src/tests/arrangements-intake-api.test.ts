@@ -86,4 +86,28 @@ describe('arrangementsApi intake (RTV-34)', () => {
       justification: 'Accountability accepted',
     });
   });
+
+  it('lists intake proposals with an optional status filter', async () => {
+    mockGet.mockResolvedValue({ data: { data: { proposals: [] } } });
+    await arrangementsApi.listIntakeProposals();
+    expect(mockGet).toHaveBeenLastCalledWith('/arrangements/intake/proposals', { params: undefined });
+
+    await arrangementsApi.listIntakeProposals('checked');
+    expect(mockGet).toHaveBeenLastCalledWith('/arrangements/intake/proposals', {
+      params: { status: 'checked' },
+    });
+  });
+
+  it('gets and resubmits a versioned arrangement proposal', async () => {
+    mockGet.mockResolvedValue({ data: { data: { proposal: { id: 'proposal-1' } } } });
+    await arrangementsApi.getIntakeProposal('proposal-1');
+    expect(mockGet).toHaveBeenLastCalledWith('/arrangements/intake/proposals/proposal-1');
+
+    mockPost.mockResolvedValue({ data: { data: { proposal: { id: 'proposal-1', status: 'submitted' } } } });
+    await arrangementsApi.resubmitIntakeProposal('proposal-1', 4, PROPOSAL);
+    expect(mockPost).toHaveBeenLastCalledWith('/arrangements/intake/proposals/proposal-1/resubmit', {
+      expectedVersion: 4,
+      proposal: PROPOSAL,
+    });
+  });
 });
