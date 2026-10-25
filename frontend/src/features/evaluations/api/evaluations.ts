@@ -101,6 +101,26 @@ export const evaluationsApi = {
   },
 };
 
+// ── E5 public-research enrichment (ADR-0003) — egress-gated, default-OFF server-side ─────────────
+// Fetch a vendor's own public trust-centre page → provenanced, UNCONFIRMED vendor facts to merge.
+// Returns 403 when the feature is disabled on the server (shown gracefully in the UI).
+export interface VendorResearchResult {
+  provenance: { sourceUrl: string; host: string; fetchedChars: number };
+  proposal: Record<string, unknown> & { subcontractors?: string[]; dataResidency?: string | null };
+  gaps: string[];
+  confirmed: false;
+}
+
+export const researchApi = {
+  research: async (vendorName: string, sourceUrl: string) => {
+    const res = await apiClient.post<ApiResponse<VendorResearchResult>>(
+      '/arrangements/intake/research',
+      { vendorName, sourceUrl }
+    );
+    return res.data;
+  },
+};
+
 // The manual lanes the buyer scores (auto lanes are filled by Retrieva).
 export const MANUAL_LANES: Lane[] = ['functional', 'ux', 'tco'];
 export const LANE_LABEL: Record<Lane, string> = {

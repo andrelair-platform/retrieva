@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Trophy, Sparkles, UserCog, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Trophy, Sparkles, UserCog, ArrowLeft, CheckCircle2, AlertTriangle, Globe } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -25,12 +25,14 @@ import {
   useAddCandidate,
   useSetManualScores,
   useSelectWinner,
+  useVendorResearch,
 } from '@/features/evaluations/queries/use-evaluations';
 import {
   MANUAL_LANES,
   LANE_LABEL,
   type EvaluationCandidate,
   type ScoredCandidate,
+  type VendorResearchResult,
 } from '@/features/evaluations/api/evaluations';
 
 function ScoreChip({ label, value }: { label: string; value: number | null | undefined }) {
@@ -50,10 +52,13 @@ export function EvaluationDetailPage({ id }: { id: string }) {
   const addCandidate = useAddCandidate(id);
   const setScores = useSetManualScores(id);
   const selectWinner = useSelectWinner(id);
+  const research = useVendorResearch();
 
   const [open, setOpen] = useState(false);
   const [vendorName, setVendorName] = useState('');
   const [doc, setDoc] = useState<File | null>(null);
+  const [researchUrl, setResearchUrl] = useState('');
+  const [researched, setResearched] = useState<VendorResearchResult | null>(null);
   // local manual-score edits keyed by candidateId → { lane: value }
   const [edits, setEdits] = useState<Record<string, Record<string, number>>>({});
 
@@ -75,17 +80,44 @@ export function EvaluationDetailPage({ id }: { id: string }) {
   const onboarded = evaluation.status === 'onboarded';
   const needsEntity = !evaluation.legalEntityId;
 
+  const resetAdd = () => {
+    setVendorName('');
+    setDoc(null);
+    setResearchUrl('');
+    setResearched(null);
+    setOpen(false);
+  };
+
   const addVendor = () =>
     addCandidate.mutate(
       { vendorName: vendorName.trim(), doc },
       {
         onSuccess: () => {
           toast.success('Candidate drafted — Retrieva scored the DORA/security lane');
-          setVendorName('');
-          setDoc(null);
-          setOpen(false);
+          resetAdd();
         },
         onError: (e) => toast.error(getErrorMessage(e)),
+      }
+    );
+
+  // E5 — fetch the vendor's public trust page (egress-gated; 403 → disabled). Preview only: the
+  // provenanced facts are shown for the human; nothing is persisted until the candidate is added.
+  const runResearch = () =>
+    research.mutate(
+      { vendorName: vendorName.trim(), sourceUrl: researchUrl.trim() },
+      {
+        onSuccess: (res) => {
+          setResearched(res.data ?? null);
+          toast.success('Fetched the vendor page — review the provenanced facts below');
+        },
+        onError: (e) => {
+          const msg = getErrorMessage(e);
+          toast.error(
+            /disabled/i.test(msg)
+              ? 'Web research is turned off for this environment'
+              : msg
+          );
+        },
       }
     );
 
@@ -250,7 +282,7 @@ export function EvaluationDetailPage({ id }: { id: string }) {
       )}
 
       {/* add candidate */}
-      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setVendorName(''); setDoc(null); } }}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetAdd(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add a candidate vendor</DialogTitle>
@@ -277,9 +309,58 @@ export function EvaluationDetailPage({ id }: { id: string }) {
                 SOC 2 / DPA / sub-processor list — grounds the vendor facts. Anything not evidenced stays flagged, never guessed.
               </p>
             </div>
+
+            {/* E5 — research the vendor's public trust page (egress-gated; disabled → a toast) */}
+            <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
+              <Label htmlFor="cand-url" className="flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5" /> …or fetch from the web (optional)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="cand-url"
+                  placeholder="https://trust.notion.so/…"
+                  value={researchUrl}
+                  onChange={(e) => setResearchUrl(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!vendorName.trim() || !researchUrl.trim() || research.isPending}
+                  onClick={runResearch}
+                >
+                  {research.isPending ? 'Fetching…' : 'Research'}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Fetches the vendor&apos;s own trust-centre / sub-processor page (allow-listed domains only).
+                Facts are shown with their source for you to verify — never auto-applied.
+              </p>
+              {researched && (
+                <div className="mt-1 rounded bg-muted/50 p-2 text-[11px]">
+                  <p className="text-muted-foreground">
+                    From <span className="text-foreground">{researched.provenance.host}</span>:
+                  </p>
+                  <p className="mt-0.5">
+                    Sub-processors:{' '}
+                    <span className="text-foreground">
+                      {researched.proposal.subcontractors?.length
+                        ? researched.proposal.subcontractors.join(', ')
+                        : '— none evidenced'}
+                    </span>
+                  </p>
+                  <p>
+                    Data residency:{' '}
+                    <span className="text-foreground">{researched.proposal.dataResidency || '— not stated'}</span>
+                  </p>
+                  {researched.gaps.length > 0 && (
+                    <p className="mt-0.5 text-amber-600">Still missing: {researched.gaps.join(', ')}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setOpen(false); setVendorName(''); setDoc(null); }}>
+            <Button variant="outline" onClick={resetAdd}>
               Cancel
             </Button>
             <Button disabled={!vendorName.trim() || addCandidate.isPending} onClick={addVendor}>
