@@ -8,9 +8,11 @@ The project uses GitHub Actions for continuous integration and continuous deploy
 
 :::warning Deployment model changed (GitOps, not SSH-to-server)
 Production now runs on the self-hosted **minicloud k3s** cluster via **GitOps**: CI builds + signs the
-image (cosign + SBOM), **Kargo** promotes it dev→prod, and **ArgoCD** reconciles the cluster — there is
-**no SSH-to-server deploy** and no DigitalOcean. The `cd.yml` / SSH-to-droplet flow described below is
-the **legacy DigitalOcean-era** pipeline, kept for historical reference.
+backend, frontend and assessment-crew images (cosign + SBOM), **Kargo** verifies each artifact and the
+assembled product release, and **Argo CD** reconciles the cluster. There is **no SSH-to-server deploy**
+and no DigitalOcean. See [Product release and promotion](./product-release.md) for the authoritative
+current flow. The `cd.yml` / SSH-to-droplet flow described below is the **legacy DigitalOcean-era**
+pipeline, kept for historical reference.
 :::
 
 ## Overview

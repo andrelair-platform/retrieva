@@ -6,6 +6,13 @@ sidebar_position: 3
 
 Essential tasks before deploying to production.
 
+:::note Current deployment gate
+The operational release checklist is enforced by the GitOps/Kargo flow documented in
+[Product release and promotion](./product-release.md). A release is not production-eligible until
+backend, frontend and assessment crew have passed their component dev checks and the assembled
+`product-dev` combination has passed its live integration analysis.
+:::
+
 ## Security Checklist
 
 ### Secrets & Keys
