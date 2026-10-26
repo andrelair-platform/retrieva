@@ -235,6 +235,31 @@ export interface ArrangementProposal {
   notes: string;
 }
 
+export type ArrangementProposalStatus =
+  | 'submitted'
+  | 'checked'
+  | 'approved'
+  | 'rejected'
+  | 'changes_requested';
+
+export interface GovernedArrangementProposal {
+  id: string;
+  organizationId: string;
+  proposal: ArrangementProposal;
+  sourceFileName: string;
+  status: ArrangementProposalStatus;
+  rowVersion: number;
+  preparedBy: string;
+  checkedBy: string | null;
+  approvedBy: string | null;
+  checkJustification: string;
+  approvalJustification: string;
+  arrangementId: string | null;
+  submittedAt: string;
+  checkedAt: string | null;
+  approvedAt: string | null;
+}
+
 // RTV-34/40 — the DORA controls a contract's clauses touch (deterministic preview shown at intake).
 export interface ControlTouchpoint {
   controlId: string;
@@ -357,9 +382,48 @@ export const arrangementsApi = {
     return res.data;
   },
   confirmIntake: async (proposal: ArrangementProposal, sourceFileName?: string, trigger?: Trigger) => {
-    const res = await apiClient.post<ApiResponse<{ arrangement: Arrangement }>>(
+    const res = await apiClient.post<ApiResponse<{ proposal: GovernedArrangementProposal }>>(
       '/arrangements/intake/confirm',
       { proposal, sourceFileName, trigger }
+    );
+    return res.data;
+  },
+  listIntakeProposals: async (status?: ArrangementProposalStatus) => {
+    const res = await apiClient.get<ApiResponse<{ proposals: GovernedArrangementProposal[] }>>(
+      '/arrangements/intake/proposals',
+      { params: status ? { status } : undefined }
+    );
+    return res.data;
+  },
+  getIntakeProposal: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<{ proposal: GovernedArrangementProposal }>>(
+      `/arrangements/intake/proposals/${id}`
+    );
+    return res.data;
+  },
+  checkIntakeProposal: async (
+    id: string,
+    body: { expectedVersion: number; decision: 'approve' | 'reject' | 'request_changes'; justification: string }
+  ) => {
+    const res = await apiClient.post<ApiResponse<{ proposal: GovernedArrangementProposal }>>(
+      `/arrangements/intake/proposals/${id}/check`,
+      body
+    );
+    return res.data;
+  },
+  approveIntakeProposal: async (
+    id: string,
+    body: { expectedVersion: number; decision: 'approve' | 'reject' | 'request_changes'; justification: string }
+  ) => {
+    const res = await apiClient.post<
+      ApiResponse<{ proposal: GovernedArrangementProposal; arrangement: Arrangement | null }>
+    >(`/arrangements/intake/proposals/${id}/approve`, body);
+    return res.data;
+  },
+  resubmitIntakeProposal: async (id: string, expectedVersion: number, proposal: ArrangementProposal) => {
+    const res = await apiClient.post<ApiResponse<{ proposal: GovernedArrangementProposal }>>(
+      `/arrangements/intake/proposals/${id}/resubmit`,
+      { expectedVersion, proposal }
     );
     return res.data;
   },

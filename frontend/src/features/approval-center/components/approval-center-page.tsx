@@ -19,6 +19,7 @@ import {
 } from '@/features/approval-center/api/approvals';
 import { useApprovalsQuery, useDecideApprovalMutation } from '@/features/approval-center/queries/use-approvals';
 import { useRunUpdates } from '@/shared/realtime/use-run-updates';
+import { ArrangementProposalQueue } from './arrangement-proposal-queue';
 
 const GATE_LABEL: Record<string, string> = {
   confirm_arrangement: 'Confirm the proposed arrangement',
@@ -163,6 +164,7 @@ export function ApprovalCenterPage() {
           )}
         </Card>
       </div>
+      <ArrangementProposalQueue />
     </div>
   );
 }
