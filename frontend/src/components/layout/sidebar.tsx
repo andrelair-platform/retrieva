@@ -12,7 +12,12 @@ import { WorkspaceSwitcher } from './workspace-switcher';
 import { useUIStore } from '@/lib/stores/ui-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { desktopNavSections, bottomNavItems, type NavItem } from '@/lib/constants/nav-items';
+import {
+  desktopNavSections,
+  bottomNavItems,
+  filterNavByFeatures,
+  type NavItem,
+} from '@/lib/constants/nav-items';
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -23,7 +28,8 @@ export function Sidebar() {
   const user = useAuthStore((state) => state.user);
 
   const filterNavItems = (items: NavItem[]) => {
-    return items.filter((item) => {
+    // Scope-down (AUD-P1): drop feature-flagged-off items first, then the workspace-role filter.
+    return filterNavByFeatures(items).filter((item) => {
       if (item.workspaceRoles) {
         const userRole = permissions.isWorkspaceOwner
           ? 'owner'

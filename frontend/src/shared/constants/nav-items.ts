@@ -20,12 +20,17 @@ import {
   PackageSearch,
 } from 'lucide-react';
 
+import { getFeatureFlags, type FeatureFlags } from '@/lib/runtime-env';
+
 export interface NavItem {
   /** i18n key (e.g. 'nav.items.riskRegister') — resolved with t() at render. */
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   workspaceRoles?: Array<'owner' | 'member' | 'viewer'>;
+  /** Scope-down (AUD-P1): hide this item unless the named feature flag is ON (default OFF). The
+   *  out-of-scope surfaces mirror the backend env gates — see runtime-env.ts getFeatureFlags(). */
+  feature?: keyof FeatureFlags;
 }
 
 export interface NavSection {
@@ -45,7 +50,9 @@ export const desktopNavSections: NavSection[] = [
   },
   {
     label: 'nav.sections.onboard',
-    items: [{ title: 'nav.items.onboardTool', href: '/evaluations', icon: PackageSearch }],
+    items: [
+      { title: 'nav.items.onboardTool', href: '/evaluations', icon: PackageSearch, feature: 'evaluations' },
+    ],
   },
   {
     label: 'nav.sections.monitor',
@@ -89,8 +96,8 @@ export const desktopNavSections: NavSection[] = [
   {
     label: 'nav.sections.intelligence',
     items: [
-      { title: 'nav.items.askAi', href: '/chat', icon: MessageSquare },
-      { title: 'nav.items.history', href: '/conversations', icon: FolderOpen },
+      { title: 'nav.items.askAi', href: '/chat', icon: MessageSquare, feature: 'chat' },
+      { title: 'nav.items.history', href: '/conversations', icon: FolderOpen, feature: 'chat' },
     ],
   },
 ];
@@ -108,10 +115,16 @@ export const mobileMainNavItems: NavItem[] = [
     icon: ClipboardList,
     workspaceRoles: ['owner', 'member'],
   },
-  { title: 'nav.items.askAi', href: '/chat', icon: MessageSquare },
-  { title: 'nav.items.history', href: '/conversations', icon: FolderOpen },
+  { title: 'nav.items.askAi', href: '/chat', icon: MessageSquare, feature: 'chat' },
+  { title: 'nav.items.history', href: '/conversations', icon: FolderOpen, feature: 'chat' },
 ];
 
 export const bottomNavItems: NavItem[] = [
   { title: 'nav.items.settings', href: '/settings', icon: Settings },
 ];
+
+/** Scope-down (AUD-P1): drop nav items whose feature flag is OFF (default). Items with no `feature` tag
+ *  always pass. Applied by the sidebar + mobile-sidebar alongside the workspace-role filter. */
+export function filterNavByFeatures(items: NavItem[], flags = getFeatureFlags()): NavItem[] {
+  return items.filter((item) => !item.feature || flags[item.feature]);
+}

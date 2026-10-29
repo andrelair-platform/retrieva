@@ -13,6 +13,7 @@ import axios from 'axios';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { getFeatureFlags } from '@/lib/runtime-env';
 import {
   Card,
   CardContent,
@@ -48,6 +49,9 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  // Scope-down (AUD-P1): the billing surface is hidden unless the billing feature flag is ON (default
+  // OFF — Retrieva is self-hosted single-tenant, not a SaaS). Mirrors the backend BILLING_ENABLED gate.
+  const billingEnabled = getFeatureFlags().billing;
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
 
@@ -417,23 +421,25 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Billing Link */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            {t('settings.billingLink.title')}
-          </CardTitle>
-          <CardDescription>
-            {t('settings.billingLink.desc')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/settings/billing">
-            <Button variant="outline">{t('settings.billingLink.manage')}</Button>
-          </Link>
-        </CardContent>
-      </Card>
+      {/* Billing Link — scope-down (AUD-P1): shown only when the billing feature flag is ON. */}
+      {billingEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              {t('settings.billingLink.title')}
+            </CardTitle>
+            <CardDescription>
+              {t('settings.billingLink.desc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/settings/billing">
+              <Button variant="outline">{t('settings.billingLink.manage')}</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
