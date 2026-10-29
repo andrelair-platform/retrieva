@@ -84,6 +84,13 @@ async function RootLayoutContent({
           dangerouslySetInnerHTML={{
             __html: `window.__ENV__=${JSON.stringify({
               API_URL: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? '',
+              // Scope-down flags (AUD-P1) — default OFF, mirror the backend env gates so the nav only
+              // shows what the backend serves. Reversible per deployment (no rebuild). See runtime-env.ts.
+              FEATURES: {
+                chat: String(process.env.CHAT_ENABLED).toLowerCase() === 'true',
+                evaluations: String(process.env.EVALUATIONS_PROCUREMENT_ENABLED).toLowerCase() === 'true',
+                billing: String(process.env.BILLING_ENABLED).toLowerCase() === 'true',
+              },
             })};`,
           }}
         />

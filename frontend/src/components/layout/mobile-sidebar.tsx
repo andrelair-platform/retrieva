@@ -11,7 +11,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { WorkspaceSwitcher } from './workspace-switcher';
 import { useUIStore } from '@/lib/stores/ui-store';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { mobileMainNavItems, bottomNavItems, type NavItem } from '@/lib/constants/nav-items';
+import {
+  mobileMainNavItems,
+  bottomNavItems,
+  filterNavByFeatures,
+  type NavItem,
+} from '@/lib/constants/nav-items';
 
 export function MobileSidebar() {
   const { t } = useTranslation();
@@ -29,7 +34,8 @@ export function MobileSidebar() {
   }, [pathname, isMobile, setSidebarOpen]);
 
   const filterNavItems = (items: NavItem[]) => {
-    return items.filter((item) => {
+    // Scope-down (AUD-P1): drop feature-flagged-off items first, then the workspace-role filter.
+    return filterNavByFeatures(items).filter((item) => {
       if (item.workspaceRoles) {
         const userRole = permissions.isWorkspaceOwner
           ? 'owner'
