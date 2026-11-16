@@ -42,14 +42,31 @@ role assignments.
   |---|---|---|
   | `entity_admin` | manage the entity's users/config | — |
   | `analyst` | draft assessments, collect evidence | **maker** |
+  | `procurement` | onboard arrangements, upload contract evidence (vendor/contract lifecycle) | maker (vendor mgmt) |
   | `ict_risk_officer` | sign off findings / risk-acceptance (management-body delegate) | **checker** |
   | `legal` | approve contractual clauses (exit, audit rights, subcontracting) | checker (legal dim.) |
+  | `security_officer` | approve the information-security dimension (SOC 2 / ISO 27001 / pentest) | checker (security dim.) |
   | `dpo` | approve the data-protection dimension (GDPR/residency) | checker (privacy dim.) |
   | `business_owner` | attest usage/criticality for *their* functions only | attester |
   | `auditor` | **read-only across everything** (internal audit / regulator) | read |
   | `viewer` | limited read-only | read |
 - **External:** `vendor_contact` — a provider rep who can **only** answer a questionnaire / upload
   evidence for **their single arrangement**; zero internal visibility (vendor portal, RTV-16/33).
+
+> **Scope decisions — named actors we deliberately do NOT model as separate roles (state them, don't
+> hide them):**
+> - **Board / senior management (the management body).** DORA makes the management body *accountable*,
+>   but it does not *operate* the tool. Accountability is represented by its **delegate**, the
+>   `ict_risk_officer` (finding sign-off + risk-acceptance, written to the immutable audit log) and
+>   escalated at group level via `group_risk`. A distinct `board` login would be an empty actor — the
+>   board consumes the attested Register + reports, it does not work the queue.
+> - **Procurement & Information Security** were previously folded into `analyst`/`business_owner`;
+>   they are now **first-class roles** (above) so the RACI names them (`procurement` = vendor/contract
+>   maker; `security_officer` = security-dimension checker, alongside `legal`/`dpo`).
+> - **Provider sub-teams (security / legal / account).** Modelled as **one** `vendor_contact`, not
+>   three sub-roles: a provider rep only answers a questionnaire / uploads evidence for a single
+>   arrangement, so differentiated provider sub-roles would add surface for no governance gain
+>   (need-first). Revisit if a provider-side approval workflow ever appears.
 
 ### 3. Central capability layer
 One policy module maps `(role, scope) → allowed actions on resource types` — no scattered
