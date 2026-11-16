@@ -167,6 +167,50 @@ assess(arrangement) ─► intake (contract/evidence parse)  ─► classify (ti
 only the clause→control→gap→score reasoning; it is **stateless**, reads evidence via tools, and holds
 **no** database credentials. Everything authoritative is written by the backend **after** a human gate.
 
+#### 3.2.2 A2A round-trip (request/response sequence)
+
+The exact wire exchange when the supervisor's gap node delegates to the crew — contract-validated on
+**both** sides, so an off-contract result halts the run rather than being trusted.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Compliance owner
+    participant Sup as Supervisor gap node<br/>LangGraph · TS
+    participant Cli as A2A client<br/>crewClient.ts
+    participant Srv as A2A server<br/>app.py · executor.py
+    participant Crew as CrewAI crew<br/>3 agents · sequential
+    participant LLM as LiteLLM + Qdrant
+
+    Sup->>Cli: assessViaCrew(request)
+    Note over Cli: AssessArrangementRequestSchema.parse<br/>client-side contract guard
+    Cli->>Srv: POST JSON-RPC 2.0 message/send<br/>params.message.parts = one DataPart
+    Note over Srv: validate_request()<br/>reject off-contract before any work
+    Srv->>Crew: asyncio.to_thread(crew.run)<br/>kickoff is sync — run off the event loop
+    Crew->>LLM: clause mapper → gap analyst → control scorer<br/>routes-to-LLM · retrieves evidence
+    LLM-->>Crew: grounded verdicts<br/>(or insufficient_evidence, never invented)
+    Crew-->>Srv: AssessmentOutput<br/>findings · verdicts · citations · confidence
+    Note over Srv: validate_response()<br/>never emit off-contract
+    Srv-->>Cli: JSON-RPC result<br/>result carries one DataPart = response
+    Note over Cli: extractResponseData +<br/>AssessArrangementResponseSchema.parse<br/>off-contract → throw → supervisor halts
+    Cli-->>Sup: mapCrewResponseToGap()<br/>CrewGapResult · proposed=true
+    Note over Sup: halt-on-doubt<br/>confidence below min → run blocked
+    Sup->>Owner: interrupt() maker/checker gate<br/>PROPOSED findings
+    Owner-->>Sup: approve / edit / reject
+    Note over Sup: authoritative write ONLY after human approval
+```
+
+*Alt text: the supervisor calls the A2A client, which contract-validates then POSTs a JSON-RPC
+`message/send` to the crew's A2A server; the server validates, runs the 3-agent crew (which routes to
+LiteLLM and retrieves evidence from Qdrant), validates the response, and returns a DataPart; the client
+re-validates against the shared contract and hands the supervisor a proposed result; the supervisor
+applies halt-on-doubt and suspends at the human maker/checker gate before any authoritative write.*
+
+> **Transport note (ADR-AGENT-02):** the client sends a **raw** JSON-RPC `message/send` rather than
+> going through the a2a-sdk client — the SDK's resolved card forced a method name the crew rejects
+> (`-32601 Method not found`), whereas a direct `message/send` reaches the executor. The network call is
+> an injectable `fetch`, so the whole round-trip is unit-testable without live infra.
+
 ### 3.3 Deployment
 
 ```
