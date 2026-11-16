@@ -23,6 +23,7 @@ The image lands in the Docusaurus `static/` tree, so the site serves it at
 - `retrieva_assessment_flow.py` — **How an assessment flows** (process view: build register → LangGraph supervisor run → human-in-the-loop decision → projections/export). Uses the built-in flowchart shapes. Embedded on the landing page.
 - `retrieva_container.py` — C4 **container** view (frontend, backend, workers, datastores, governed AI platform).
 - `retrieva_ai_native.py` — **How the AI-native service works** (the two-repo view): client data → the five agent pillars + the CrewAI crew over A2A → the human-in-the-loop inbox → analyst sign-off → outcomes. Embedded in `docs/strategy/ai-native-service.md`.
+- `retrieva_multiagent_system.py` — **Multi-agent assessment system** (the supervisor/worker topology): the deterministic LangGraph-JS supervisor (TypeScript) ⇄ the 3-agent CrewAI crew (Python) over the A2A protocol, with backing LLMOps/evidence/durability deps and the human gate. Embedded in `docs/architecture/agentic-assessment-orchestrator.md` §3.2.
 - `embed-svg-images.py` — post-process step that inlines icon PNGs as base64 so the SVGs render standalone. **Run it after regenerating any diagram.**
 - `icons/` — brand PNGs for components with no built-in `diagrams` icon (Qdrant, Langfuse, Authentik, Ollama, BullMQ).
 

@@ -126,7 +126,30 @@ C4Context
 *Alt text: the compliance owner talks only to retrieva-backend; the backend delegates the assessment
 sub-task to the Python crew over an internal A2A link; both trace to Langfuse.*
 
-### 3.2 Container — the supervisor graph (deterministic)
+### 3.2 Container — the multi-agent system
+
+> **This is a supervisor/worker (hierarchical) multi-agent system** — not a single LLM called in a
+> loop. A *deterministic* LangGraph supervisor (TypeScript) delegates one bounded sub-task to a
+> *collaborative* CrewAI crew of three agents (Python), over the open **A2A** protocol, and every
+> authoritative write waits behind a human gate.
+
+[![Retrieva multi-agent assessment system](/img/architecture/retrieva-multiagent-system.svg)](/img/architecture/retrieva-multiagent-system.svg)
+
+*Legend: solid = principal flow · dashed = backing dependency · amber = the A2A seam.
+[Full-resolution SVG →](/img/architecture/retrieva-multiagent-system.svg)*
+
+| Layer | Role | Where it lives (evidence) |
+|---|---|---|
+| **Supervisor** (1 agent) | Deterministic orchestration + all human gates; owns run state & routing | `retrieva-backend/services/orchestrator/assessmentGraph.ts` — a LangGraph-JS `StateGraph`; every edge routes on *state data, never an LLM*; `interrupt()` human gate; halt-on-doubt |
+| **A2A seam** | Cross-runtime, cross-language agent transport — JSON-RPC 2.0 `message/send` | client → `orchestrator/crewClient.ts`; server → crew `app.py` (`A2AStarletteApplication` + Agent Card at `/.well-known/agent-card.json`) + `executor.py` (`AgentExecutor`) |
+| **Crew** (3 agents) | Bounded, collaborative reasoning; output **proposed, never authoritative** | `retrieva-assessment-crew/.../crew.py` — `Crew(agents=[clause_mapper, gap_analyst, control_scorer], process=Process.sequential)` |
+
+**The pattern:** a hierarchical supervisor–worker system. Autonomy is *confined* to the crew and
+*subordinate* to the supervisor's human gate — the governance shape DORA / regulated finance require.
+The A2A link sits behind a default-deny netpol (backend ⇄ crew only) and is gated by
+`CREW_A2A_ENABLED` (the supervisor uses the in-process engine until the flag flips).
+
+#### 3.2.1 Supervisor graph (detailed)
 
 ```
 assess(arrangement) ─► intake (contract/evidence parse)  ─► classify (tier/appetite)
