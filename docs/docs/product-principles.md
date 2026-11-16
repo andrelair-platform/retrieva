@@ -50,7 +50,6 @@ The default answer is **"yes, automate"**; the burden is on the engineer to just
 - Extracting Art. 30 clause language from contracts
 - (Roadmap) Document language detection
 - (Roadmap) Contract version diffing
-- (Roadmap) Technical Documentation generation for EU AI Act
 
 ### Categories still candidate for AI automation
 
@@ -116,7 +115,7 @@ These three clauses are how Retrieva stays:
 - **Defensibly automated** — the AI is doing 90% of the work, but a human signs every line that matters to a regulator.
 - **Differentiated from generalist TPRM** — broad tools cannot afford the depth of AI investment per regulation; the trade-off for breadth is shallow automation. We make the opposite bet.
 
-These principles will continue to apply when Retrieva extends to **EU AI Act** (next regulation module) and **NIS2** (after that). Same constitution, different regulation.
+Retrieva's scope is deliberately **DORA ICT third-party risk**, done deeply — not a multi-regulation platform.
 
 ## Related
 

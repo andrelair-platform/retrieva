@@ -54,9 +54,8 @@ the **MVP cut line** ([Product Maturity](./product-maturity.md)) is the discipli
 **Structural longevity:**
 - **The problem is legally mandatory and permanent.** DORA is in force and regulator-enforced, with
   no sunset. Compliance demand doesn't churn like consumer trends — it deepens.
-- **Regulation compounds in your favour.** DORA RTS updates, the CTPP/lead-overseer regime, and
-  adjacent regimes (NIS2, EU AI Act, operational-resilience rules) each become a new module on the
-  *same graph* — a widening moat, not a rebuild.
+- **Regulation compounds in your favour.** DORA RTS updates and the CTPP/lead-overseer regime each
+  deepen the same graph — a widening moat, not a rebuild.
 - **System-of-record stickiness.** Once a customer's estate lives in the graph and their Register is
   generated from it, ripping it out is a governance project nobody wants.
 
@@ -74,9 +73,8 @@ the **MVP cut line** ([Product Maturity](./product-maturity.md)) is the discipli
    year-round risk-management system, not the one-time filing tool. The filing is a byproduct.
 
 **What would actually kill it:** staying a single-entity assessment tool. Survival past year 3 is the
-**V2 layer already scoped** — group governance (RTV-35), multi-regulation modules, the
-change-monitoring engine as the always-on product. Hence the shape: *MVP now, platform layer as the
-roadmap.*
+**V2 layer already scoped** — group governance (RTV-35) and the change-monitoring engine as the
+always-on product. Hence the shape: *MVP now, platform layer as the roadmap.*
 
 ## Strategy in one line
 

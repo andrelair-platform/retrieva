@@ -9,7 +9,7 @@ title: Agentic Assessment Orchestrator
 > house SDD template (`sdd-template.md`) — three audience views, C4, NFR register, data design, the
 > A2A contract, operational/scaling, security/compliance, a decision log. It **extends** the product
 > [Solution Architecture](./solution-architecture.md) (it does not duplicate it) and **reconciles**
-> the committed orchestrator epic **RTV-76** with the multi-framework agent direction (LangChain +
+> the committed orchestrator epic **RTV-76** with the multi-agent-framework direction (LangChain +
 > LangGraph + CrewAI + A2A, human-in-the-loop).
 >
 > - **Product / repo(s):** Retrieva — `retrieva-backend` (supervisor) + **`retrieva-assessment-crew`** (new, Python crew)

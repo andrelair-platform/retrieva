@@ -6,7 +6,7 @@ sidebar_position: 9
 
 **Status:** Live on **dev** (2026-09-29). The reading + verdict + decision pipeline that turns a
 provider's documents into cited, human-decided DORA findings. The AI drafts; the human decides
-(EU AI Act human-in-the-loop; DORA maker-checker). This page documents the backend engine, the
+(DORA maker-checker human-in-the-loop). This page documents the backend engine, the
 decision inbox (backend + frontend), estate import, and the two evaluation harnesses.
 
 ## What it does
@@ -148,7 +148,7 @@ ASSESSMENT_RERANK_ENABLED=true|false
 ## Compliance mapping
 - **DORA Art. 28/30** — contractual-requirement controls (security, BCP, audit rights, exit,
   sub-processing, data location, incident, authority cooperation…).
-- **EU AI Act — human-in-the-loop** — the AI drafts a cited verdict; a human is the accountable decider
+- **Human-in-the-loop (DORA maker-checker)** — the AI drafts a cited verdict; a human is the accountable decider
   (maker-checker SoD, override-with-reason).
 - **Register / audit** — decisions + risk openings are appended to the immutable audit log with the
   control-library + capability-map versions.

@@ -354,7 +354,6 @@ Registre dérivé de l'[architecture de solution](../architecture/solution-archi
 - Conformité au règlement **(UE) 2022/2554 (DORA)**, articles 28–30, et au gabarit **EBA RT.02.01**.
 - **RGPD** : résidence UE des données, PII maintenue dans le cluster, masquage (Presidio) à la
   passerelle.
-- **EU AI Act** : support à la décision + supervision humaine (satisfait par les garde-fous §7.7).
 - **RGAA** : accessibilité (audit 96/100 obtenu).
 
 ### 9.2 Contraintes techniques
