@@ -80,8 +80,7 @@ v1 roles are **app-managed** (assigned in Retrieva). A **seam to map Authentik/O
 Retrieva roles** is documented for enterprise SSO + self-host (RTV-44) — deferred, not v1.
 
 ## Compliance mapping
-- **DORA:** management-body accountability (risk officer = delegate), SoD, auditor read access, third-party (vendor) limited access.
-- **EU AI Act:** the approver is the human-oversight gate on AI output.
+- **DORA:** management-body accountability (risk officer = delegate), SoD, auditor read access, third-party (vendor) limited access. The approver is the human-oversight gate on AI output.
 - **GDPR:** DPO role + data-scoped access + entity isolation.
 - **SOC 2 / ISO 27001:** RBAC, least privilege, SoD, audit trail.
 

@@ -57,7 +57,6 @@ and the human owns accountability.
 
 - **DORA is in force** (Jan 2025) and enforcement is ramping — demand is regulator-mandated, not
   discretionary.
-- **The EU AI Act** adds AI-governance obligations on top — the same buyers, the same year.
 - **Intelligence got good enough** — multimodal document understanding + RAG can now read the
   evidence base a firm actually has, not a clean API.
 

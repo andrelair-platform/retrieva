@@ -85,8 +85,8 @@ extracted clauses to controls and produces findings.
 
 ## 5. Non-negotiable trust guardrails
 
-These are what make the output audit-defensible and satisfy **both** DORA (management-body
-accountability) and the **EU AI Act** (decision support + human oversight) simultaneously:
+These are what make the output audit-defensible and satisfy **DORA** (management-body
+accountability + human oversight of AI decision support):
 
 | Rule | Why |
 |---|---|
@@ -263,8 +263,8 @@ intake populates the graph.
 - **Immutable audit trail (§5).** `audit_log` records who/what/target/evidence/when for every
   state-changing action. It is **provably append-only**: a database `BEFORE UPDATE/DELETE` trigger
   rejects any mutation, and the repository exposes no update/delete path. This is the
-  "the human decided, on this evidence, at this time" record DORA (management-body accountability) and
-  the EU AI Act (human oversight) both require — verified by an integration test that asserts a raw
+  "the human decided, on this evidence, at this time" record DORA (management-body accountability +
+  human oversight) requires — verified by an integration test that asserts a raw
   `UPDATE`/`DELETE` throws.
 - **Isolation inherited** — both tables carry `organization_id` and every query composes
   `entityScopeCondition`, so evidence/audit are entity-scoped under `ENTITY_ISOLATION_MODE=enforce`.

@@ -75,7 +75,7 @@ Register), `alertMonitorService`, plus full multi-tenant (`Organization → Work
 Stripe billing, MFA, auth. Domain models: `Assessment`, `CriticalFunction`, `ProviderDependency`
 (the graph), `VendorQuestionnaire`, `Organization/Workspace`.
 
-## The roadmap — 6 themes (the ~90 open issues cluster into these)
+## The roadmap — 5 themes (the ~90 open issues cluster into these)
 
 | # | Theme | What it is | Representative issues | Maturity |
 |---|---|---|---|---|
@@ -83,8 +83,7 @@ Stripe billing, MFA, auth. Domain models: `Assessment`, `CriticalFunction`, `Pro
 | **2** | **Concentration & nth-party graph** *(the moat)* | Art 28(4)/29 — the cross-vendor question questionnaire-tools can't answer | #165, #207, #300, #350 (RTV-15 ✅) | 🟢 differentiator |
 | **3** | **Evidence + Findings workflow** | Evidence library, vendor portal, finding tracker, approvals | #226, #227, #228, #365, #360, #378 (RTV-16/17) | 🟡 next |
 | **4** | **AI depth & quality** | Eval harness, AI-drafted decisions, NL command, injection defence | #385, #374, #375, #377, #220, #221 | 🟡 the "how do you know it works" layer |
-| **5** | **Multi-regulation expansion** | EU AI Act · NIS2 · Solvency II — one engine, many frameworks | #171, #355, #369, #359 | 🔵 the scale story |
-| **6** | **Enterprise-ready** | SSO, API, white-label, i18n (DE/FR), audit log, observability, Azure | #214, #218, #408, #351, #213, #224, #390 + epics #385–#393 | 🟡 sell-ability |
+| **5** | **Enterprise-ready** | SSO, API, white-label, i18n (DE/FR), audit log, observability, Azure | #214, #218, #408, #351, #213, #224, #390 + epics #385–#393 | 🟡 sell-ability |
 
 ## The strategic through-line
 
@@ -94,10 +93,8 @@ Stripe billing, MFA, auth. Domain models: `Assessment`, `CriticalFunction`, `Pro
 - **Next (the fundable wedge)** — themes **3–4** make it *sellable + trustworthy*: the evidence
   workflow + **measurable AI evaluation** (recall@5, groundedness, hallucination %, cost/latency)
   are the traction numbers a buyer and an investor both ask for.
-- **Later (the vision)** — theme **5**: "one engine, many regulations" turns a DORA tool into a
-  **multi-framework compliance platform**, and ultimately the **governance layer of the AI-native
-  insurer** (see the platform's *AI-First Insurance Operating Model*). Compliance is the wedge with
-  mandatory demand; the platform is the expansion.
+- **Scope (deliberate)** — Retrieva is a **DORA ICT third-party-risk** product, end to end. It is
+  **not** a multi-regulation platform: adjacent regimes are out of the certified scope.
 
 ## Honest risks (from the issue backlog)
 
