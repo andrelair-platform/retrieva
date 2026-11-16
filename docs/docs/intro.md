@@ -50,6 +50,20 @@ a Postgres checkpointer, traced in Langfuse) → a human decides in the **decisi
 center** (separation-of-duties, live over Socket.io) → the register projection, risk register,
 concentration graph and EBA RT.01–RT.04 export. The diagram is [generated from code](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_assessment_flow.py).*
 
+## The multi-agent system
+
+[![Retrieva multi-agent assessment system](/img/architecture/retrieva-multiagent-system.svg)](/img/architecture/retrieva-multiagent-system.svg)
+
+*A **supervisor/worker (hierarchical) multi-agent system** — not one LLM in a loop. A *deterministic*
+**LangGraph-JS** supervisor (`retrieva-backend`, TypeScript) delegates one bounded sub-task to a
+*collaborative* **CrewAI** crew of three sequential agents — clause mapper → gap analyst → control
+scorer (`retrieva-assessment-crew`, Python) — over the open **A2A** protocol (JSON-RPC 2.0
+`message/send`). The crew's output is **proposed, never authoritative**: the supervisor's `interrupt()`
+human gate decides, and halt-on-doubt blocks a low-confidence run. The diagram is [generated from
+code](https://github.com/andrelair-platform/retrieva/blob/main/docs/diagrams/retrieva_multiagent_system.py);
+the request/response round-trip is detailed in [Architecture → Agentic Assessment Orchestrator
+§3.2](/architecture/agentic-assessment-orchestrator#32-container--the-multi-agent-system).*
+
 ## Key features
 
 ### Register of Information (the arrangements domain)
