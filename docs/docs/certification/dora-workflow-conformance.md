@@ -87,7 +87,7 @@ via les gates. Gap detection explicable + traçabilité source (citations) en pl
 
 1. Unified inventory + relationship graph → 🟢 (Org→Workspace→CriticalFunction→ProviderDependency)
 2. Evidence ingestion + assessment engine → 🟢
-3. Human approval + remediation engine → 🟢/🟡 (approval ✅ ; remediation en code mais **email prod down** — P0)
+3. Human approval + remediation engine → 🟢 (approval ✅ ; remediation ✅ ; email prod **`configured`** — reste la vérif de délivrabilité, P0)
 4. Register generation + validation → 🟢 (RT.01–04 + completeness)
 5. Continuous monitoring → 🟢/🟡 (event + scheduled)
 
@@ -100,7 +100,7 @@ périmètre du blueprint (le F = intra-client, déjà 🟢).
 
 | Phase | Lacune | Remédiation (points de touche) | Effort | DORA | Bloc |
 |---|---|---|---|---|---|
-| **P0** | 🔴 Email prod no-op (#475) | Provisionner `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (Vault → ES `retrieva-secrets` → `values-prod`) + vérif DNS `retrieva.online`. **Code prêt** (`emailService.ts`). | S | Art.28(1) | BC03/BC04 |
+| **P0** | 🟡 Email prod — **wiring déjà fait** (clé Vault + `email.enabled:true` + env présents ; health `configured`). Reste : **vérifier la délivrabilité** (domaine Resend `retrieva.online` SPF/DKIM + un envoi réel). | S | Art.28(1) | BC03/BC04 |
 | **P1a** | 🟡 Gate activation pré-contrat (B-8) | `canActivate(arrangement)` sur `approve_onboarding` : exige legal `clause:signoff` + `security:signoff` + risk décidé + evidence complète ; 409 sinon. (`lifecycle/arrangementLifecycle.ts`) | M | Art.28(4),30 | BC02/BC03 |
 | **P1b** | 🟡 Délégation d'autorité graduée | Seuils par criticité (standard→`ict_risk_officer` ; important→+`group_risk` ; critical→co-sign) ; table versionnée. (`config/authz/`, `riskLifecycle.ts`) | M | Art.28(1) | BC01/BC03 |
 | **P2a** | 🟡 Routing intelligent des findings | Table `(findingType,criticality)→role` : assigner + notifier le bon rôle. (`modules/decisionQueue/`, `applyFindingDecision.ts`, `emailService`) — dépend de P0. | M | Art.28 | BC02 |
