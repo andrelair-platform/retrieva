@@ -98,6 +98,7 @@ const sidebars: SidebarsConfig = {
   ],
   certificationSidebar: [
     'certification/overview',
+    'certification/dora-workflow-conformance',
     {
       type: 'category',
       label: 'Bloc 1 — Cadrer (oral)',
