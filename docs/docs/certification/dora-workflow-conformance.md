@@ -12,8 +12,9 @@ sidebar_position: 2
 > **BC04 (maintien en condition opérationnelle)**.
 >
 > Évaluation faite sur le code (49 services, 16 modules, 38 tables, l'orchestrateur multi-agent, le RBAC
-> `domain_role`). **Conformité actuelle : ~75–80 %**, structurée autour du **cycle de vie** (pas de
-> formulaires isolés).
+> `domain_role`). **Conformité actuelle : ~82–85 %** (P0/P1a/P1b livrés en prod ; **P2 implémenté +
+> testé, déploiement en attente infra**), structurée autour du **cycle de vie** (pas de formulaires
+> isolés). Reste à construire : P3 (data-quality registre), P4 (evidence-packs + dashboards).
 
 ## 1. Cycle de vie (5 étapes)
 
@@ -32,19 +33,24 @@ sidebar_position: 2
 `QuestionnaireService`+`evidenceRequests` (Collect) · `gapAnalysisAgent` (Assess) ·
 `riskLifecycle`/`applyFindingDecision` (Remediate) · `registerProjection` (Update) · `surveillance` (Monitor).
 
-### B — Nouveau fournisseur avant contrat — 🟡 présent, gate à durcir
+### B — Nouveau fournisseur avant contrat — 🟢 gate durci (P1a livré)
 `intake/` + `adoptionRequestService` (Intake) · `discoveryService` dedup (Screen) · classify ✅ ·
 DDQ+evidence (Due diligence) · `contractExtractionService` (Contract) · `scoring`+decision gate (Risk) ·
 `arrangementProposalWorkflow` + lifecycle `prospect→due_diligence→active` (Onboard).
-**Écart (P1a) :** l'étape « vérifier les approbations/conditions AVANT activation » existe comme états de
-lifecycle (`approve_onboarding {approval:true}`) mais n'est pas un **gate bloquant dur** (pas de
-précondition exigeant les sign-offs legal + security + risk réunis).
+**P1a livré (prod, PR retrieva-backend#205) :** `approve_onboarding` est désormais un **gate bloquant
+dur** — il renvoie **409** tant que l'évaluation confirme un manquement (`recommendation:'blocked'`) ou
+n'a pas tourné. `activationBlockers()` (pur, `onboarding/onboardingDecision.ts`) est imposé dans
+`arrangements.controller.ts` : plus d'activation sans la décision de risque et les conditions réunies.
 
-### C — Monitoring event-driven — 🟢/🟡
+### C — Monitoring event-driven — 🟢 (P2b implémenté)
 Event-driven réel : `cveClient` (vulnérabilités), `statuspageClient` (incidents), event-types
 `cve/incident/breach/cascade/blast_radius` + dedup. Scheduled : `periodicReassessment`.
-**Écart (P2b) :** les triggers *sous-traitant change* et *data-location change* sont détectables via le
-graphe mais pas tous câblés à un flux d'événement entrant.
+**P2b implémenté (L0/L1, déploiement en attente) :** les triggers *sous-traitant change* et
+*data-location change* sont désormais câblés — à la **ré-ingestion** d'un arrangement existant,
+`dependencyChangeDiff` (pur) diffe les sous-traitants + la résidence vs l'état antérieur et, sur un
+changement matériel, `changeTriggeredReassessment` **rouvre l'arrangement** (`start_review`, le trigger
+RTV-32 jumeau du scheduler) + ré-enfile l'assessment, le tout tracé dans l'audit immuable. Câblé dans
+`intake/arrangementIntakeService.confirmProposal` (best-effort, fail-safe). Sévérité CIF-majorée.
 
 ## 3. Workflows supports D–I
 
@@ -70,7 +76,7 @@ Le RBAC `domain_role` couvre les 9 parties ; les deux manquants (procurement, in
 | Information security / IT | `security_officer` | 🟢 |
 | Legal / compliance | `legal` + `group_compliance` | 🟢 |
 | Supplier | `vendor_contact` (portail) | 🟢 |
-| Risk-acceptance authority | `ict_risk_officer.risk:accept` | 🟡 pas de seuils de délégation (P1b) |
+| Risk-acceptance authority | `ict_risk_officer.risk:accept` → `risk:acceptHigh` → `risk:acceptCritical` | 🟢 délégation graduée par sévérité (P1b livré) |
 | Senior management | délégué à `ict_risk_officer` (pas d'acteur board — décision documentée) | 🟡 |
 | Internal audit | `auditor` (read-only) | 🟢 (indépendance = accepté-risque, projet solo) |
 
@@ -95,16 +101,18 @@ via les gates. Gap detection explicable + traçabilité source (citations) en pl
 
 ## 7. Plan de remédiation vers 100 %
 
-Fermer les **6 lacunes actionnables**. La concentration *cross-client* (marché) reste roadmap, hors
-périmètre du blueprint (le F = intra-client, déjà 🟢).
+**P0 (email prod), P1a (gate activation) et P1b (délégation graduée) sont livrés en prod** ✅ ;
+**P2a (routing) + P2b (triggers event-driven) sont implémentés + testés (L0/L1), déploiement en attente
+(infra)** ✅ ; restent **2 lacunes** (P3 data-quality, P4 evidence-packs). La concentration *cross-client*
+(marché) reste roadmap, hors périmètre du blueprint (le F = intra-client, déjà 🟢).
 
 | Phase | Lacune | Remédiation (points de touche) | Effort | DORA | Bloc |
 |---|---|---|---|---|---|
-| **P0** | 🟡 Email prod — **wiring déjà fait** (clé Vault + `email.enabled:true` + env présents ; health `configured`). Reste : **vérifier la délivrabilité** (domaine Resend `retrieva.online` SPF/DKIM + un envoi réel). | S | Art.28(1) | BC03/BC04 |
-| **P1a** | 🟡 Gate activation pré-contrat (B-8) | `canActivate(arrangement)` sur `approve_onboarding` : exige legal `clause:signoff` + `security:signoff` + risk décidé + evidence complète ; 409 sinon. (`lifecycle/arrangementLifecycle.ts`) | M | Art.28(4),30 | BC02/BC03 |
-| **P1b** | 🟡 Délégation d'autorité graduée | Seuils par criticité (standard→`ict_risk_officer` ; important→+`group_risk` ; critical→co-sign) ; table versionnée. (`config/authz/`, `riskLifecycle.ts`) | M | Art.28(1) | BC01/BC03 |
-| **P2a** | 🟡 Routing intelligent des findings | Table `(findingType,criticality)→role` : assigner + notifier le bon rôle. (`modules/decisionQueue/`, `applyFindingDecision.ts`, `emailService`) — dépend de P0. | M | Art.28 | BC02 |
-| **P2b** | 🟡 Triggers event-driven manquants | Diff auto à la ré-ingestion (subprocessor/residency) → event → rouvre l'assessment. (`surveillance/classify.ts`, `concentrationService`, `periodicReassessment`) | M | Art.28(1),29 | BC04 |
+| **P0** | 🟢 Email prod — **wiring livré** (clé Vault + `email.enabled:true` + env présents ; health `configured`). Reste : **vérifier la délivrabilité** (domaine Resend `retrieva.online` SPF/DKIM + un envoi réel). | S | Art.28(1) | BC03/BC04 |
+| **P1a** | 🟢 **LIVRÉ** (prod #205) — Gate activation pré-contrat (B-8) | `activationBlockers()` sur `approve_onboarding` : 409 tant que l'évaluation confirme un breach (`recommendation:'blocked'`) ou n'a pas tourné. (`onboarding/onboardingDecision.ts` + `arrangements.controller.ts`) | M | Art.28(4),30 | BC02/BC03 |
+| **P1b** | 🟢 **LIVRÉ** (prod #206) — Délégation d'autorité graduée | Seuils par sévérité : low/medium→`risk:accept` (ict_risk_officer) ; high→`risk:acceptHigh` ; critical→`risk:acceptCritical` (group_risk). Capabilities v1.6.0. (`riskLifecycle.capabilityForAcceptance`) | M | Art.28(1) | BC01/BC03 |
+| **P2a** | 🟢 **implémenté** (L0/L1, déploiement en attente) — Routing intelligent des findings | Table pure `domain→rôle` (`findingRouting.ts`) : à l'ouverture d'un risque, route le gap vers le bon rôle (DPO/sécurité/legal/ICT-risk), **escalade** `group_risk` sur haute sévérité + CIF, et **notifie** les porteurs du rôle (`findingRouteNotifier.ts` → `emailService`, fail-safe). Inbox filtrable par rôle (`decisionQueue.routedRole`/`itemsForRole`). Câblé dans `applyFindingDecision.ts`. | M | Art.28 | BC02 |
+| **P2b** | 🟢 **implémenté** (L0/L1, déploiement en attente) — Triggers event-driven | Diff pur à la ré-ingestion (`dependencyChangeDiff.ts` — subprocessor/residency, sévérité CIF-majorée) → `changeTriggeredReassessment.ts` rouvre l'arrangement (`start_review`) + ré-enfile l'assessment + audit. Câblé dans `intake/arrangementIntakeService.confirmProposal`. | M | Art.28(1),29 | BC04 |
 | **P3** | 🟡 Data-quality registre (116 checks ESA) | Étendre `completeness/rules.ts` vers les familles ESA (intégrité relationnelle, champs obligatoires par RT, validation LEI, cohérence CIF, complétude nth-party) ; chaque règle tracée à l'ITS 2024/2956. | L | Art.28(3)+ITS | BC02/BC04 |
 | **P4** | 🟡 Dashboards + evidence-packs audit | Endpoint evidence-pack on-demand + dashboards (overdue/freshness/coverage/deadlines). (`reportability/`, nouveau `auditPack`, frontend) | M-L | Art.28(1) | BC04 |
 
