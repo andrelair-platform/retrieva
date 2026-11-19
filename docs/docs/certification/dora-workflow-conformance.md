@@ -12,10 +12,10 @@ sidebar_position: 2
 > **BC04 (maintien en condition opérationnelle)**.
 >
 > Évaluation faite sur le code (49 services, 16 modules, 38 tables, l'orchestrateur multi-agent, le RBAC
-> `domain_role`). **Conformité actuelle : ~82–85 %** (P0/P1a/P1b livrés en prod ; **P2 implémenté +
-> testé, déploiement en attente infra**), structurée autour du **cycle de vie** (pas de formulaires
-> isolés). P3 (data-quality registre ESA) implémenté + testé, déploiement en attente ; reste à construire :
-> P4 (evidence-packs + dashboards).
+> `domain_role`). **Conformité actuelle : ~95 % du blueprint actionnable** (P0/P1a/P1b livrés en prod ;
+> **P2/P3/P4 implémentés + testés L0/L1, déploiement en attente infra**), structurée autour du **cycle de vie** (pas de formulaires
+> isolés). **P2, P3 et P4 implémentés + testés (L0/L1), déploiement en attente infra** — les 7 phases
+> actionnables P0–P4 sont faites (matrice fermée à ~100 % du blueprint actionnable).
 
 ## 1. Cycle de vie (5 étapes)
 
@@ -62,7 +62,7 @@ RTV-32 jumeau du scheduler) + ré-enfile l'assessment, le tout tracé dans l'aud
 | F | Dependency & concentration | `concentrationService`, `providerDependencies`, `substituteProviders` (nth-party) | 🟢 |
 | G | Register of Information | **RT.01.01/02.01/03.01/04.01 + B_01.01/02** · `completeness`+`rules`+`reconciliationService` · réf. ITS 2024/2956 | 🟢 |
 | H | Termination & exit | `exitStrategy`, `exitArtefacts` (exit_blueprint/provider_match/reintegration_model) | 🟢 |
-| I | Compliance monitoring & audit readiness | `auditLog`/`actionAudit` (immutable), `reportabilityService` | 🟡 (dashboards/evidence-packs partiels — P4) |
+| I | Compliance monitoring & audit readiness | `auditLog`/`actionAudit` (immutable), `reportabilityService` + **`auditDashboard`/`auditPack` (P4)** | 🟢 (dashboard overdue/freshness/coverage/deadlines + evidence-pack on-demand tamper-évident ; viz frontend = couche mince restante) |
 
 ## 4. Modèle human-in-the-loop (9 parties)
 
@@ -104,9 +104,12 @@ via les gates. Gap detection explicable + traçabilité source (citations) en pl
 
 **P0 (email prod), P1a (gate activation) et P1b (délégation graduée) sont livrés en prod** ✅ ;
 **P2a (routing) + P2b (triggers event-driven) sont implémentés + testés (L0/L1), déploiement en attente
-(infra)** ✅ ; **P3 (data-quality registre ESA) implémenté + testé** ✅ ; reste **1 lacune** (P4
-evidence-packs + dashboards). La concentration *cross-client*
-(marché) reste roadmap, hors périmètre du blueprint (le F = intra-client, déjà 🟢).
+(infra)** ✅ ; **P3 (data-quality registre ESA) et P4 (dashboards + evidence-packs audit) implémentés +
+testés** ✅. **Les 7 phases actionnables P0–P4 sont faites** (P0–P1b en prod ; P2–P4 implémentés + testés
+L0/L1, déploiement en attente infra) → la matrice est fermée à ~100 % du blueprint actionnable. Reste
+pour le full-déploiement : L2/L3 + QA gate live, et la viz frontend du dashboard (couche mince). La
+concentration *cross-client* (marché) reste roadmap, hors périmètre du blueprint (le F = intra-client,
+déjà 🟢).
 
 | Phase | Lacune | Remédiation (points de touche) | Effort | DORA | Bloc |
 |---|---|---|---|---|---|
@@ -116,7 +119,7 @@ evidence-packs + dashboards). La concentration *cross-client*
 | **P2a** | 🟢 **implémenté** (L0/L1, déploiement en attente) — Routing intelligent des findings | Table pure `domain→rôle` (`findingRouting.ts`) : à l'ouverture d'un risque, route le gap vers le bon rôle (DPO/sécurité/legal/ICT-risk), **escalade** `group_risk` sur haute sévérité + CIF, et **notifie** les porteurs du rôle (`findingRouteNotifier.ts` → `emailService`, fail-safe). Inbox filtrable par rôle (`decisionQueue.routedRole`/`itemsForRole`). Câblé dans `applyFindingDecision.ts`. | M | Art.28 | BC02 |
 | **P2b** | 🟢 **implémenté** (L0/L1, déploiement en attente) — Triggers event-driven | Diff pur à la ré-ingestion (`dependencyChangeDiff.ts` — subprocessor/residency, sévérité CIF-majorée) → `changeTriggeredReassessment.ts` rouvre l'arrangement (`start_review`) + ré-enfile l'assessment + audit. Câblé dans `intake/arrangementIntakeService.confirmProposal`. | M | Art.28(1),29 | BC04 |
 | **P3** | 🟢 **implémenté** (L0/L1, déploiement en attente) — Data-quality registre (familles ESA) | `completeness/esaDataQuality.ts` étend `rules.ts` au-delà de la simple présence : **validité LEI** (structure ISO 17442 + **checksum ISO 7064 mod 97-10**), **liste de codes pays** (ISO 3166-1 alpha-2), **intégrité relationnelle** cross-template (arrangement→entité/fournisseur, arêtes nth-party), sur l'ensemble des nœuds (pas de faux-positif workspace). Catalogue `ESA_CHECKS` (checkId→réf ITS 2024/2956) ; chaque finding tracé. Les familles applicables au modèle sont couvertes (les contrôles ESA portant sur des champs non modélisés — montants, dates de contrat — restent N/A, documentés). | L | Art.28(3)+ITS | BC02/BC04 |
-| **P4** | 🟡 Dashboards + evidence-packs audit | Endpoint evidence-pack on-demand + dashboards (overdue/freshness/coverage/deadlines). (`reportability/`, nouveau `auditPack`, frontend) | M-L | Art.28(1) | BC04 |
+| **P4** | 🟢 **implémenté** (backend L0/L1, déploiement en attente) — Dashboards + evidence-packs audit | `auditDashboard.ts` (pur — overdue reassessments/freshness/coverage/deadlines) + `auditPack.ts` (pur — dossier auditeur **tamper-évident**, hash d'intégrité sur le contenu) + `auditReadinessService.ts` ; endpoints `GET /reportability/dashboard` + `/audit-pack/:id` (gate `reportability:read`). La **viz frontend** reste la couche mince consommatrice. | M-L | Art.28(1) | BC04 |
 
 **Séquence :** P0 (~1-2 j) → P1 (~1 sprint) → P2 (~1 sprint) → P3 (~1-2 sprints) → P4 (~1 sprint) ≈
 **4-6 sprints**. Livraison en stories BMAD (repo `retrieva`), tier-A → pyramide L0–L4 + QA gate avant prod.
