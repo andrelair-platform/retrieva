@@ -26,17 +26,26 @@ and risk teams:
   resumable (Postgres checkpointer), traced in Langfuse, and monitored live.
 - **Human-in-the-loop governance** — nothing authoritative is written without sign-off. A **decision
   inbox** (cross-arrangement AI-draft queue) and an **approval center** (run-gate approvals) enforce
-  review, with **separation-of-duties** on resume. *AI drafts, human decides.*
+  review, with **separation-of-duties** on resume. An approved gap is **routed to the owning party**
+  (security / DPO / legal / ICT-risk), escalating to the management-body delegate on a severe
+  critical/important finding, and the holders are notified. *AI drafts, human decides.*
 - **Concentration & nth-party risk** — model *critical function → provider → sub-provider* and answer
   "if this provider fails, which functions stop, and where are we over-concentrated?" (DORA Art 28(4)/29).
+- **Register data-quality (ESA)** — beyond "is the field present?", the register is validated against the
+  ESA/EBA data-quality families it's filed against (ITS 2024/2956): **LEI** (ISO 17442 + ISO 7064
+  checksum), **ISO 3166 country**, and cross-template **referential integrity** — each finding traced to
+  the regulation.
 - **Risk register & remediation** — findings derive risks with a lifecycle
   (open → mitigating → mitigated → accepted → closed) and management-body risk acceptance.
 - **Vendor questionnaires & evidence portal** — auto-generate and **LLM-score** security questionnaires
   (0–100); collect evidence from vendors against a DORA evidence checklist.
 - **Compliance AI copilot** — ask compliance questions in natural language; a governed RAG pipeline
   searches your documents and the DORA knowledge base, with citations.
-- **Monitoring & alerts** — automated 24-hour alerts for certification expiry, contract renewal, overdue
-  annual reviews, and stale assessments.
+- **Audit readiness** — a tamper-evident, on-demand **evidence pack** per arrangement + a readiness
+  **dashboard** (overdue reassessments, evidence freshness, register coverage, upcoming deadlines).
+- **Monitoring & triggers** — automated 24-hour alerts (certification expiry, contract renewal, overdue
+  reviews, stale assessments) **and event-driven reassessment**: a material change on re-ingestion
+  (subprocessor added/removed, data-residency move) reopens the arrangement for a fresh assessment.
 - **Multi-tenant & multi-legal-entity** — workspace + legal-entity isolation, RBAC, MFA, field-level
   encryption, and full LLMOps observability.
 
@@ -86,7 +95,10 @@ Postgres checkpointer (resumable) and emit a per-run Langfuse trace.
 Two surfaces keep a human in the loop: a **decision inbox** that merges AI-drafted findings and open
 risks into one queue (most-uncertain / most-severe first), and an **approval center** that gates
 assessment *runs* by `runId + gate`. **Separation-of-duties** is enforced on resume, and the run monitor
-streams live progress over Socket.io.
+streams live progress over Socket.io. When a checker approves a gap, **intelligent routing** assigns the
+remediation to the owning party by control domain (security / DPO / legal / ICT-risk) — escalating to the
+management-body delegate (`group_risk`) on a high/critical finding on a critical-or-important function —
+and notifies the holders of that role; the inbox is filterable by "my role".
 
 ### Intelligent RAG copilot
 
@@ -111,7 +123,24 @@ A dashboard + scoring engine over the *critical function → provider → sub-pr
 AI-extracted sub-provider edges, human-confirmed) surfaces single-points-of-failure and
 over-concentration for DORA Art 28(4)/29.
 
-### Automated compliance monitoring
+### Register data-quality (ESA checks)
+
+The register-completeness audit validates the Register of Information against the **ESA/EBA data-quality
+families** it's filed against (ITS 2024/2956), not just field presence: **LEI** (ISO 17442 structure +
+ISO 7064 mod 97-10 checksum), **country** (ISO 3166-1 alpha-2), and cross-template **referential
+integrity** (an arrangement's maintaining entity/provider and every nth-party edge must resolve). Each
+finding carries its **check id + ITS reference**, so a gap is traceable to the rule and the regulation.
+
+### Audit readiness
+
+For an auditor/regulator, Retrieva produces evidence on demand: a tamper-evident **evidence pack** per
+arrangement (`GET /api/v1/reportability/audit-pack/:arrangementId`) that bundles the arrangement, its
+reportability determinations, findings, risks, register gaps and immutable audit trail into one dossier
+with a **content-only integrity hash** (stable across re-generation); and a readiness **dashboard**
+(`GET /api/v1/reportability/dashboard`) of overdue reassessments, evidence freshness, register coverage
+and upcoming deadlines.
+
+### Automated compliance monitoring + event-driven triggers
 
 A BullMQ repeatable job runs every 24 hours and emails alerts to workspace owners:
 
@@ -119,6 +148,11 @@ A BullMQ repeatable job runs every 24 hours and emails alerts to workspace owner
 - Contract renewal — 60 days
 - Annual review overdue
 - No assessment in 12 months
+
+Alongside this **time-driven** cadence, Retrieva also reassesses on **change**: when a re-ingested
+contract shows a **material change** — a subprocessor added/removed, or a data-residency move — the
+arrangement is reopened for a fresh assessment (the `start_review` change trigger), recorded in the
+immutable audit trail.
 
 ### EBA Register of Information export
 
@@ -182,6 +216,7 @@ are the **foundation layer**:
 | Phase 3 | Vendor questionnaires with LLM scoring | ✅ Production |
 | Phase 4 | Monitoring alerts + Register of Information export | ✅ Production |
 | TPRM v1 | Arrangements/Register domain · agentic assessment runs · human-in-the-loop governance · concentration & nth-party risk · risk register · evidence portal | ✅ Shipped |
+| DORA conformance (P0–P4) | Pre-contract activation gate · graduated risk-acceptance delegation · intelligent finding routing · event-driven reassessment triggers · ESA register data-quality checks · audit-readiness dashboard + evidence packs | ✅ Shipped — see [DORA workflow conformance](/certification/dora-workflow-conformance) |
 
 ## Quick Links
 
