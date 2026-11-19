@@ -157,7 +157,8 @@
       "discovery": "Découverte",
       "exitStrategy": "Stratégie de sortie",
       "contractAmendments": "Avenants contractuels",
-      "onboardTool": "Intégrer un outil"
+      "onboardTool": "Intégrer un outil",
+      "auditReadiness": "Préparation à l'audit"
     },
     "titles": {
       "riskRegister": "Registre des risques",

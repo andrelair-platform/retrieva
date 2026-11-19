@@ -18,6 +18,7 @@ import {
   DoorOpen,
   FileSignature,
   PackageSearch,
+  Gauge,
 } from 'lucide-react';
 
 import { getFeatureFlags, type FeatureFlags } from '@/lib/runtime-env';
@@ -80,6 +81,7 @@ export const desktopNavSections: NavSection[] = [
     label: 'nav.sections.govern',
     items: [
       { title: 'nav.items.riskRegister', href: '/risk-register', icon: BarChart3 },
+      { title: 'nav.items.auditReadiness', href: '/audit-readiness', icon: Gauge },
       { title: 'nav.items.exitStrategy', href: '/exit-strategy', icon: DoorOpen },
       { title: 'nav.items.contractAmendments', href: '/contract-amendments', icon: FileSignature },
     ],

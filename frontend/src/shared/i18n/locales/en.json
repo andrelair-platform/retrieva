@@ -157,7 +157,8 @@
       "discovery": "Discovery",
       "exitStrategy": "Exit Strategy",
       "contractAmendments": "Contract Amendments",
-      "onboardTool": "Onboard a Tool"
+      "onboardTool": "Onboard a Tool",
+      "auditReadiness": "Audit Readiness"
     },
     "titles": {
       "riskRegister": "Risk Register",
