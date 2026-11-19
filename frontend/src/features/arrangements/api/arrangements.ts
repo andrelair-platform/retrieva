@@ -201,10 +201,21 @@ export interface Risk {
   status: RiskStatus;
   openedBy: string | null;
   ownerId: string | null;
+  /** remediation deadline (nullable) — drives the overdue reminder/escalation sweep. */
+  dueDate: string | null;
   remediation: Array<{ at: string; by: string; from: string; to: string; reason: string | null }>;
   createdAt: string;
   updatedAt: string;
 }
+
+// Supplier-notice types the backend accepts (Workflow A step 8).
+export type SupplierNoticeType =
+  | 'breach'
+  | 'subprocessor_change'
+  | 'residency_change'
+  | 'incident'
+  | 'service_degradation'
+  | 'other';
 
 export interface CreateArrangementInput {
   legalEntityId: string;
@@ -559,6 +570,27 @@ export const arrangementsApi = {
       `/arrangements/${arrangementId}/risks/${riskId}`,
       { status, ...(reason ? { reason } : {}) }
     );
+    return res.data;
+  },
+
+  // Workflow A step 6 — set/clear a risk's remediation deadline (drives the overdue reminder sweep).
+  setRiskDueDate: async (arrangementId: string, riskId: string, dueDate: string | null) => {
+    const res = await apiClient.patch<ApiResponse<{ risk: Risk }>>(
+      `/arrangements/${arrangementId}/risks/${riskId}/due-date`,
+      { dueDate }
+    );
+    return res.data;
+  },
+
+  // Workflow A step 8 — log a notification the supplier sent the bank → records it + reopens the
+  // arrangement for reassessment.
+  logSupplierNotice: async (
+    arrangementId: string,
+    body: { type: SupplierNoticeType; summary?: string; reference?: string }
+  ) => {
+    const res = await apiClient.post<
+      ApiResponse<{ recorded: true; reopened: boolean; reassessmentQueued: boolean; notice: { type: string; label: string; severity: string } }>
+    >(`/arrangements/${arrangementId}/supplier-notice`, body);
     return res.data;
   },
 
