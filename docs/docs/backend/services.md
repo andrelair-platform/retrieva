@@ -571,3 +571,45 @@ Generates a Word (.docx) compliance report using the `docx` npm package.
 5. Methodology notes
 
 Entry point: `generateReport(assessmentId)` → returns a `Buffer` ready to stream.
+
+## DORA Governance & Reportability Services
+
+The lifecycle services behind finding routing, event-driven reassessment, register data-quality and audit
+readiness (the DORA workflow-conformance P2–P4 closure). All are **pure + injectable** where the logic is
+deterministic, so each is unit-testable with no DB/LLM.
+
+### Finding routing (`services/assessment/findingRouting.ts` + `findingRouteNotifier.ts`)
+
+When a checker approves a gap-finding (opening a remediation Risk), the gap is routed to the party whose
+mandate the control falls under — mapping the control's **domain** to an owning `domain_role`
+(security_officer / dpo / legal / ict_risk_officer). A **high/critical** gap on a **critical-or-important**
+arrangement escalates to the management-body delegate (`group_risk`). `findingRouteNotifier` resolves the
+routed role(s) → the entity members who hold them → their emails, and sends a notification (fail-safe —
+a notify failure never breaks the SoD decision). The decision inbox stamps each item's `routedRole` so it
+can be filtered by "my role".
+
+### Event-driven reassessment (`services/lifecycle/dependencyChangeDiff.ts` + `changeTriggeredReassessment.ts`)
+
+The **change** half of the re-assessment machine (twin of the periodic cadence). On re-ingestion of an
+existing arrangement, `dependencyChangeDiff` diffs the **subprocessors** + **data-residency** against the
+prior state (CIF-escalated severity); on a material change, `changeTriggeredReassessment` reopens the
+arrangement (`start_review`), enqueues a fresh assessment and audits `arrangement.dependency_change`.
+Composed by `reingestDependencyCheck` and wired best-effort into `intake/arrangementIntakeService`.
+
+### ESA register data-quality (`services/completeness/esaDataQuality.ts`)
+
+Extends the register-completeness rules beyond field presence to the ESA/EBA validation families
+(ITS 2024/2956): **LEI** (ISO 17442 + ISO 7064 mod 97-10 checksum), **country** (ISO 3166-1 alpha-2) and
+cross-template **referential integrity**. The `ESA_CHECKS` catalogue maps each check id → its ITS
+reference, embedded in the finding detail for traceability.
+
+### Audit readiness (`services/reportability/auditDashboard.ts` · `auditPack.ts` · `auditReadinessService.ts`)
+
+- `auditDashboard` (pure) computes the readiness metrics — overdue reassessments (CIF 90d / standard
+  180d cadence), evidence freshness, register coverage, upcoming deadlines.
+- `auditPack` (pure) assembles the fetched artefacts (arrangement, determinations, findings, risks,
+  register gaps, audit trail) into one auditor dossier + a manifest with a **content-only SHA-256
+  integrity hash** (tamper-evident, stable across re-generation).
+- `auditReadinessService` orchestrates both with injectable loaders; served at
+  `GET /api/v1/reportability/dashboard` and `GET /api/v1/reportability/audit-pack/:arrangementId`
+  (gated by `reportability:read`; pack access is audited).

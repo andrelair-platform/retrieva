@@ -159,11 +159,22 @@ docker compose down -v && docker compose up   # full clean reset (wipes volumes)
 
 ## Features
 
+Retrieva covers the **financial entity's side of DORA Pillar 4 (ICT third-party risk management)** as a
+coherent, human-in-the-loop lifecycle — *discover → classify & assess → evidence & decide → register &
+monitor* — not a pile of isolated forms. The arrangement graph *is* the Register of Information.
+
 | Feature | Description |
 |---|---|
-| **DORA gap analysis** | Upload vendor ICT docs → structured report with Critical/High/Medium/Low gaps mapped to DORA articles |
+| **DORA gap analysis** | Upload vendor ICT docs → evidence-grounded, cited gap report mapped to DORA articles (AI drafts; a human checker decides under maker≠checker SoD) |
 | **Multi-source ingestion** | PDF / DOCX / XLSX upload, URL crawling — indexed into a per-tenant vector store |
 | **DORA copilot (RAG Q&A)** | Natural-language compliance questions, grounded on your docs + the DORA knowledge base, with citations |
+| **Register of Information** | RT.01–04 + B_01/02 projection generated from the arrangement graph, with on-demand export |
+| **Register data-quality (ESA)** | Validity checks the Register is filed against (ITS 2024/2956): LEI (ISO 17442 + ISO 7064 checksum), ISO 3166 country, cross-template referential integrity — each traced to the regulation |
+| **Decision inbox + finding routing** | One cross-arrangement queue of AI-drafted findings + open risks; an approved gap is **routed to the owning party** (security / DPO / legal / ICT-risk), escalating to the management-body delegate on a severe critical/important finding, and the holders are notified |
+| **Event-driven reassessment** | A material change on re-ingestion — a subprocessor added/removed, or a data-residency move — **reopens the arrangement** for a fresh assessment (the change trigger, twin of the periodic cadence) |
+| **Audit readiness** | A tamper-evident, on-demand **evidence pack** per arrangement + a readiness **dashboard** (overdue reassessments, evidence freshness, register coverage, upcoming deadlines) |
+| **Concentration & nth-party** | Sub-chain (nth-party) extraction + concentration/single-point-of-failure analysis across the provider graph |
+| **Continuous monitoring** | CTPP surveillance (status-page incidents + CVE feeds) + periodic re-assessment on a cadence |
 | **Workspace isolation** | Multi-tenant: each workspace isolated at the DB and vector-store layer |
 | **Enterprise security** | PII masking, prompt-injection detection, output sanitisation, httpOnly JWT, AES-256 field encryption |
 

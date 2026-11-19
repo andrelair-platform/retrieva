@@ -109,6 +109,7 @@ frontend/
 | `/sources` | Data sources hub (files, Confluence, URLs) | Owner/Member |
 | `/conversations` | Conversation history | All members |
 | `/arrangements` · `/assessment-runs` · `/approvals` · `/decision-inbox` · `/concentration` · `/risk-register` · `/register-of-information` · `/evidence` | DORA TPRM domain (register, agentic runs, HITL governance, concentration, risk) | All members |
+| `/audit-readiness` | Audit-readiness dashboard — overdue reassessments, evidence freshness, register coverage, upcoming deadlines + per-arrangement evidence-pack download | All members |
 | `/members` | Member management | Owner only |
 | `/workspaces` | Workspace management | All members |
 | `/notifications` | Notifications | All members |
