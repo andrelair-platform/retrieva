@@ -155,6 +155,7 @@
       "commandCenter": "Command Center",
       "surveillance": "Surveillance",
       "discovery": "Discovery",
+      "addEstate": "Add your estate",
       "exitStrategy": "Exit Strategy",
       "contractAmendments": "Contract Amendments",
       "onboardTool": "Onboard a Tool",
@@ -1455,7 +1456,7 @@
   },
   "commandCenter": {
     "kicker": "Your DORA third-party risk, live",
-    "subtitle": "Autonomous agents discover, assess, monitor and report — you review and sign off.",
+    "subtitle": "You bring your vendors and evidence; Retrieva assesses them against DORA, monitors and reports — you review and sign off. It never connects to your systems.",
     "posture": {
       "title": "Risk posture",
       "subtitle": "From your decision queue",

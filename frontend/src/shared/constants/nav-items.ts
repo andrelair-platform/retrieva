@@ -14,7 +14,6 @@ import {
   Gavel,
   LayoutDashboard,
   Radar,
-  Radio,
   DoorOpen,
   FileSignature,
   PackageSearch,
@@ -52,6 +51,7 @@ export const desktopNavSections: NavSection[] = [
   {
     label: 'nav.sections.onboard',
     items: [
+      { title: 'nav.items.addEstate', href: '/discovery', icon: PackageSearch },
       { title: 'nav.items.onboardTool', href: '/evaluations', icon: PackageSearch, feature: 'evaluations' },
     ],
   },
@@ -60,7 +60,6 @@ export const desktopNavSections: NavSection[] = [
     items: [
       { title: 'nav.items.decisionInbox', href: '/decision-inbox', icon: Inbox },
       { title: 'nav.items.surveillance', href: '/surveillance', icon: Radar },
-      { title: 'nav.items.discovery', href: '/discovery', icon: Radio },
     ],
   },
   {

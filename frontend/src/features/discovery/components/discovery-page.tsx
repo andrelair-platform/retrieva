@@ -1,14 +1,15 @@
 'use client';
 
 /**
- * Discovery — live view of the discovery agent's proposal inbox (RTV-91/106/107).
+ * Add your estate — the proposal inbox from a tenant-uploaded export (RTV-91/106).
  *
- * The agent sweeps connected source systems and proposes Register-of-Information entries. Each row is
- * a DRAFT proposal; confirming it creates the arrangement (the HITL boundary — nothing is auto-added).
+ * From an export the tenant uploads (CSV/XLSX/JSON from their own tool), the LLM normalises vendors to
+ * proposed Register entries. Each row is a DRAFT proposal; confirming it creates the arrangement (the
+ * HITL boundary — nothing is auto-added, and nothing connects to the tenant's systems).
  */
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Radio, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { PackageSearch, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/page-header';
@@ -55,9 +56,9 @@ export function DiscoveryPage() {
   return (
     <div className="page-container mx-auto max-w-5xl">
       <PageHeader
-        icon={Radio}
-        title="Discovery"
-        description="Third-party ICT the discovery agent found across your source systems. Confirm a proposal to add it to your Register of Information — nothing is added automatically."
+        icon={PackageSearch}
+        title="Add your estate"
+        description="Vendors normalised from an export you uploaded (a CSV/XLSX/JSON from your own tool). Confirm a proposal to add it to your Register of Information — nothing is added automatically, and nothing connects to your systems."
         actions={pending > 0 ? <Badge variant="outline">{pending} awaiting review</Badge> : undefined}
       />
 
@@ -69,11 +70,11 @@ export function DiscoveryPage() {
         </div>
       ) : !proposals?.length ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-12 text-center">
-          <Radio className="h-7 w-7 text-muted-foreground" />
+          <PackageSearch className="h-7 w-7 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">No proposals yet</p>
           <p className="max-w-md text-sm text-muted-foreground">
-            When the discovery agent sweeps your connected source systems, the third-party ICT it finds
-            will appear here for you to confirm into the register.
+            Upload an export of your ICT estate (a CSV/XLSX/JSON from your own SSO, procurement or CMDB
+            tool) and the vendors it contains will appear here for you to confirm into the register.
           </p>
         </div>
       ) : (
