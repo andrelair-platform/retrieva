@@ -371,7 +371,7 @@
   "landing": {
     "badge": "DORA Regulation (EU) 2022/2554",
     "heroTitle": "Your DORA third-party risk, run by AI agents — signed off by you.",
-    "heroSubtitle": "Autonomous agents discover your ICT providers, assess them against DORA, chase the evidence, watch for incidents, and draft the Register, contract amendments and exit plans. Your risk officer reviews each draft and signs off — you keep accountability, and you get an audit-ready outcome instead of another tool to fill in.",
+    "heroSubtitle": "You bring your ICT vendors and the evidence you hold; AI agents assess them against DORA, chase the missing evidence, watch for incidents, and draft the Register, contract amendments and exit plans. Your risk officer reviews each draft and signs off — Retrieva never connects to your systems, you keep accountability, and you get an audit-ready outcome instead of another tool to fill in.",
     "featuresHeading": "Every DORA capability — run by the agents, supervised by you",
     "features": {
       "gapAnalysis": {
@@ -449,7 +449,7 @@
       },
       "assess": {
         "title": "Agents go to work",
-        "desc": "They discover your ICT providers, assess each against every DORA article, and chase the evidence you don’t already have."
+        "desc": "You bring your vendor list and documents; they assess each against every DORA article and chase the evidence you don’t already have."
       },
       "invite": {
         "title": "Agents draft the artefacts",
@@ -609,7 +609,7 @@
     },
     "tour": {
       "heading": "See the agents at work",
-      "subtitle": "A 90-second tour — raw data in, the agents discover, assess, draft and surveil, you review and sign off, and an audit-ready Register comes out.",
+      "subtitle": "A 90-second tour — you bring your estate and documents, the agents assess, draft and surveil, you review and sign off, and an audit-ready Register comes out.",
       "play": "Watch the product tour",
       "duration": "90 seconds"
     }

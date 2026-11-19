@@ -53,7 +53,7 @@ export default function OnboardingPage() {
     }
     // If user already has an org, skip onboarding
     if (isInitialized && isAuthenticated && user?.organizationId) {
-      router.replace('/assessments');
+      router.replace('/overview');
     }
   }, [isInitialized, isAuthenticated, user?.organizationId, router]);
 
@@ -78,7 +78,9 @@ export default function OnboardingPage() {
       });
       await syncCurrentUser();
       toast.success(t('auth.onboarding.toastSuccess', { name: data.name }));
-      router.push('/assessments');
+      // Land on the Command Center — its zero-data band guides the first-run flow (import vendors →
+      // upload documents → assess), instead of dropping into an empty, workspace-less Gap Analysis.
+      router.push('/overview');
     } catch (err) {
       setError(getErrorMessage(err));
     }

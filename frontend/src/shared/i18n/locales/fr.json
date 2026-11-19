@@ -371,7 +371,7 @@
   "landing": {
     "badge": "Règlement DORA (UE) 2022/2554",
     "heroTitle": "Votre risque tiers DORA, piloté par des agents IA — validé par vous.",
-    "heroSubtitle": "Des agents autonomes découvrent vos prestataires TIC, les évaluent au regard de DORA, récupèrent les preuves, surveillent les incidents et rédigent le registre, les avenants et les plans de sortie. Votre responsable des risques examine chaque brouillon et le valide — vous gardez la responsabilité, et vous obtenez un résultat prêt pour l’audit plutôt qu’un outil de plus à remplir.",
+    "heroSubtitle": "Vous apportez vos prestataires TIC et les preuves que vous détenez ; des agents IA les évaluent au regard de DORA, récupèrent les preuves manquantes, surveillent les incidents et rédigent le registre, les avenants et les plans de sortie. Votre responsable des risques examine chaque brouillon et le valide — Retrieva ne se connecte jamais à vos systèmes, vous gardez la responsabilité, et vous obtenez un résultat prêt pour l’audit plutôt qu’un outil de plus à remplir.",
     "featuresHeading": "Chaque capacité DORA — pilotée par les agents, supervisée par vous",
     "features": {
       "gapAnalysis": {
@@ -449,7 +449,7 @@
       },
       "assess": {
         "title": "Les agents se mettent au travail",
-        "desc": "Ils découvrent vos prestataires TIC, les évaluent au regard de chaque article DORA et récupèrent les preuves que vous n’avez pas déjà."
+        "desc": "Vous apportez votre liste de prestataires et vos documents ; ils les évaluent au regard de chaque article DORA et récupèrent les preuves que vous n’avez pas déjà."
       },
       "invite": {
         "title": "Les agents rédigent les artefacts",
@@ -609,7 +609,7 @@
     },
     "tour": {
       "heading": "Voyez les agents à l’œuvre",
-      "subtitle": "Un tour de 90 secondes — vos données brutes en entrée, les agents découvrent, évaluent, rédigent et surveillent, vous examinez et validez, et un registre prêt pour l’audit en ressort.",
+      "subtitle": "Un tour de 90 secondes — vous apportez votre parc et vos documents, les agents évaluent, rédigent et surveillent, vous examinez et validez, et un registre prêt pour l’audit en ressort.",
       "play": "Voir la démo produit",
       "duration": "90 secondes"
     }

@@ -7,9 +7,10 @@
  * proposed Register entries. Each row is a DRAFT proposal; confirming it creates the arrangement (the
  * HITL boundary — nothing is auto-added, and nothing connects to the tenant's systems).
  */
+import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { PackageSearch, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { PackageSearch, CheckCircle2, Loader2, ArrowRight, UploadCloud } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/page-header';
@@ -23,6 +24,7 @@ import {
   useConfirmProposalMutation,
 } from '@/features/discovery/queries/use-discovery';
 import type { DiscoveryProposal, DiscoveryProposalStatus } from '@/features/discovery/api/discovery';
+import { EstateUploadDialog } from './estate-upload-dialog';
 
 const STATUS_BADGE: Record<DiscoveryProposalStatus, string> = {
   pending: 'bg-warning-muted text-warning',
@@ -43,6 +45,7 @@ function proposalNote(p: DiscoveryProposal): string {
 export function DiscoveryPage() {
   const { data: proposals, isLoading } = useDiscoveryProposalsQuery();
   const confirm = useConfirmProposalMutation();
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const onConfirm = (p: DiscoveryProposal) => {
     confirm.mutate(p.id, {
@@ -59,7 +62,15 @@ export function DiscoveryPage() {
         icon={PackageSearch}
         title="Add your estate"
         description="Vendors normalised from an export you uploaded (a CSV/XLSX/JSON from your own tool). Confirm a proposal to add it to your Register of Information — nothing is added automatically, and nothing connects to your systems."
-        actions={pending > 0 ? <Badge variant="outline">{pending} awaiting review</Badge> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {pending > 0 ? <Badge variant="outline">{pending} awaiting review</Badge> : null}
+            <Button size="sm" onClick={() => setUploadOpen(true)}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Upload an export
+            </Button>
+          </div>
+        }
       />
 
       {isLoading ? (
@@ -73,9 +84,13 @@ export function DiscoveryPage() {
           <PackageSearch className="h-7 w-7 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">No proposals yet</p>
           <p className="max-w-md text-sm text-muted-foreground">
-            Upload an export of your ICT estate (a CSV/XLSX/JSON from your own SSO, procurement or CMDB
-            tool) and the vendors it contains will appear here for you to confirm into the register.
+            Upload an export of your ICT estate (a CSV/XLSX from your own SSO, procurement or CMDB tool)
+            and the vendors it contains will appear here for you to confirm into the register.
           </p>
+          <Button size="sm" className="mt-1" onClick={() => setUploadOpen(true)}>
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Upload an export
+          </Button>
         </div>
       ) : (
         <ul className="space-y-2.5">
@@ -137,6 +152,8 @@ export function DiscoveryPage() {
           })}
         </ul>
       )}
+
+      <EstateUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }

@@ -311,6 +311,16 @@ export interface DocumentTriageResult {
   counts: { total: number; matched: number; unmatched: number; vendors: number };
 }
 
+export interface DocumentContentTriage {
+  filename: string;
+  extractedProviderName: string | null;
+  proposedArrangementId: string | null;
+  proposedProviderName: string | null;
+  confidence: number;
+  matchSource: 'content';
+  candidates?: Array<{ arrangementId: string; providerName: string; label?: string }>;
+}
+
 const GRAPH = '/arrangement-graph';
 
 export const arrangementsApi = {
@@ -418,6 +428,19 @@ export const arrangementsApi = {
     const res = await apiClient.post<ApiResponse<DocumentTriageResult>>(
       '/arrangements/intake/documents/triage',
       { files }
+    );
+    return res.data;
+  },
+
+  // Onboarding — content fallback (Layer 2) for ONE file the name pass couldn't place: upload it, the
+  // backend reads the text + extracts the provider name and matches it to a vendor. Nothing persisted.
+  triageDocumentContent: async (file: File) => {
+    const fd = new FormData();
+    fd.append('contract', file);
+    const res = await apiClient.post<ApiResponse<DocumentContentTriage>>(
+      '/arrangements/intake/documents/triage-content',
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120_000 }
     );
     return res.data;
   },

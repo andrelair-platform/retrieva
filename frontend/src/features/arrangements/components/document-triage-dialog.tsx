@@ -55,6 +55,7 @@ interface Row {
   category: EvidenceCategory | null;
   confidence: number;
   matchSource: string;
+  identifying?: boolean; // Layer-2 content-identify in progress
 }
 
 const relPath = (f: File): string | undefined =>
@@ -137,6 +138,30 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
   const setRow = (i: number, patch: Partial<Row>) =>
     setRows((rs) => (rs ? rs.map((r, j) => (j === i ? { ...r, ...patch } : r)) : rs));
 
+  // Layer 2: for a row the name pass couldn't place, upload the file so the backend reads its text,
+  // extracts the provider name and matches it to a vendor.
+  const identifyFromContent = async (i: number) => {
+    const row = rows?.[i];
+    if (!row) return;
+    setRow(i, { identifying: true });
+    try {
+      const res = await arrangementsApi.triageDocumentContent(row.file);
+      const d = res.data;
+      if (d?.proposedArrangementId) {
+        setRow(i, { arrangementId: d.proposedArrangementId, matchSource: 'content', confidence: d.confidence });
+        toast.success(`Matched to ${d.proposedProviderName}`);
+      } else if (d?.extractedProviderName) {
+        toast.message(`Found "${d.extractedProviderName}" — no matching vendor; assign manually`);
+      } else {
+        toast.message('No vendor name could be read from this document');
+      }
+    } catch (e) {
+      toast.error(getErrorMessage(e) || 'Could not read the document');
+    } finally {
+      setRow(i, { identifying: false });
+    }
+  };
+
   const assignable = (rows ?? []).filter((r) => r.arrangementId);
 
   const commit = async () => {
@@ -164,6 +189,7 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
 
   const matchBadge = (src: string, conf: number) => {
     if (src === 'folder' || src === 'filename') return <Badge variant="secondary">matched {Math.round(conf * 100)}%</Badge>;
+    if (src === 'content') return <Badge variant="secondary">content {Math.round(conf * 100)}%</Badge>;
     if (src === 'token') return <Badge variant="outline">guess {Math.round(conf * 100)}%</Badge>;
     return <Badge variant="outline">unassigned</Badge>;
   };
@@ -279,7 +305,28 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="px-3 py-1.5">{matchBadge(r.matchSource, r.confidence)}</td>
+                        <td className="px-3 py-1.5">
+                          <div className="flex items-center gap-2">
+                            {matchBadge(r.matchSource, r.confidence)}
+                            {!r.arrangementId && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                disabled={r.identifying}
+                                onClick={() => identifyFromContent(i)}
+                                title="Read the document to find the vendor"
+                              >
+                                {r.identifying ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                )}
+                                <span className="ml-1">Identify</span>
+                              </Button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
