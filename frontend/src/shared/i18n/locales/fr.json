@@ -155,6 +155,7 @@
       "commandCenter": "Centre de pilotage",
       "surveillance": "Surveillance",
       "discovery": "Découverte",
+      "addEstate": "Ajouter votre parc",
       "exitStrategy": "Stratégie de sortie",
       "contractAmendments": "Avenants contractuels",
       "onboardTool": "Intégrer un outil",
@@ -1455,7 +1456,7 @@
   },
   "commandCenter": {
     "kicker": "Votre risque tiers DORA, en direct",
-    "subtitle": "Des agents autonomes découvrent, évaluent, surveillent et rapportent — vous validez et signez.",
+    "subtitle": "Vous apportez vos prestataires et vos preuves ; Retrieva les évalue au regard de DORA, surveille et rapporte — vous examinez et validez. Jamais de connexion à vos systèmes.",
     "posture": {
       "title": "Posture de risque",
       "subtitle": "Depuis votre file de décision",

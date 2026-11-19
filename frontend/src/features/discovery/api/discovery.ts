@@ -1,13 +1,13 @@
 import apiClient from '@/shared/api/client';
 import type { ApiResponse } from '@/types';
 
-// ── Discovery (RTV-91/106/107) — the source-agnostic discovery agent's proposal inbox ────────────
-// Mirrors retrieva-backend /api/v1/discovery. The agent sweeps connected source systems (Entra ID,
-// SaaS registries, uploads, REST/SCIM/OData) and proposes Register-of-Information entries. Nothing is
-// authoritative — each proposal is CONFIRMED by a human (which creates the arrangement). Org + entity
-// scoped server-side.
+// ── Estate ingestion (RTV-91/106) — the proposal inbox ────────────────────────────────────────────
+// Mirrors retrieva-backend /api/v1/discovery. From an export the TENANT uploads (CSV/XLSX/JSON they
+// exported from their own tool), the LLM normalises vendors to proposed Register-of-Information entries.
+// Nothing is authoritative — each proposal is CONFIRMED by a human (which creates the arrangement), and
+// nothing connects to the tenant's systems. Org + entity scoped server-side.
 
-export type DiscoverySource = 'okta' | 'authentik' | 'erpnext' | 'generic' | 'rest' | 'scim' | 'odata';
+export type DiscoverySource = 'generic';
 export type DiscoveryProposalStatus = 'pending' | 'confirmed' | 'dismissed';
 
 export interface DiscoveryProposal {

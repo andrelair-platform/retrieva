@@ -17,7 +17,6 @@
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import {
-  Radio,
   Radar,
   ClipboardCheck,
   FileSignature,
@@ -34,11 +33,14 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+import { FileSpreadsheet, FolderUp } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDecisionQueueQuery } from '@/features/decision-inbox/queries/use-decision-inbox';
+import { useArrangementsQuery } from '@/features/arrangements/queries/use-arrangements-query';
 import type { DecisionItem } from '@/features/decision-inbox/api/decision-inbox';
 import type { RiskSeverity } from '@/features/arrangements/api/arrangements';
 
@@ -49,7 +51,6 @@ const AGENTS: Array<{
   href: string;
   accent: string; // tailwind text colour for the icon
 }> = [
-  { key: 'discovery', icon: Radio, href: '/discovery', accent: 'text-chart-1' },
   { key: 'surveillance', icon: Radar, href: '/surveillance', accent: 'text-chart-3' },
   { key: 'ddq', icon: ClipboardCheck, href: '/questionnaires', accent: 'text-chart-4' },
   { key: 'redliner', icon: FileSignature, href: '/contract-amendments', accent: 'text-chart-2' },
@@ -101,14 +102,49 @@ const SEVERITY_DOT: Record<RiskSeverity, string> = {
 export function CommandCenterPage() {
   const { t } = useTranslation();
   const { data, isLoading } = useDecisionQueueQuery();
+  const { data: arrangements = [], isLoading: loadingArrangements } = useArrangementsQuery();
 
   const items = data?.items ?? [];
   const posture = computePosture(items);
   const topItems = items.slice(0, 5);
   const bandStyle = BAND_STYLES[posture.band];
+  const emptyRegister = !loadingArrangements && arrangements.length === 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-5 text-foreground sm:p-6">
+      {/* ── Zero-data onboarding band — bring your data (no auto-discovery) ─────────────── */}
+      {emptyRegister && (
+        <section className="rounded-xl border border-primary/20 bg-primary/[0.04] p-5 sm:p-6">
+          <h2 className="font-display text-lg font-semibold tracking-tight">Let&apos;s build your register</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Retrieva assesses the ICT vendors and evidence <strong>you provide</strong> — it never connects to
+            or crawls your systems. Start by bringing what you already have.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/arrangements"
+              className="group flex items-start gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary/40"
+            >
+              <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <span>
+                <span className="block text-sm font-medium">1 · Import your vendor list</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">One Excel/CSV → an arrangement per vendor.</span>
+              </span>
+            </Link>
+            <Link
+              href="/arrangements"
+              className="group flex items-start gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary/40"
+            >
+              <FolderUp className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <span>
+                <span className="block text-sm font-medium">2 · Upload your documents</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">Drop a folder — we map each file to a vendor.</span>
+              </span>
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* ── Hero — dark mission-control band ───────────────────────────────────────────── */}
       <section className="relative overflow-hidden rounded-xl bg-sidebar px-6 py-7 text-sidebar-foreground shadow-sm sm:px-8 sm:py-9">
         <div
