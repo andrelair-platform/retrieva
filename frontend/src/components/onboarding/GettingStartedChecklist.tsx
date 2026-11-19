@@ -5,7 +5,6 @@ import { Check, X, Building2, ShieldCheck, ClipboardList, Users, Activity } from
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { authApi } from '@/shared/api';
-import { useUIStore, MODAL_IDS } from '@/lib/stores/ui-store';
 import type { OnboardingChecklist } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +23,6 @@ interface Props {
 export function GettingStartedChecklist({ checklist }: Props) {
   const router = useRouter();
   const updateUser = useAuthStore((state) => state.updateUser);
-  const openModal = useUIStore((state) => state.openModal);
 
   const dismiss = async () => {
     try {
@@ -41,9 +39,9 @@ export function GettingStartedChecklist({ checklist }: Props) {
     {
       key: 'vendorCreated',
       icon: Building2,
-      label: 'Add your first vendor',
-      cta: 'Add vendor',
-      onClick: () => openModal(MODAL_IDS.CREATE_WORKSPACE),
+      label: 'Import your vendor list',
+      cta: 'Import',
+      onClick: () => router.push('/arrangements'),
     },
     {
       key: 'assessmentCreated',

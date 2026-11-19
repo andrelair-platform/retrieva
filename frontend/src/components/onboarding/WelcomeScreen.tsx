@@ -6,13 +6,11 @@ import { Building2, Users, BookOpen, ArrowRight, ShieldCheck } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { authApi } from '@/shared/api';
-import { useUIStore, MODAL_IDS } from '@/lib/stores/ui-store';
 
 export function WelcomeScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
-  const openModal = useUIStore((state) => state.openModal);
   const [dismissing, setDismissing] = useState(false);
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
@@ -34,10 +32,10 @@ export function WelcomeScreen() {
   const actions = [
     {
       icon: Building2,
-      title: 'Add your first vendor',
-      description: 'Create a workspace for an ICT vendor and start the DORA compliance workflow.',
-      cta: 'Add vendor',
-      onClick: () => dismiss(() => openModal(MODAL_IDS.CREATE_WORKSPACE)),
+      title: 'Import your vendor list',
+      description: 'Bring the ICT vendors you already have — one Excel/CSV creates an arrangement per vendor.',
+      cta: 'Import list',
+      onClick: () => dismiss(() => router.push('/arrangements')),
     },
     {
       icon: Users,
