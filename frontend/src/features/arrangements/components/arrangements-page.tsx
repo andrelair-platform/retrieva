@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Network, Building2, ExternalLink, Plus, Sparkles } from 'lucide-react';
+import { Network, Building2, ExternalLink, Plus, Sparkles, FileSpreadsheet, FolderUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -27,6 +27,8 @@ import { useArrangementsQuery } from '@/features/arrangements/queries/use-arrang
 import { CriticalityBadge, ArrangementTypeBadge, LifecycleBadge } from './badges';
 import { ArrangementForm } from './arrangement-form';
 import { IntakeDialog } from './intake-dialog';
+import { EstateImportDialog } from './estate-import-dialog';
+import { DocumentTriageDialog } from './document-triage-dialog';
 
 const LIFECYCLE_FILTERS: Array<{ value: LifecycleStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All states' },
@@ -44,6 +46,8 @@ export function ArrangementsPage() {
   const { data: arrangements = [], isLoading } = useArrangementsQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [intakeOpen, setIntakeOpen] = useState(false);
+  const [estateOpen, setEstateOpen] = useState(false);
+  const [triageOpen, setTriageOpen] = useState(false);
   const [lifecycle, setLifecycle] = useState<LifecycleStatus | 'all'>('all');
 
   const cifCount = useMemo(
@@ -67,13 +71,21 @@ export function ArrangementsPage() {
         description="The DORA contractual arrangements — the core object risk is tracked against."
         actions={
           <>
-            <Button size="sm" onClick={() => setIntakeOpen(true)}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Import from contract
+            <Button size="sm" onClick={() => setEstateOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Import vendor list
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => setTriageOpen(true)}>
+              <FolderUp className="h-4 w-4 mr-2" />
+              Upload documents
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setIntakeOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              From contract
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setFormOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New arrangement
+              New
             </Button>
           </>
         }
@@ -101,12 +113,52 @@ export function ArrangementsPage() {
           ))}
         </div>
       ) : arrangements.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <div className="mx-auto flex max-w-xl flex-col items-center justify-center gap-5 py-14 text-center">
           <Network className="h-12 w-12 text-muted-foreground/40" />
-          <p className="text-muted-foreground">No arrangements yet.</p>
-          <Button size="sm" onClick={() => setFormOpen(true)}>
-            Create your first arrangement
-          </Button>
+          <div>
+            <p className="font-medium">Let&apos;s build your register</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Start with the list of ICT vendors you already have — import a spreadsheet, then drop in the
+              documents you hold for each. No system access needed.
+            </p>
+          </div>
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => setEstateOpen(true)}
+              className="group flex items-start gap-3 rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary/30 hover:bg-muted/60"
+            >
+              <FileSpreadsheet className="mt-0.5 h-5 w-5 text-primary shrink-0" />
+              <span>
+                <span className="block text-sm font-medium">1 · Import your vendor list</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  One Excel/CSV → an arrangement per vendor.
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setTriageOpen(true)}
+              className="group flex items-start gap-3 rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary/30 hover:bg-muted/60"
+            >
+              <FolderUp className="mt-0.5 h-5 w-5 text-primary shrink-0" />
+              <span>
+                <span className="block text-sm font-medium">2 · Upload your documents</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Drop a folder — we map each file to a vendor.
+                </span>
+              </span>
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Prefer one at a time? Use{' '}
+            <button className="underline hover:text-foreground" onClick={() => setIntakeOpen(true)}>
+              import from a contract
+            </button>{' '}
+            or{' '}
+            <button className="underline hover:text-foreground" onClick={() => setFormOpen(true)}>
+              add one manually
+            </button>
+            .
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -187,6 +239,8 @@ export function ArrangementsPage() {
 
       <ArrangementForm open={formOpen} onOpenChange={setFormOpen} />
       <IntakeDialog open={intakeOpen} onOpenChange={setIntakeOpen} />
+      <EstateImportDialog open={estateOpen} onOpenChange={setEstateOpen} />
+      <DocumentTriageDialog open={triageOpen} onOpenChange={setTriageOpen} />
     </div>
   );
 }
