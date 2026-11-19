@@ -283,6 +283,34 @@ export interface IntakeResult {
   source: { fileName: string; parsedChars: number };
 }
 
+// Onboarding — bulk estate import (POST /arrangements/intake/import). Mirrors the backend ImportSummary.
+export interface EstateImportSummary {
+  total: number;
+  created: number; // on dry-run: "would create"
+  duplicates: number;
+  skipped: number;
+  errors: Array<{ row: number; provider: string; messages: string[] }>;
+  source?: { fileName: string; rows: number };
+}
+
+// Onboarding — document triage (POST /arrangements/intake/documents/triage). Mirrors the backend shapes.
+// Reuses the existing `EvidenceCategory` (defined above for the evidence checklist).
+export interface DocumentTriageProposal {
+  filename: string;
+  relativePath?: string;
+  proposedArrangementId: string | null;
+  proposedProviderName: string | null;
+  proposedCategory: EvidenceCategory | null;
+  confidence: number;
+  matchSource: 'folder' | 'filename' | 'token' | 'none';
+  candidates?: Array<{ arrangementId: string; providerName: string; label?: string }>;
+}
+
+export interface DocumentTriageResult {
+  proposals: DocumentTriageProposal[];
+  counts: { total: number; matched: number; unmatched: number; vendors: number };
+}
+
 const GRAPH = '/arrangement-graph';
 
 export const arrangementsApi = {
@@ -359,13 +387,37 @@ export const arrangementsApi = {
   },
 
   // Upload a document → index its text (RAG) so assessments cite real passages (RTV-34).
-  ingestEvidence: async (id: string, file: File) => {
+  ingestEvidence: async (id: string, file: File, category?: string | null) => {
     const fd = new FormData();
     fd.append('contract', file);
+    if (category) fd.append('category', category);
     const res = await apiClient.post<ApiResponse<{ evidence: Evidence; chunks: number }>>(
       `/arrangements/${id}/evidence/ingest`,
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120_000 }
+    );
+    return res.data;
+  },
+
+  // Onboarding — bulk estate import (CSV/XLSX vendor list). dryRun=true previews (created/duplicate/
+  // error rows) without persisting; dryRun=false creates the arrangements.
+  importEstate: async (file: File, dryRun = true) => {
+    const fd = new FormData();
+    fd.append('estate', file);
+    const res = await apiClient.post<ApiResponse<EstateImportSummary>>(
+      `/arrangements/intake/import?dryRun=${dryRun ? 'true' : 'false'}`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120_000 }
+    );
+    return res.data;
+  },
+
+  // Onboarding — document triage: send filenames/folder paths → proposals of which vendor
+  // (arrangement) + DORA category each document belongs to (nothing uploaded/persisted here).
+  triageDocuments: async (files: Array<{ filename: string; relativePath?: string }>) => {
+    const res = await apiClient.post<ApiResponse<DocumentTriageResult>>(
+      '/arrangements/intake/documents/triage',
+      { files }
     );
     return res.data;
   },
