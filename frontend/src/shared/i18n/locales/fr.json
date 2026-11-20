@@ -159,7 +159,8 @@
       "exitStrategy": "Stratégie de sortie",
       "contractAmendments": "Avenants contractuels",
       "onboardTool": "Intégrer un outil",
-      "auditReadiness": "Préparation à l'audit"
+      "auditReadiness": "Préparation à l'audit",
+      "team": "Équipe"
     },
     "titles": {
       "riskRegister": "Registre des risques",
@@ -1128,7 +1129,8 @@
         "analystLabel": "Analyste conformité",
         "analystDesc": "Créer et lancer des évaluations, envoyer des questionnaires, voir tous les fournisseurs",
         "viewerLabel": "Lecture seule",
-        "viewerDesc": "Consulter uniquement les évaluations et résultats — aucun accès en création ou édition"
+        "viewerDesc": "Consulter uniquement les évaluations et résultats — aucun accès en création ou édition",
+        "doraDesc": "Les rôles du workflow DORA que vous attribuez aux personnes de votre processus de risque tiers. La séparation rédacteur ≠ validateur est appliquée : qui rédige un constat ne peut pas l’approuver."
       },
       "activeMembers": "Membres actifs",
       "noActiveMembers": "Aucun membre actif pour le moment.",
@@ -1155,7 +1157,56 @@
       "toastInviteSent": "Invitation envoyée",
       "toastInviteFailed": "Échec de l'envoi de l'invitation",
       "toastMemberRemoved": "Membre retiré",
-      "toastRemoveFailed": "Échec du retrait du membre"
+      "toastRemoveFailed": "Échec du retrait du membre",
+      "addRole": "Ajouter un rôle",
+      "removeRole": "Retirer le rôle {{role}}",
+      "manageRolesHint": "Attribuez à chaque membre son rôle dans le workflow DORA. Ajoutez ou retirez des rôles ci-dessous — vous seul (administrateur) le pouvez.",
+      "inviteDoraDesc": "Ils reçoivent un lien par e-mail pour rejoindre {{org}}. Choisissez le rôle DORA qu’ils auront — modifiable à tout moment depuis la liste des membres.",
+      "toastRoleAssigned": "Rôle attribué",
+      "toastRoleRevoked": "Rôle retiré",
+      "toastRoleFailed": "Impossible de mettre à jour le rôle",
+      "domainRoles": {
+        "entity_admin": {
+          "label": "Admin (propriétaire)",
+          "desc": "Accès complet + gestion de l’équipe et des rôles. Le propriétaire responsable — seul rôle pouvant inviter."
+        },
+        "analyst": {
+          "label": "Analyste (rédacteur)",
+          "desc": "Rédige les évaluations, collecte les preuves, pilote la remédiation. Ne peut pas approuver ses propres constats (SoD)."
+        },
+        "procurement": {
+          "label": "Achats (rédacteur)",
+          "desc": "Intègre les prestations et téléverse les preuves contractuelles. Rédacteur — sans pouvoir de validation."
+        },
+        "ict_risk_officer": {
+          "label": "Responsable Risque TIC (validateur)",
+          "desc": "Approuve les constats et accepte le risque (délégué de l’organe de direction). Le validateur."
+        },
+        "legal": {
+          "label": "Juridique (validateur)",
+          "desc": "Valide les clauses contractuelles (termes DORA Art. 30)."
+        },
+        "security_officer": {
+          "label": "RSSI (validateur)",
+          "desc": "Valide la dimension sécurité de l’information et classe les preuves (SOC 2 / ISO 27001)."
+        },
+        "dpo": {
+          "label": "DPO (validateur)",
+          "desc": "Valide la dimension protection des données / vie privée."
+        },
+        "business_owner": {
+          "label": "Responsable Métier (attestateur)",
+          "desc": "Atteste l’usage et la criticité des fonctions dont il est responsable."
+        },
+        "auditor": {
+          "label": "Auditeur (lecture seule)",
+          "desc": "Lecture seule sur l’ensemble — pour l’audit interne / les réviseurs externes."
+        },
+        "viewer": {
+          "label": "Observateur (lecture seule)",
+          "desc": "Accès en lecture seule limité aux évaluations et prestations."
+        }
+      }
     }
   },
   "workspaces": {

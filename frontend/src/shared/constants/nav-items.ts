@@ -18,6 +18,7 @@ import {
   FileSignature,
   PackageSearch,
   Gauge,
+  Users,
 } from 'lucide-react';
 
 import { getFeatureFlags, type FeatureFlags } from '@/lib/runtime-env';
@@ -121,6 +122,10 @@ export const mobileMainNavItems: NavItem[] = [
 ];
 
 export const bottomNavItems: NavItem[] = [
+  // Team is visible to all members (viewing the roster is fine); invite + role management inside
+  // the page stay gated to the org admin (entity_admin). Surfaced here so it isn't buried two
+  // clicks deep under the Settings gear.
+  { title: 'nav.items.team', href: '/settings/team', icon: Users },
   { title: 'nav.items.settings', href: '/settings', icon: Settings },
 ];
 

@@ -206,4 +206,39 @@ describe('organizationsApi', () => {
       expect(result.status).toBe('success');
     });
   });
+
+  // invite with an elevated DORA domain role
+  describe('invite() with domainRole', () => {
+    it('passes the domainRole through to POST /organizations/invite', async () => {
+      mockPost.mockResolvedValue({ data: { status: 'success', data: { member: mockMember } } });
+      await organizationsApi.invite({ email: 'risk@hdi.de', role: 'viewer', domainRole: 'ict_risk_officer' });
+      expect(mockPost).toHaveBeenCalledWith('/organizations/invite', {
+        email: 'risk@hdi.de',
+        role: 'viewer',
+        domainRole: 'ict_risk_officer',
+      });
+    });
+  });
+
+  // assignRole / revokeRole (domain-role provisioning)
+  describe('assignRole()', () => {
+    it('calls POST /organizations/role-assignments with userId + role', async () => {
+      mockPost.mockResolvedValue({ data: { status: 'success' } });
+      await organizationsApi.assignRole({ userId: 'user-001', role: 'ict_risk_officer' });
+      expect(mockPost).toHaveBeenCalledWith('/organizations/role-assignments', {
+        userId: 'user-001',
+        role: 'ict_risk_officer',
+      });
+    });
+  });
+
+  describe('revokeRole()', () => {
+    it('calls DELETE /organizations/role-assignments with body { userId, role }', async () => {
+      mockDelete.mockResolvedValue({ data: { status: 'success' } });
+      await organizationsApi.revokeRole({ userId: 'user-001', role: 'legal' });
+      expect(mockDelete).toHaveBeenCalledWith('/organizations/role-assignments', {
+        data: { userId: 'user-001', role: 'legal' },
+      });
+    });
+  });
 });
