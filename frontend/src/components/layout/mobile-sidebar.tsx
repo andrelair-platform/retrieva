@@ -91,6 +91,9 @@ export function MobileSidebar() {
         </ScrollArea>
 
         <div className="mt-auto border-t px-3 py-2">
+          <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 select-none">
+            {t('nav.sections.account')}
+          </p>
           <nav className="flex flex-col gap-1">
             {visibleBottomNav.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
