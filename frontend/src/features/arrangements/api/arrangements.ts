@@ -229,6 +229,11 @@ export interface CreateArrangementInput {
   dependency?: Level | null;
   exitDifficulty?: Level | null;
   trigger?: Trigger; // RTV-31 — sets the initial lifecycle state
+  // Workflow B pre-contract intake (new provider only) — the business owner's need.
+  businessPurpose?: string | null;
+  expectedCost?: string | null;
+  expectedCostCurrency?: string | null;
+  requestedStartDate?: string | null;
 }
 
 export interface ArrangementProposal {

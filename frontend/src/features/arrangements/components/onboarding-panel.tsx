@@ -2,7 +2,17 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardCheck, Scale, UploadCloud, Layers } from 'lucide-react';
+import {
+  ClipboardCheck,
+  Scale,
+  UploadCloud,
+  Layers,
+  CheckCircle2,
+  XCircle,
+  CircleDashed,
+  ShieldCheck,
+  ShieldAlert,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -12,7 +22,39 @@ import {
   useClausePackQuery,
   useClauseGapCheck,
 } from '@/features/arrangements/queries/use-onboarding';
-import type { ClauseGapReport, ClauseCoverage } from '@/features/arrangements/api/onboarding';
+import type {
+  ClauseGapReport,
+  ClauseCoverage,
+  Readiness,
+  ReadinessStatus,
+  Intake,
+} from '@/features/arrangements/api/onboarding';
+
+// Pre-contract readiness checklist labels (keyed by the backend ReadinessItem.key).
+const READINESS_LABEL: Record<string, string> = {
+  intake: 'Intake confirmed',
+  assessment: 'Assessment run',
+  findings: 'No blocking findings',
+  evidence: 'Evidence sufficient',
+};
+const STATUS_ICON: Record<ReadinessStatus, typeof CheckCircle2> = {
+  pass: CheckCircle2,
+  fail: XCircle,
+  pending: CircleDashed,
+};
+const STATUS_COLOR: Record<ReadinessStatus, string> = {
+  pass: 'text-green-600',
+  fail: 'text-red-600',
+  pending: 'text-amber-600',
+};
+
+function money(intake?: Intake): string | null {
+  if (!intake?.expectedCost) return null;
+  const n = Number(intake.expectedCost);
+  if (Number.isNaN(n)) return null;
+  const cur = intake.expectedCostCurrency || 'EUR';
+  return `${cur} ${n.toLocaleString()}`;
+}
 
 const REC_STYLE: Record<string, string> = {
   ready: 'bg-green-100 text-green-700 border-green-200',
@@ -53,6 +95,9 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
 
   return (
     <div className="space-y-4">
+      {/* ── pre-contract readiness checklist (the HARD gate, made legible) ──────── */}
+      {decision?.readiness && <ReadinessCard readiness={decision.readiness} intake={decision.intake} />}
+
       {/* ── onboarding decision pack ─────────────────────────────────────────── */}
       {decision && (
         <Card className="p-4">
@@ -163,6 +208,73 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
         </Card>
       )}
     </div>
+  );
+}
+
+function ReadinessCard({ readiness, intake }: { readiness: Readiness; intake?: Intake }) {
+  const cleared = readiness.canActivate;
+  const cost = money(intake);
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          {cleared ? (
+            <ShieldCheck className="h-4 w-4 text-green-600" />
+          ) : (
+            <ShieldAlert className="h-4 w-4 text-amber-600" />
+          )}
+          Pre-contract readiness
+        </h2>
+        <Badge
+          variant="outline"
+          className={`text-[11px] ${cleared ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}
+        >
+          {cleared ? 'Cleared to activate' : `${readiness.blockers.length || 'Not'} blocker${readiness.blockers.length === 1 ? '' : 's'}`}
+        </Badge>
+      </div>
+
+      <ul className="mt-3 space-y-1.5">
+        {readiness.items.map((item) => {
+          const Icon = STATUS_ICON[item.status] ?? CircleDashed;
+          return (
+            <li key={item.key} className="flex items-start gap-2 text-xs">
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${STATUS_COLOR[item.status] ?? 'text-muted-foreground'}`} />
+              <span>
+                <span className="font-medium text-foreground">{READINESS_LABEL[item.key] ?? item.key}</span>
+                <span className="text-muted-foreground"> — {item.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* intake summary (Workflow B step 1) */}
+      {intake && (intake.businessPurpose || cost || intake.requestedStartDate) && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+          {intake.businessPurpose && (
+            <span>
+              Purpose: <span className="text-foreground">{intake.businessPurpose}</span>
+            </span>
+          )}
+          {cost && (
+            <span>
+              Expected cost: <span className="text-foreground">{cost}</span>
+            </span>
+          )}
+          {intake.requestedStartDate && (
+            <span>
+              Requested start: <span className="text-foreground">{intake.requestedStartDate}</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        {cleared
+          ? 'All pre-contract conditions met — a checker may approve onboarding (activation).'
+          : 'Activation is blocked until these conditions are met. The checker can resolve the findings or formally accept the risk, then approve — the platform will not activate a risky supplier silently.'}
+      </p>
+    </Card>
   );
 }
 
