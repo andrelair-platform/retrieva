@@ -159,7 +159,8 @@
       "exitStrategy": "Exit Strategy",
       "contractAmendments": "Contract Amendments",
       "onboardTool": "Onboard a Tool",
-      "auditReadiness": "Audit Readiness"
+      "auditReadiness": "Audit Readiness",
+      "team": "Team"
     },
     "titles": {
       "riskRegister": "Risk Register",
@@ -1128,7 +1129,8 @@
         "analystLabel": "Compliance Analyst",
         "analystDesc": "Create and run assessments, send questionnaires, view all vendors",
         "viewerLabel": "Read-only",
-        "viewerDesc": "View assessments and results only — no create or edit access"
+        "viewerDesc": "View assessments and results only — no create or edit access",
+        "doraDesc": "The DORA workflow roles you assign to the people in your third-party risk process. Maker ≠ checker is enforced — the person who drafts a finding cannot approve it."
       },
       "activeMembers": "Active Members",
       "noActiveMembers": "No active members yet.",
@@ -1155,7 +1157,56 @@
       "toastInviteSent": "Invitation sent",
       "toastInviteFailed": "Failed to send invitation",
       "toastMemberRemoved": "Member removed",
-      "toastRemoveFailed": "Failed to remove member"
+      "toastRemoveFailed": "Failed to remove member",
+      "addRole": "Add role",
+      "removeRole": "Remove {{role}} role",
+      "manageRolesHint": "Assign each member their DORA workflow role. Add or remove roles with the controls below — only you (an admin) can.",
+      "inviteDoraDesc": "They get an email link to join {{org}}. Pick the DORA role they will hold — you can change it anytime from the members list.",
+      "toastRoleAssigned": "Role assigned",
+      "toastRoleRevoked": "Role removed",
+      "toastRoleFailed": "Could not update the role",
+      "domainRoles": {
+        "entity_admin": {
+          "label": "Admin (owner)",
+          "desc": "Full access + manages the team and roles. The accountable owner — the only role that can invite people."
+        },
+        "analyst": {
+          "label": "Analyst (maker)",
+          "desc": "Drafts assessments, collects evidence, works the remediation loop. Cannot approve its own findings (SoD)."
+        },
+        "procurement": {
+          "label": "Procurement (maker)",
+          "desc": "Onboards arrangements and uploads contract evidence. A maker — no sign-off authority."
+        },
+        "ict_risk_officer": {
+          "label": "ICT Risk Officer (checker)",
+          "desc": "Approves findings and accepts risk (management-body delegate). The checker in the maker≠checker split."
+        },
+        "legal": {
+          "label": "Legal (checker)",
+          "desc": "Signs off contractual clauses (DORA Art. 30 terms)."
+        },
+        "security_officer": {
+          "label": "Security Officer (checker)",
+          "desc": "Signs off the information-security dimension and classifies security evidence (SOC 2 / ISO 27001)."
+        },
+        "dpo": {
+          "label": "DPO (checker)",
+          "desc": "Signs off the data-protection / privacy dimension."
+        },
+        "business_owner": {
+          "label": "Business Owner (attester)",
+          "desc": "Attests usage and criticality for the functions they own."
+        },
+        "auditor": {
+          "label": "Auditor (read-only)",
+          "desc": "Read-only across everything — for internal audit / external reviewers."
+        },
+        "viewer": {
+          "label": "Viewer (read-only)",
+          "desc": "Limited read-only access to assessments and arrangements."
+        }
+      }
     }
   },
   "workspaces": {

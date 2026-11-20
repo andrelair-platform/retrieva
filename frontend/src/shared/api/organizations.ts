@@ -11,12 +11,27 @@ export interface OrganizationData {
   trialEndsAt?: string | null;
 }
 
+/** The DORA workflow roles assignable to a member (mirrors the backend ASSIGNABLE_ROLES). */
+export type DomainRole =
+  | 'entity_admin'
+  | 'analyst'
+  | 'procurement'
+  | 'ict_risk_officer'
+  | 'legal'
+  | 'security_officer'
+  | 'dpo'
+  | 'business_owner'
+  | 'auditor'
+  | 'viewer';
+
 export interface OrgMember {
   id: string;
   email: string;
   role: 'org_admin' | 'analyst' | 'viewer';
   status: 'pending' | 'active' | 'revoked';
   joinedAt?: string;
+  /** Active entity-scope DORA roles this member holds (empty for pending invitees). */
+  domainRoles?: DomainRole[];
   user?: { id: string; name: string; email: string } | null;
 }
 
@@ -50,11 +65,25 @@ export const organizationsApi = {
     return response.data;
   },
 
-  invite: async (data: { email: string; role: string }) => {
+  invite: async (data: { email: string; role: string; domainRole?: DomainRole }) => {
     const response = await apiClient.post<ApiResponse<{ member: OrgMember }>>(
       '/organizations/invite',
       data
     );
+    return response.data;
+  },
+
+  /** Grant a DORA domain role to an existing member. Gated server-side to entity_admin (user:manage). */
+  assignRole: async (data: { userId: string; role: DomainRole }) => {
+    const response = await apiClient.post<ApiResponse>('/organizations/role-assignments', data);
+    return response.data;
+  },
+
+  /** Revoke a member's DORA domain role. Gated server-side to entity_admin (user:manage). */
+  revokeRole: async (data: { userId: string; role: DomainRole }) => {
+    const response = await apiClient.delete<ApiResponse>('/organizations/role-assignments', {
+      data,
+    });
     return response.data;
   },
 
