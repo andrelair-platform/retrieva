@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -160,6 +160,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ['arrangement-lifecycle', id] });
       qc.invalidateQueries({ queryKey: ['arrangement', id] });
       qc.invalidateQueries({ queryKey: ['arrangements'] });
+      // lifecycle change → the pre-contract gate/transitions change → refresh the readiness pack
+      qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
     },
     onError: (e) => {
       const msg = getErrorMessage(e);
@@ -175,6 +177,15 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const findingsQuery = useFindingsQuery(id, assessing);
   const findings = findingsQuery.data?.findings ?? [];
   const coverage = findingsQuery.data?.coverage ?? null;
+
+  // The pre-contract readiness/decision is derived from the findings — but an assessment is ASYNC
+  // (findings arrive via the poll above, after the run mutation already resolved). Refresh the
+  // onboarding-decision whenever the findings data changes so the readiness gate reflects reality
+  // without a manual reload (fixes the stale "Assessment run ❌" after a run completes).
+  const findingsUpdatedAt = findingsQuery.dataUpdatedAt;
+  useEffect(() => {
+    if (preContract) qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
+  }, [findingsUpdatedAt, preContract, id, qc]);
   // RTV-43 — the remediation loop: gaps a checker approved into tracked Risks.
   const { data: risks = [] } = useRisksQuery(id);
 
