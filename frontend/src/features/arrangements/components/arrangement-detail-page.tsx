@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle, Send, Copy, Ban } from 'lucide-react';
+import { ArrowLeft, Play, Plus, FileText, ShieldCheck, ShieldAlert, Gauge, Check, X, ChevronRight, AlertTriangle, Send, Copy, Ban, CalendarClock, Megaphone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -44,7 +44,15 @@ import {
   EVIDENCE_CATEGORY_LABELS,
   type RiskStatus,
   type EvidenceCategory,
+  type SupplierNoticeType,
 } from '@/features/arrangements/api/arrangements';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   CriticalityBadge,
   ArrangementTypeBadge,
@@ -82,6 +90,23 @@ const RISK_ACTION_LABEL: Record<RiskStatus, string> = {
   accepted: 'Accept risk',
   closed: 'Close',
 };
+
+// Supplier-notice type → label (mirrors the backend SUPPLIER_NOTICE_TYPES).
+const SUPPLIER_NOTICE_LABELS: Record<SupplierNoticeType, string> = {
+  breach: 'Security breach / data incident',
+  subprocessor_change: 'Subcontractor (nth-party) change',
+  residency_change: 'Data-location / residency change',
+  incident: 'Major service incident',
+  service_degradation: 'Service degradation',
+  other: 'Other notification',
+};
+const SUPPLIER_NOTICE_TYPES = Object.keys(SUPPLIER_NOTICE_LABELS) as SupplierNoticeType[];
+
+/** days until an ISO deadline (negative = overdue). null if none. */
+function daysToDue(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000);
+}
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -241,6 +266,44 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     },
   });
 
+  // Workflow A step 6 — set/clear a risk's remediation deadline.
+  const setDueDate = useMutation({
+    mutationFn: (v: { riskId: string; dueDate: string | null }) =>
+      arrangementsApi.setRiskDueDate(id, v.riskId, v.dueDate),
+    onSuccess: (_res, v) => {
+      toast.success(v.dueDate ? 'Remediation deadline set' : 'Deadline cleared');
+      qc.invalidateQueries({ queryKey: ['risks', id] });
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  // Workflow A step 8 — log a supplier notice → reopen for reassessment.
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeType, setNoticeType] = useState<SupplierNoticeType>('incident');
+  const [noticeSummary, setNoticeSummary] = useState('');
+  const [noticeRef, setNoticeRef] = useState('');
+  const logNotice = useMutation({
+    mutationFn: () =>
+      arrangementsApi.logSupplierNotice(id, {
+        type: noticeType,
+        summary: noticeSummary.trim() || undefined,
+        reference: noticeRef.trim() || undefined,
+      }),
+    onSuccess: (res) => {
+      toast.success(
+        res.data?.reopened
+          ? 'Notice logged — the arrangement was reopened for reassessment'
+          : 'Notice logged'
+      );
+      qc.invalidateQueries({ queryKey: ['arrangement', id] });
+      qc.invalidateQueries({ queryKey: ['risks', id] });
+      setNoticeOpen(false);
+      setNoticeSummary('');
+      setNoticeRef('');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
   if (isLoading) return <div className="page-container max-w-5xl mx-auto space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
   if (!arrangement) return <div className="page-container max-w-5xl mx-auto">Arrangement not found.</div>;
 
@@ -254,14 +317,20 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         title={`${arrangement.providerName} · ${arrangement.businessFunctionName}`}
         description={arrangement.legalEntityName}
         actions={
-          <Button
-            size="sm"
-            onClick={() => assess.mutate()}
-            disabled={assess.isPending || (assessing && findings.length === 0)}
-          >
-            <Play className="h-4 w-4 mr-2" />
-            {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setNoticeOpen(true)}>
+              <Megaphone className="h-4 w-4 mr-2" />
+              Log supplier notice
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => assess.mutate()}
+              disabled={assess.isPending || (assessing && findings.length === 0)}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
+            </Button>
+          </div>
         }
       />
 
@@ -540,14 +609,51 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           <div className="rounded-md border divide-y">
             {risks.map((r) => {
               const nexts = RISK_TRANSITIONS[r.status] ?? [];
+              const dd = daysToDue(r.dueDate);
+              const inLoop = r.status === 'open' || r.status === 'mitigating';
               return (
                 <div key={r.id} className="px-3 py-2.5 text-sm space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs">{r.controlId}</span>
                     <RiskSeverityBadge value={r.severity} />
                     <RiskStatusBadge value={r.status} />
+                    {inLoop && dd !== null && dd < 0 && (
+                      <Badge variant="destructive" className="text-[10px]">overdue {Math.abs(dd)}d</Badge>
+                    )}
+                    {inLoop && dd !== null && dd >= 0 && dd <= 7 && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600">due in {dd}d</Badge>
+                    )}
                   </div>
                   {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+                  {inLoop && (
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <CalendarClock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <Label className="text-[11px] text-muted-foreground">Remediation due</Label>
+                      <Input
+                        type="date"
+                        value={r.dueDate ? r.dueDate.slice(0, 10) : ''}
+                        disabled={setDueDate.isPending}
+                        onChange={(e) =>
+                          setDueDate.mutate({
+                            riskId: r.id,
+                            dueDate: e.target.value ? new Date(e.target.value).toISOString() : null,
+                          })
+                        }
+                        className="h-7 w-[150px] text-xs"
+                      />
+                      {r.dueDate && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          disabled={setDueDate.isPending}
+                          onClick={() => setDueDate.mutate({ riskId: r.id, dueDate: null })}
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   {nexts.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {nexts.map((s) =>
@@ -584,6 +690,55 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           </div>
         </div>
       )}
+
+      {/* Workflow A step 8 — log a supplier notification → reopen for reassessment */}
+      <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Log a supplier notice</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Record a notification this supplier sent you. Retrieva logs it in the audit trail and reopens
+              the arrangement for a fresh assessment. (Nothing connects to the supplier&apos;s systems.)
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Type</Label>
+              <Select value={noticeType} onValueChange={(v) => setNoticeType(v as SupplierNoticeType)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SUPPLIER_NOTICE_TYPES.map((tp) => (
+                    <SelectItem key={tp} value={tp}>{SUPPLIER_NOTICE_LABELS[tp]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">What the supplier reported (optional)</Label>
+              <Textarea
+                value={noticeSummary}
+                onChange={(e) => setNoticeSummary(e.target.value)}
+                placeholder="e.g. Vendor notified us of a new sub-processor (Acme Cloud) in the US."
+                className="text-sm"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Supplier reference (optional)</Label>
+              <Input
+                value={noticeRef}
+                onChange={(e) => setNoticeRef(e.target.value)}
+                placeholder="e.g. their ticket / notice id"
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNoticeOpen(false)} disabled={logNotice.isPending}>Cancel</Button>
+            <Button onClick={() => logNotice.mutate()} disabled={logNotice.isPending}>
+              {logNotice.isPending ? 'Logging…' : 'Log + reassess'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={evOpen} onOpenChange={setEvOpen}>
         <DialogContent className="sm:max-w-md">
