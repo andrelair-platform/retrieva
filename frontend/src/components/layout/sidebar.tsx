@@ -140,8 +140,14 @@ export function Sidebar() {
         </nav>
       </ScrollArea>
 
-      {/* ── Bottom Navigation ── */}
+      {/* ── Bottom Navigation (Account: Team + Settings) ── */}
       <div className={cn('shrink-0 border-t border-sidebar-border py-3', sidebarCollapsed ? 'px-2' : 'px-3')}>
+        {/* Section label so Team/Settings read as a grouped area, not stray footer icons */}
+        {!sidebarCollapsed && (
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70 select-none">
+            {t('nav.sections.account')}
+          </p>
+        )}
         <nav className="flex flex-col gap-0.5">
           {visibleBottomNav.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
