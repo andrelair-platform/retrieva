@@ -62,6 +62,7 @@ import {
   RiskStatusBadge,
 } from './badges';
 import { OnboardingPanel } from './onboarding-panel';
+import { useOnboardingDecisionQuery } from '@/features/arrangements/queries/use-onboarding';
 
 // Human labels for the state-machine transitions (the backend returns transition names).
 const TRANSITION_LABEL: Record<string, string> = {
@@ -143,6 +144,12 @@ export function ArrangementDetailPage({ id }: { id: string }) {
 
   const { data: arrangement, isLoading } = useArrangementQuery(id);
   const { data: lifecycle } = useArrangementLifecycleQuery(id);
+  // Pre-contract readiness drives the HARD activation gate — disable `approve_onboarding` until clear
+  // (the backend 409s regardless; this just stops a doomed click). Only fetched while pre-contract.
+  const preContract = lifecycle?.status === 'prospect' || lifecycle?.status === 'due_diligence';
+  const { data: onboardingDecision } = useOnboardingDecisionQuery(id, preContract);
+  const activationBlocked =
+    preContract && onboardingDecision?.readiness ? !onboardingDecision.readiness.canActivate : false;
   const { data: evidence = [] } = useArrangementEvidenceQuery(id);
   const { data: checklist } = useEvidenceChecklistQuery(id); // RTV-64/#226
 
@@ -343,19 +350,28 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           </div>
           {lifecycle.transitions.length > 0 ? (
             <div className="flex flex-wrap gap-2 sm:ml-auto">
-              {lifecycle.transitions.map((t) => (
-                <Button
-                  key={t.transition}
-                  size="sm"
-                  variant={t.approval ? 'default' : 'outline'}
-                  disabled={transition.isPending}
-                  onClick={() => transition.mutate(t.transition)}
-                  title={t.approval ? 'Management-body decision — requires a checker role' : undefined}
-                >
-                  {t.approval && <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />}
-                  {TRANSITION_LABEL[t.transition] ?? t.transition}
-                </Button>
-              ))}
+              {lifecycle.transitions.map((t) => {
+                const gated = t.transition === 'approve_onboarding' && activationBlocked;
+                return (
+                  <Button
+                    key={t.transition}
+                    size="sm"
+                    variant={t.approval ? 'default' : 'outline'}
+                    disabled={transition.isPending || gated}
+                    onClick={() => transition.mutate(t.transition)}
+                    title={
+                      gated
+                        ? 'Pre-contract conditions not met — see the readiness checklist below'
+                        : t.approval
+                          ? 'Management-body decision — requires a checker role'
+                          : undefined
+                    }
+                  >
+                    {t.approval && <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />}
+                    {TRANSITION_LABEL[t.transition] ?? t.transition}
+                  </Button>
+                );
+              })}
             </div>
           ) : (
             <span className="text-xs text-muted-foreground sm:ml-auto">Terminal state — no further transitions.</span>

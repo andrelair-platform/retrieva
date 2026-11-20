@@ -54,6 +54,12 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
   const [dataResidency, setDataResidency] = useState('');
   const [trigger, setTrigger] = useState<Trigger>('existing');
 
+  // Workflow B pre-contract intake — the business owner's need (only for a new provider).
+  const [businessPurpose, setBusinessPurpose] = useState('');
+  const [expectedCost, setExpectedCost] = useState('');
+  const [expectedCostCurrency, setExpectedCostCurrency] = useState('EUR');
+  const [requestedStartDate, setRequestedStartDate] = useState('');
+
   // quick-create inline state
   const [newEntity, setNewEntity] = useState('');
   const [newFn, setNewFn] = useState('');
@@ -135,6 +141,15 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
+        // Workflow B intake — only meaningful for a new-provider prospect.
+        ...(trigger === 'new'
+          ? {
+              businessPurpose: businessPurpose.trim() || null,
+              expectedCost: expectedCost.trim() || null,
+              expectedCostCurrency: expectedCost.trim() ? expectedCostCurrency : null,
+              requestedStartDate: requestedStartDate || null,
+            }
+          : {}),
       }),
     onSuccess: () => {
       toast.success('Arrangement created');
@@ -166,6 +181,57 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Workflow B intake (new provider only) — the business owner's pre-contract need. */}
+          {trigger === 'new' && (
+            <div className="space-y-3 rounded-md border border-dashed p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Pre-contract intake — the business need (optional but recommended)
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Purpose / business need</Label>
+                <Input
+                  placeholder="Why this provider is needed"
+                  value={businessPurpose}
+                  onChange={(e) => setBusinessPurpose(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1.5">
+                  <Label className="text-xs">Expected cost (annual)</Label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={expectedCost}
+                      onChange={(e) => setExpectedCost(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <Select value={expectedCostCurrency} onValueChange={setExpectedCostCurrency}>
+                      <SelectTrigger className="h-8 w-20 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <Label className="text-xs">Requested start date</Label>
+                  <Input
+                    type="date"
+                    value={requestedStartDate}
+                    onChange={(e) => setRequestedStartDate(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Legal entity */}
           <div className="space-y-1.5">
