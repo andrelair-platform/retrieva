@@ -37,6 +37,10 @@ const STATUS_BADGE: Record<ExitArtefactStatus, string> = {
   rejected: 'bg-muted text-muted-foreground',
 };
 
+function isPendingFor(m: { isPending: boolean; variables?: string }, id: string): boolean {
+  return m.isPending && m.variables === id;
+}
+
 export function ExitStrategyPage() {
   const { data: artefacts, isLoading } = useExitArtefactsQuery();
   const approve = useApproveArtefactMutation();
@@ -130,9 +134,9 @@ export function ExitStrategyPage() {
                         <Button
                           size="sm"
                           onClick={() => onApprove(a)}
-                          disabled={approve.isPending && approve.variables === a.id}
+                          disabled={isPendingFor(approve, a.id)}
                         >
-                          {approve.isPending && approve.variables === a.id ? (
+                          {isPendingFor(approve, a.id) ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Check className="mr-1.5 h-3.5 w-3.5" />
@@ -143,9 +147,9 @@ export function ExitStrategyPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => onReject(a)}
-                          disabled={reject.isPending && reject.variables === a.id}
+                          disabled={isPendingFor(reject, a.id)}
                         >
-                          {reject.isPending && reject.variables === a.id ? (
+                          {isPendingFor(reject, a.id) ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <X className="mr-1.5 h-3.5 w-3.5" />

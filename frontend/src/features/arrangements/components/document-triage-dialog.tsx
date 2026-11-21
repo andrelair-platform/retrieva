@@ -66,6 +66,33 @@ const relPath = (f: File): string | undefined =>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional: non-standard DOM attributes
 const FOLDER_ATTRS: any = { webkitdirectory: '', directory: '' };
 
+type TriageResult = { uploaded: number; skipped: number; failed: number };
+
+function resultSuffix(result: TriageResult) {
+  return {
+    skipped: result.skipped ? ` · ${result.skipped} skipped` : '',
+    failed: result.failed ? ` · ${result.failed} failed` : '',
+  };
+}
+
+function deriveTriageView(args: {
+  files: File[];
+  rows: Row[] | null;
+  progress: { done: number; total: number } | null;
+  result: TriageResult | null;
+}) {
+  const { files, rows, progress, result } = args;
+  const assignable = (rows ?? []).filter((r) => r.arrangementId);
+  const hasProgress = !!progress;
+  return {
+    assignable,
+    hasProgress,
+    showFilePicker: files.length > 0 && !rows,
+    commitDisabled: !rows || assignable.length === 0 || hasProgress,
+    suffix: resultSuffix(result ?? { uploaded: 0, skipped: 0, failed: 0 }),
+  };
+}
+
 export function DocumentTriageDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const { data: arrangements = [] } = useArrangementsQuery();
@@ -162,7 +189,12 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
     }
   };
 
-  const assignable = (rows ?? []).filter((r) => r.arrangementId);
+  const { assignable, hasProgress, showFilePicker, commitDisabled, suffix } = deriveTriageView({
+    files,
+    rows,
+    progress,
+    result,
+  });
 
   const commit = async () => {
     const todo = assignable;
@@ -194,8 +226,28 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
     return <Badge variant="outline">unassigned</Badge>;
   };
 
+  const handleOpenChange = (o: boolean) => {
+    if (o) onOpenChange(o);
+    else close();
+  };
+
+  const renderFooter = () => {
+    if (result) return <Button onClick={close}>Done</Button>;
+    return (
+      <>
+        <Button variant="ghost" onClick={close} disabled={hasProgress}>
+          Cancel
+        </Button>
+        <Button onClick={commit} disabled={commitDisabled}>
+          {progress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Upload {assignable.length} documents
+        </Button>
+      </>
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : close())}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Bulk-upload documents</DialogTitle>
@@ -213,7 +265,7 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
                 size="sm"
                 variant="outline"
                 onClick={() => folderRef.current?.click()}
-                disabled={!!progress}
+                disabled={hasProgress}
               >
                 <FolderUp className="mr-2 h-4 w-4" /> Select folder
               </Button>
@@ -221,11 +273,11 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
                 size="sm"
                 variant="outline"
                 onClick={() => filesRef.current?.click()}
-                disabled={!!progress}
+                disabled={hasProgress}
               >
                 <FilePlus2 className="mr-2 h-4 w-4" /> Add files
               </Button>
-              {files.length > 0 && !rows && (
+              {showFilePicker && (
                 <Button size="sm" onClick={analyze} disabled={analyzing}>
                   {analyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                   Analyze {files.length} files
@@ -248,7 +300,7 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
               />
             </div>
 
-            {files.length > 0 && !rows && (
+            {showFilePicker && (
               <p className="text-xs text-muted-foreground">{files.length} files selected across your folders.</p>
             )}
 
@@ -356,26 +408,12 @@ export function DocumentTriageDialog({ open, onOpenChange }: Props) {
           <div className="flex items-center gap-2 rounded-md border border-green-600/30 bg-green-600/5 p-3 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             {result.uploaded} documents uploaded
-            {result.skipped ? ` · ${result.skipped} skipped` : ''}
-            {result.failed ? ` · ${result.failed} failed` : ''}.
+            {suffix.skipped}
+            {suffix.failed}.
           </div>
         )}
 
-        <DialogFooter>
-          {result ? (
-            <Button onClick={close}>Done</Button>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={close} disabled={!!progress}>
-                Cancel
-              </Button>
-              <Button onClick={commit} disabled={!rows || assignable.length === 0 || !!progress}>
-                {progress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Upload {assignable.length} documents
-              </Button>
-            </>
-          )}
-        </DialogFooter>
+        <DialogFooter>{renderFooter()}</DialogFooter>
       </DialogContent>
     </Dialog>
   );

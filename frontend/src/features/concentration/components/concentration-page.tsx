@@ -30,6 +30,96 @@ import {
 } from '@/features/concentration/queries/use-concentration-query';
 import { ConcentrationGraph } from './concentration-graph';
 
+type ConcentrationAnalysis = ReturnType<typeof useConcentrationAnalysisQuery>['data'];
+type ConcentrationGraphData = ReturnType<typeof useConcentrationGraphQuery>['data'];
+
+/** KPI scalar values derived from the coverage summary. */
+function deriveKpis(analysis: ConcentrationAnalysis) {
+  const cov = analysis?.coverage;
+  const totalProviders = cov?.totalProviders ?? 0;
+  const providersMapped = cov?.providersMappedToFunctions ?? 0;
+  return {
+    kpiTotalProviders: totalProviders,
+    kpiCriticalFunctions: cov?.criticalFunctionCount ?? 0,
+    kpiCoverage: `${providersMapped}/${totalProviders}`,
+  };
+}
+
+/** Graph presence flag + safe node/edge arrays. */
+function deriveGraph(graph: ConcentrationGraphData) {
+  const nodes = graph?.nodes ?? [];
+  const edges = graph?.edges ?? [];
+  return { hasGraph: nodes.length > 0, graphNodes: nodes, graphEdges: edges };
+}
+
+/** Precompute the list sections + their empty-state flags from the raw analysis. */
+function deriveConcentrationView(analysis: ConcentrationAnalysis, graph: ConcentrationGraphData) {
+  const providerConcentration = analysis?.providerConcentration ?? [];
+  const sharedSubstrate = analysis?.sharedSubstrate ?? [];
+  const spofs = analysis?.singlePointsOfFailure ?? [];
+
+  return {
+    providerConcentration,
+    sharedSubstrate,
+    spofs,
+    ...deriveKpis(analysis),
+    ...deriveGraph(graph),
+    noSpofs: spofs.length === 0,
+    noSharedSubstrate: sharedSubstrate.length === 0,
+    noProviderConcentration: providerConcentration.length === 0,
+  };
+}
+
+/** Submit-button state for the extract dialog (disabled flag + label). */
+function extractButtonState(
+  extractWs: string,
+  isPending: boolean
+): { extractDisabled: boolean; extractLabel: string } {
+  return {
+    extractDisabled: !extractWs || isPending,
+    extractLabel: isPending ? 'Scanning…' : 'Extract',
+  };
+}
+
+/** Provider choices for the sub-provider extract dialog (stripped `w:` id + label). */
+function deriveProviderChoices(graph: ConcentrationGraphData): { id: string; label: string }[] {
+  return (graph?.nodes ?? [])
+    .filter((n) => n.type === 'provider')
+    .map((n) => ({ id: n.id.replace(/^w:/, ''), label: n.label }));
+}
+
+/** Empty-state flags for the three list sections + the provider picker. */
+function deriveListFlags(
+  dependencies: unknown[],
+  functions: unknown[],
+  providerChoices: unknown[]
+): { noDependencies: boolean; noFunctions: boolean; noProviderChoices: boolean; scanButtonTitle: string } {
+  const noProviderChoices = providerChoices.length === 0;
+  return {
+    noDependencies: dependencies.length === 0,
+    noFunctions: functions.length === 0,
+    noProviderChoices,
+    scanButtonTitle: noProviderChoices
+      ? 'Add vendors first'
+      : 'Extract sub-providers from a vendor’s documents',
+  };
+}
+
+/** Toast feedback for a sub-provider extraction result (created edges vs. candidate state). */
+function toastExtractResult(res: Awaited<ReturnType<typeof concentrationApi.extractSubProviders>>) {
+  const created = res.data?.created ?? 0;
+  if (created > 0) {
+    toast.success(`${created} sub-provider edge(s) proposed — review and confirm below`);
+    return;
+  }
+  const hadCandidates = (res.data?.candidates?.length ?? 0) > 0;
+  toast.info(
+    hadCandidates
+      ? 'No new sub-providers — everything found is already mapped'
+      : 'No sub-providers found (this vendor has no indexed documents yet)'
+  );
+}
+
 function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <Card className="p-4">
@@ -40,6 +130,12 @@ function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hi
   );
 }
 
+// All derivable logic has been hoisted into pure helpers above (KPIs, graph, list flags,
+// extract-button/toast state); the residual complexity is irreducible per-section JSX
+// conditional gates, which can only be lowered by extracting render subtrees into
+// sub-components — explicitly out of scope for this clean-code pass (JSX tree must stay
+// identical). Tracked: minicloud-gitops#2353.
+// eslint-disable-next-line complexity -- residual count is JSX section gates only; logic fully extracted; tracked minicloud-gitops#2353
 export function ConcentrationPage() {
   const qc = useQueryClient();
   const { data: analysis, isLoading } = useConcentrationAnalysisQuery();
@@ -55,7 +151,7 @@ export function ConcentrationPage() {
       concentrationApi.confirmDependency(v.id, v.confirmed),
     onSuccess: () => {
       toast.success('Dependency updated');
-      invalidateAll();
+      void invalidateAll();
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -68,28 +164,22 @@ export function ConcentrationPage() {
   const extractDeps = useMutation({
     mutationFn: (workspaceId: string) => concentrationApi.extractSubProviders(workspaceId),
     onSuccess: (res) => {
-      const created = res.data?.created ?? 0;
-      if (created > 0) {
-        toast.success(`${created} sub-provider edge(s) proposed — review and confirm below`);
-      } else {
-        const hadCandidates = (res.data?.candidates?.length ?? 0) > 0;
-        toast.info(
-          hadCandidates
-            ? 'No new sub-providers — everything found is already mapped'
-            : 'No sub-providers found (this vendor has no indexed documents yet)'
-        );
-      }
+      toastExtractResult(res);
       setExtractOpen(false);
       setExtractWs('');
-      invalidateAll();
+      void invalidateAll();
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   // provider choices from the graph (id `w:<wsId>`), used by the sub-provider extract dialog.
-  const providerChoices = (graph?.nodes ?? [])
-    .filter((n) => n.type === 'provider')
-    .map((n) => ({ id: n.id.replace(/^w:/, ''), label: n.label }));
+  const providerChoices = deriveProviderChoices(graph);
+  const { noDependencies, noFunctions, noProviderChoices, scanButtonTitle } = deriveListFlags(
+    dependencies,
+    functions,
+    providerChoices
+  );
+  const { extractDisabled, extractLabel } = extractButtonState(extractWs, extractDeps.isPending);
 
   if (isLoading) {
     return (
@@ -99,10 +189,20 @@ export function ConcentrationPage() {
     );
   }
 
-  const cov = analysis?.coverage;
-  const providerConcentration = analysis?.providerConcentration ?? [];
-  const sharedSubstrate = analysis?.sharedSubstrate ?? [];
-  const spofs = analysis?.singlePointsOfFailure ?? [];
+  const {
+    providerConcentration,
+    sharedSubstrate,
+    spofs,
+    kpiTotalProviders,
+    kpiCriticalFunctions,
+    kpiCoverage,
+    hasGraph,
+    graphNodes,
+    graphEdges,
+    noSpofs,
+    noSharedSubstrate,
+    noProviderConcentration,
+  } = deriveConcentrationView(analysis, graph);
 
   return (
     <div className="page-container mx-auto max-w-7xl space-y-6">
@@ -114,13 +214,13 @@ export function ConcentrationPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Kpi label="Providers" value={cov?.totalProviders ?? 0} />
-        <Kpi label="Critical functions" value={cov?.criticalFunctionCount ?? 0} />
+        <Kpi label="Providers" value={kpiTotalProviders} />
+        <Kpi label="Critical functions" value={kpiCriticalFunctions} />
         <Kpi label="Single points of failure" value={spofs.length} hint="CIF on a sole provider" />
         <Kpi label="Shared substrate" value={sharedSubstrate.length} hint="reached by ≥2 providers" />
         <Kpi
           label="Provider coverage"
-          value={`${cov?.providersMappedToFunctions ?? 0}/${cov?.totalProviders ?? 0}`}
+          value={kpiCoverage}
           hint="mapped to a function"
         />
       </div>
@@ -128,8 +228,8 @@ export function ConcentrationPage() {
       {/* Graph */}
       <Card className="p-4">
         <h2 className="text-sm font-semibold flex items-center gap-1.5 mb-3"><GitBranch className="h-4 w-4" /> Dependency graph</h2>
-        {graph && graph.nodes.length > 0 ? (
-          <ConcentrationGraph nodes={graph.nodes} edges={graph.edges} />
+        {hasGraph ? (
+          <ConcentrationGraph nodes={graphNodes} edges={graphEdges} />
         ) : (
           <p className="text-sm text-muted-foreground">
             No graph yet — map business functions to their providers in the{' '}
@@ -142,7 +242,7 @@ export function ConcentrationPage() {
       <div className="grid md:grid-cols-2 gap-4">
         <div>
           <h2 className="text-sm font-semibold flex items-center gap-1.5 mb-2"><AlertTriangle className="h-4 w-4" /> Single points of failure ({spofs.length})</h2>
-          {spofs.length === 0 ? (
+          {noSpofs ? (
             <p className="text-sm text-muted-foreground">No CIF depends on a single provider.</p>
           ) : (
             <div className="rounded-md border divide-y">
@@ -157,7 +257,7 @@ export function ConcentrationPage() {
         </div>
         <div>
           <h2 className="text-sm font-semibold flex items-center gap-1.5 mb-2"><Layers className="h-4 w-4" /> Shared substrate ({sharedSubstrate.length})</h2>
-          {sharedSubstrate.length === 0 ? (
+          {noSharedSubstrate ? (
             <p className="text-sm text-muted-foreground">No node is reached by two or more providers.</p>
           ) : (
             <div className="rounded-md border divide-y">
@@ -175,7 +275,7 @@ export function ConcentrationPage() {
       {/* Provider concentration ranking */}
       <div>
         <h2 className="text-sm font-semibold mb-2">Provider concentration</h2>
-        {providerConcentration.length === 0 ? (
+        {noProviderConcentration ? (
           <p className="text-sm text-muted-foreground">No assessed provider supports a mapped critical function yet.</p>
         ) : (
           <div className="rounded-md border divide-y">
@@ -198,14 +298,14 @@ export function ConcentrationPage() {
           <Button
             size="sm"
             variant="outline"
-            disabled={providerChoices.length === 0}
-            title={providerChoices.length === 0 ? 'Add vendors first' : 'Extract sub-providers from a vendor’s documents'}
+            disabled={noProviderChoices}
+            title={scanButtonTitle}
             onClick={() => setExtractOpen(true)}
           >
             <ScanSearch className="h-3.5 w-3.5 mr-1" /> Scan vendor docs
           </Button>
         </div>
-        {dependencies.length === 0 ? (
+        {noDependencies ? (
           <p className="text-sm text-muted-foreground">No sub-provider edges yet.</p>
         ) : (
           <div className="rounded-md border overflow-x-auto">
@@ -263,7 +363,7 @@ export function ConcentrationPage() {
           Functions and their providers are derived from the register&apos;s business functions and their
           contractual arrangements — manage them in the Register, not here.
         </p>
-        {functions.length === 0 ? (
+        {noFunctions ? (
           <p className="text-sm text-muted-foreground">
             No critical or important functions yet. Define business functions and their arrangements in the{' '}
             <Link href="/register" className="underline underline-offset-2">Register</Link>.
@@ -295,7 +395,7 @@ export function ConcentrationPage() {
             </p>
             <div className="space-y-1.5">
               <Label>Vendor</Label>
-              {providerChoices.length === 0 ? (
+              {noProviderChoices ? (
                 <p className="text-xs text-muted-foreground">No vendors yet.</p>
               ) : (
                 <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
@@ -316,8 +416,8 @@ export function ConcentrationPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setExtractOpen(false); setExtractWs(''); }}>Cancel</Button>
-            <Button disabled={!extractWs || extractDeps.isPending} onClick={() => extractDeps.mutate(extractWs)}>
-              {extractDeps.isPending ? 'Scanning…' : 'Extract'}
+            <Button disabled={extractDisabled} onClick={() => extractDeps.mutate(extractWs)}>
+              {extractLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

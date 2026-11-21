@@ -49,6 +49,63 @@ const RISK_BG: Record<OverallRisk, string> = {
   Low:    'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800',
 };
 
+// ── Risk-matrix pure helpers (keep the render branch-light) ──────────────────────
+
+/** Heat-map row index for an inherent-risk level. */
+function inherentRowIndex(risk: OverallRisk): number {
+  if (risk === 'High') return 0;
+  if (risk === 'Medium') return 1;
+  return 2;
+}
+
+/** Heat-map column index for a control-effectiveness percentage. */
+function controlColIndex(effectiveness: number): number {
+  if (effectiveness < 33) return 0;
+  if (effectiveness <= 66) return 1;
+  return 2;
+}
+
+/** i18n key for the control-effectiveness band. */
+function controlLabelKey(effectiveness: number): string {
+  if (effectiveness >= 67) return 'assessments.matrix.ctrlHigh';
+  if (effectiveness >= 33) return 'assessments.matrix.ctrlMed';
+  return 'assessments.matrix.ctrlLow';
+}
+
+/** Tailwind text-colour class for the control-effectiveness band. */
+function controlColorClass(effectiveness: number): string {
+  if (effectiveness >= 67) return 'text-green-600';
+  if (effectiveness >= 33) return 'text-amber-600';
+  return 'text-destructive';
+}
+
+/** Sum the DORA-function weights of the active vendor functions. */
+function sumFunctionWeights(fns: readonly string[]): number {
+  return fns.reduce((s, fn) => s + (FUNCTION_WEIGHT[fn as keyof typeof FUNCTION_WEIGHT] ?? 0), 0);
+}
+
+/** Assemble every derived value the matrix render needs (keeps the component branch-light). */
+function buildMatrixView(
+  assessment: Assessment,
+  workspace: WorkspaceWithMembership | null,
+  qScore: number | null,
+) {
+  const vendorTier = workspace?.vendorTier ?? 'standard';
+  const activeFns = workspace?.vendorFunctions ?? [];
+  const results = assessment.results;
+  const m = buildRiskMatrix(vendorTier, activeFns, results?.gaps ?? null, qScore);
+  return {
+    m,
+    doraRisk: results?.overallRisk ?? m.residualRisk,
+    inherentRow: inherentRowIndex(m.inherentRisk),
+    ctrlCol: controlColIndex(m.controlEffectiveness),
+    activeFns,
+    fnSum: sumFunctionWeights(activeFns),
+    hasFns: activeFns.length > 0,
+    vendorTier,
+  };
+}
+
 // ── 1. Residual Risk Matrix ────────────────────────────────────────────────────
 
 export function ResidualRiskMatrix({
@@ -61,16 +118,8 @@ export function ResidualRiskMatrix({
   qScore?: number | null;
 }) {
   const { t } = useTranslation();
-  const gaps = assessment.results?.gaps ?? null;
-  const m = buildRiskMatrix(
-    workspace?.vendorTier,
-    workspace?.vendorFunctions,
-    gaps,
-    qScore,
-  );
-
-  // Effective DORA risk label from assessment (overrides computed when present)
-  const doraRisk = assessment.results?.overallRisk ?? m.residualRisk;
+  const { m, doraRisk, inherentRow, ctrlCol, activeFns, fnSum, hasFns, vendorTier } =
+    buildMatrixView(assessment, workspace, qScore);
 
   // ── Heat-map grid (3×3) ──────────────────────────────────────────────────────
   // Rows: inherent risk level  Col: control effectiveness bracket
@@ -81,16 +130,7 @@ export function ResidualRiskMatrix({
     ['Low',    'Low',    'Low'],     // inherentLow
   ];
 
-  const inherentRow = m.inherentRisk === 'High' ? 0 : m.inherentRisk === 'Medium' ? 1 : 2;
-  const ctrlCol     = m.controlEffectiveness < 33 ? 0 : m.controlEffectiveness <= 66 ? 1 : 2;
-
-  const activeFns = (workspace?.vendorFunctions ?? []);
-  const fnSum     = activeFns.reduce((s, fn) => s + (FUNCTION_WEIGHT[fn] ?? 0), 0);
-
-  const ctrlLabel =
-    m.controlEffectiveness >= 67 ? t('assessments.matrix.ctrlHigh') :
-    m.controlEffectiveness >= 33 ? t('assessments.matrix.ctrlMed') :
-    t('assessments.matrix.ctrlLow');
+  const ctrlLabel = t(controlLabelKey(m.controlEffectiveness));
 
   return (
     <Card>
@@ -140,12 +180,12 @@ export function ResidualRiskMatrix({
 
           {/* Tier row */}
           <div className="flex justify-between">
-            <span>{t('assessments.matrix.tier', { tier: workspace?.vendorTier ?? 'standard' })}</span>
-            <span className="font-mono text-muted-foreground">{t('assessments.matrix.base', { base: TIER_BASE[workspace?.vendorTier ?? 'standard'] })}</span>
+            <span>{t('assessments.matrix.tier', { tier: vendorTier })}</span>
+            <span className="font-mono text-muted-foreground">{t('assessments.matrix.base', { base: TIER_BASE[vendorTier] })}</span>
           </div>
 
           {/* Functions */}
-          {activeFns.length > 0 && (
+          {hasFns && (
             <div className="flex justify-between">
               <span>{t('assessments.matrix.functions', { count: activeFns.length })}</span>
               <span className="font-mono text-muted-foreground">+{fnSum}</span>
@@ -175,7 +215,7 @@ export function ResidualRiskMatrix({
 
           <div className="border-t pt-1 flex justify-between font-medium">
             <span>{t('assessments.matrix.controlEffectiveness')}</span>
-            <span className={`font-mono ${m.controlEffectiveness >= 67 ? 'text-green-600' : m.controlEffectiveness >= 33 ? 'text-amber-600' : 'text-destructive'}`}>
+            <span className={`font-mono ${controlColorClass(m.controlEffectiveness)}`}>
               {m.controlEffectiveness}% · {ctrlLabel}
             </span>
           </div>
@@ -348,7 +388,7 @@ export function FormalRiskDecision({
     mutationFn: ({ decision, rat }: { decision: RiskDecisionValue; rat: string }) =>
       assessmentsApi.setRiskDecision(assessmentId, decision, rat),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
+      void queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
       toast.success(t('assessments.decision.toastRecorded'));
       setPending(null);
       setRationale('');

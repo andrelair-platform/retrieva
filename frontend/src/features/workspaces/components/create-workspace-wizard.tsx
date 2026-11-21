@@ -117,6 +117,253 @@ function TierBadge({ tier }: { tier: VendorTier }) {
   );
 }
 
+// Step 3 body (functions + tier). Plain render helper (not a component) — identical tree, fewer
+// branches in the main wizard body.
+function renderWizardStep3(args: {
+  t: (key: string) => string;
+  vendorFunctions: VendorFunction[];
+  toggleFunction: (value: VendorFunction) => void;
+  suggestedTier: VendorTier | null;
+  tierOverride: VendorTier | '';
+  setTierOverride: (v: VendorTier | '') => void;
+  effectiveTier: VendorTier | null;
+  setStep: (s: 1 | 2 | 3 | 4) => void;
+}): React.ReactNode {
+  const { t, vendorFunctions, toggleFunction, suggestedTier, tierOverride, setTierOverride, effectiveTier, setStep } =
+    args;
+  return (
+    <div className="space-y-4 py-2">
+      {FUNCTION_GROUPS.map((group) => (
+        <div key={group.labelKey} className="space-y-1.5">
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${group.colorClass}`}
+          >
+            {t(group.labelKey)}
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {group.items.map((value) => {
+              const active = vendorFunctions.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => toggleFunction(value)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    active ? group.activeClass : 'border-border bg-background hover:bg-accent'
+                  }`}
+                >
+                  {t(`workspaces.wizard.functions.${value}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div className="rounded-md border bg-muted/30 px-3 py-2.5 space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium">{t('workspaces.wizard.vendorTier')}</span>
+          {suggestedTier && tierOverride === '' && (
+            <span className="text-xs text-muted-foreground">{t('workspaces.wizard.autoSuggested')}</span>
+          )}
+        </div>
+        <Select
+          value={tierOverride || suggestedTier || 'none'}
+          onValueChange={(value) => setTierOverride(value === 'none' ? '' : (value as VendorTier))}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={t('workspaces.wizard.selectTier')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">{t('workspaces.wizard.tierNotSet')}</SelectItem>
+            <SelectItem value="critical">{t('workspaces.tier.critical')}</SelectItem>
+            <SelectItem value="important">{t('workspaces.tier.important')}</SelectItem>
+            <SelectItem value="standard">{t('workspaces.tier.standard')}</SelectItem>
+          </SelectContent>
+        </Select>
+        {effectiveTier && <p className="text-xs text-muted-foreground">{t(`workspaces.wizard.tierTooltip.${effectiveTier}`)}</p>}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setStep(4)}
+        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+      >
+        {t('workspaces.wizard.skipFunctions')}
+      </button>
+    </div>
+  );
+}
+
+// Step 4 body (review + contract). Plain render helper (not a component) — identical tree.
+function renderWizardStep4(args: {
+  t: (key: string) => string;
+  name: string;
+  effectiveTier: VendorTier | null;
+  serviceType: VendorServiceType | null;
+  isIctService: boolean | null;
+  vendorFunctions: VendorFunction[];
+  country: string;
+  setCountry: (v: string) => void;
+  contractStart: string;
+  setContractStart: (v: string) => void;
+  contractEnd: string;
+  setContractEnd: (v: string) => void;
+}): React.ReactNode {
+  const {
+    t,
+    name,
+    effectiveTier,
+    serviceType,
+    isIctService,
+    vendorFunctions,
+    country,
+    setCountry,
+    contractStart,
+    setContractStart,
+    contractEnd,
+    setContractEnd,
+  } = args;
+  return (
+    <div className="space-y-4 py-2">
+      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-sm">{name}</span>
+          {effectiveTier && <TierBadge tier={effectiveTier} />}
+          {serviceType && (
+            <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5 bg-background">
+              {t(`workspaces.wizard.serviceTypeLabel.${serviceType}`)}
+            </span>
+          )}
+          {isIctService === false && (
+            <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5 bg-background">
+              {t('workspaces.wizard.nonIct')}
+            </span>
+          )}
+        </div>
+        {vendorFunctions.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {vendorFunctions.map((value) => (
+              <span
+                key={value}
+                className="text-xs bg-background border rounded px-1.5 py-0.5 text-muted-foreground"
+              >
+                {t(`workspaces.wizard.functions.${value}`)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="ws-country">{t('workspaces.wizard.country')}</Label>
+        <Select value={country} onValueChange={setCountry}>
+          <SelectTrigger id="ws-country">
+            <SelectValue placeholder={t('workspaces.wizard.countryPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            {COUNTRIES.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="ws-start">{t('workspaces.wizard.contractStart')}</Label>
+          <Input
+            id="ws-start"
+            type="date"
+            value={contractStart}
+            onChange={(event) => setContractStart(event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ws-end">{t('workspaces.wizard.contractEnd')}</Label>
+          <Input
+            id="ws-end"
+            type="date"
+            value={contractEnd}
+            onChange={(event) => setContractEnd(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground border rounded-md px-3 py-2 bg-muted/40">
+        {t('workspaces.wizard.settingsNote1')}
+        <strong>{t('workspaces.wizard.settingsNoteStrong')}</strong>{t('workspaces.wizard.settingsNote2')}
+      </p>
+    </div>
+  );
+}
+
+// The step navigation footer. A plain render helper (not a component) so the tree is identical while
+// keeping the branch-heavy step buttons out of the main wizard body.
+function renderWizardFooter(args: {
+  step: 1 | 2 | 3 | 4;
+  t: (key: string) => string;
+  name: string;
+  isIctService: boolean | null;
+  mutationPending: boolean;
+  onCancel: () => void;
+  goToStep2: () => void;
+  setStep: (s: 1 | 2 | 3 | 4) => void;
+  onCreate: () => void;
+}): React.ReactNode {
+  const { step, t, name, isIctService, mutationPending, onCancel, goToStep2, setStep, onCreate } = args;
+  return (
+    <DialogFooter className="gap-2">
+      {step === 1 && (
+        <>
+          <Button variant="outline" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={goToStep2}>
+            {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </>
+      )}
+      {step === 2 && (
+        <>
+          <Button variant="outline" onClick={() => setStep(1)}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
+          </Button>
+          <Button onClick={() => setStep(isIctService === false ? 4 : 3)} disabled={isIctService === null}>
+            {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </>
+      )}
+      {step === 3 && (
+        <>
+          <Button variant="outline" onClick={() => setStep(2)}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
+          </Button>
+          <Button onClick={() => setStep(4)}>
+            {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </>
+      )}
+      {step === 4 && (
+        <>
+          <Button variant="outline" onClick={() => setStep(isIctService === false ? 2 : 3)}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
+          </Button>
+          <Button onClick={onCreate} disabled={name.trim().length < 2 || mutationPending}>
+            {mutationPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Building2 className="h-4 w-4 mr-2" />
+            )}
+            {t('workspaces.wizard.create')}
+          </Button>
+        </>
+      )}
+    </DialogFooter>
+  );
+}
+
 export function CreateWorkspaceWizard() {
   const { t } = useTranslation();
   const activeModal = useUIStore((state) => state.activeModal);
@@ -170,7 +417,7 @@ export function CreateWorkspaceWizard() {
         vendorFunctions: vendorFunctions.length ? vendorFunctions : undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       toast.success(t('workspaces.wizard.toastCreated'));
       reset();
       closeModal();
@@ -282,193 +529,45 @@ export function CreateWorkspaceWizard() {
           </div>
         )}
 
-        {step === 3 && (
-          <div className="space-y-4 py-2">
-            {FUNCTION_GROUPS.map((group) => (
-              <div key={group.labelKey} className="space-y-1.5">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${group.colorClass}`}
-                >
-                  {t(group.labelKey)}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.items.map((value) => {
-                    const active = vendorFunctions.includes(value);
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleFunction(value)}
-                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          active ? group.activeClass : 'border-border bg-background hover:bg-accent'
-                        }`}
-                      >
-                        {t(`workspaces.wizard.functions.${value}`)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+        {step === 3 &&
+          renderWizardStep3({
+            t,
+            vendorFunctions,
+            toggleFunction,
+            suggestedTier,
+            tierOverride,
+            setTierOverride,
+            effectiveTier,
+            setStep,
+          })}
 
-            <div className="rounded-md border bg-muted/30 px-3 py-2.5 space-y-2">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium">{t('workspaces.wizard.vendorTier')}</span>
-                {suggestedTier && tierOverride === '' && (
-                  <span className="text-xs text-muted-foreground">{t('workspaces.wizard.autoSuggested')}</span>
-                )}
-              </div>
-              <Select
-                value={tierOverride || suggestedTier || 'none'}
-                onValueChange={(value) => setTierOverride(value === 'none' ? '' : (value as VendorTier))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={t('workspaces.wizard.selectTier')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('workspaces.wizard.tierNotSet')}</SelectItem>
-                  <SelectItem value="critical">{t('workspaces.tier.critical')}</SelectItem>
-                  <SelectItem value="important">{t('workspaces.tier.important')}</SelectItem>
-                  <SelectItem value="standard">{t('workspaces.tier.standard')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {effectiveTier && <p className="text-xs text-muted-foreground">{t(`workspaces.wizard.tierTooltip.${effectiveTier}`)}</p>}
-            </div>
+        {step === 4 &&
+          renderWizardStep4({
+            t,
+            name,
+            effectiveTier,
+            serviceType,
+            isIctService,
+            vendorFunctions,
+            country,
+            setCountry,
+            contractStart,
+            setContractStart,
+            contractEnd,
+            setContractEnd,
+          })}
 
-            <button
-              type="button"
-              onClick={() => setStep(4)}
-              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-            >
-              {t('workspaces.wizard.skipFunctions')}
-            </button>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-4 py-2">
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-sm">{name}</span>
-                {effectiveTier && <TierBadge tier={effectiveTier} />}
-                {serviceType && (
-                  <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5 bg-background">
-                    {t(`workspaces.wizard.serviceTypeLabel.${serviceType}`)}
-                  </span>
-                )}
-                {isIctService === false && (
-                  <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5 bg-background">
-                    {t('workspaces.wizard.nonIct')}
-                  </span>
-                )}
-              </div>
-              {vendorFunctions.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {vendorFunctions.map((value) => (
-                    <span
-                      key={value}
-                      className="text-xs bg-background border rounded px-1.5 py-0.5 text-muted-foreground"
-                    >
-                      {t(`workspaces.wizard.functions.${value}`)}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="ws-country">{t('workspaces.wizard.country')}</Label>
-              <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger id="ws-country">
-                  <SelectValue placeholder={t('workspaces.wizard.countryPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {COUNTRIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="ws-start">{t('workspaces.wizard.contractStart')}</Label>
-                <Input
-                  id="ws-start"
-                  type="date"
-                  value={contractStart}
-                  onChange={(event) => setContractStart(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ws-end">{t('workspaces.wizard.contractEnd')}</Label>
-                <Input
-                  id="ws-end"
-                  type="date"
-                  value={contractEnd}
-                  onChange={(event) => setContractEnd(event.target.value)}
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground border rounded-md px-3 py-2 bg-muted/40">
-              {t('workspaces.wizard.settingsNote1')}
-              <strong>{t('workspaces.wizard.settingsNoteStrong')}</strong>{t('workspaces.wizard.settingsNote2')}
-            </p>
-          </div>
-        )}
-
-        <DialogFooter className="gap-2">
-          {step === 1 && (
-            <>
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button onClick={goToStep2}>
-                {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(1)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
-              </Button>
-              <Button onClick={() => setStep(isIctService === false ? 4 : 3)} disabled={isIctService === null}>
-                {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(2)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
-              </Button>
-              <Button onClick={() => setStep(4)}>
-                {t('workspaces.wizard.next')} <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </>
-          )}
-          {step === 4 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(isIctService === false ? 2 : 3)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> {t('workspaces.wizard.back')}
-              </Button>
-              <Button
-                onClick={() => mutation.mutate()}
-                disabled={name.trim().length < 2 || mutation.isPending}
-              >
-                {mutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Building2 className="h-4 w-4 mr-2" />
-                )}
-                {t('workspaces.wizard.create')}
-              </Button>
-            </>
-          )}
-        </DialogFooter>
+        {renderWizardFooter({
+          step,
+          t,
+          name,
+          isIctService,
+          mutationPending: mutation.isPending,
+          onCancel: () => handleOpenChange(false),
+          goToStep2,
+          setStep,
+          onCreate: () => mutation.mutate(),
+        })}
       </DialogContent>
     </Dialog>
   );

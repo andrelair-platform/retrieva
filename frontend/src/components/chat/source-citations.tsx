@@ -112,13 +112,21 @@ interface SourceCardProps {
   domId?: string;
 }
 
+/** Derive display flags for a source card's content (has-body + truncated preview). */
+function getSourceContent(content: string | undefined): {
+  hasContent: boolean;
+  truncatedContent: string | undefined;
+} {
+  const hasContent = !!content && content.length > 0;
+  const truncatedContent =
+    content && content.length > 200 ? content.slice(0, 200) + '...' : content;
+  return { hasContent, truncatedContent };
+}
+
 function SourceCard({ source, index, isExpanded, onToggle, domId }: SourceCardProps) {
   const { t } = useTranslation();
-  const hasContent = source.content && source.content.length > 0;
-  const truncatedContent =
-    source.content && source.content.length > 200
-      ? source.content.slice(0, 200) + '...'
-      : source.content;
+  const { hasContent, truncatedContent } = getSourceContent(source.content);
+  const showLink = !!source.url && isValidExternalUrl(source.url);
 
   return (
     <div
@@ -158,7 +166,7 @@ function SourceCard({ source, index, isExpanded, onToggle, domId }: SourceCardPr
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {/* ISSUE #51 FIX: Only render link if URL is valid (http/https) */}
-              {source.url && isValidExternalUrl(source.url) && (
+              {showLink && (
                 <a
                   href={source.url}
                   target="_blank"

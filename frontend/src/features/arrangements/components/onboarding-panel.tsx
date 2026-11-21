@@ -71,8 +71,27 @@ const COVERAGE_STYLE: Record<ClauseCoverage, string> = {
 // draft-contract gap-check. Shown for arrangements still being onboarded (prospect / due_diligence).
 const PRE_CONTRACT = new Set(['prospect', 'due_diligence']);
 
+function isPreContract(lifecycleStatus?: string): boolean {
+  return !lifecycleStatus || PRE_CONTRACT.has(lifecycleStatus);
+}
+
+function buildCoverageMap(report: ClauseGapReport | null): Map<string, ClauseGapReport['items'][number]> {
+  return new Map((report?.items ?? []).map((i) => [i.controlId, i]));
+}
+
+type MetricTone = 'ok' | 'warn' | 'bad' | 'default';
+
+const badTone = (n: number): MetricTone => (n ? 'bad' : 'ok');
+const warnTone = (n: number): MetricTone => (n ? 'warn' : 'ok');
+
+const gateDecisionLabel = (canApprove: boolean): string =>
+  canApprove ? 'approve / reject onboarding' : 'onboarding';
+
+const gapCheckLabel = (isPending: boolean): string => (isPending ? 'Checking…' : 'Gap-check a draft');
+
+// eslint-disable-next-line complexity -- irreducible render-branch floor: ~10 single-flag JSX conditionals, each gating a distinct subtree (readiness/decision/reasons/concentration/pack/report); non-JSX logic already hoisted to module helpers (isPreContract/buildCoverageMap/badTone/warnTone/gateDecisionLabel/gapCheckLabel); extracting subtrees would create sub-components. tracked minicloud-gitops#2353
 export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycleStatus?: string }) {
-  const show = !lifecycleStatus || PRE_CONTRACT.has(lifecycleStatus);
+  const show = isPreContract(lifecycleStatus);
   const { data: decision } = useOnboardingDecisionQuery(id, show);
   const { data: pack } = useClausePackQuery(id);
   const gapCheck = useClauseGapCheck(id);
@@ -91,7 +110,7 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
     });
   };
 
-  const coverageById = new Map((report?.items ?? []).map((i) => [i.controlId, i]));
+  const coverageById = buildCoverageMap(report);
 
   return (
     <div className="space-y-4">
@@ -117,8 +136,8 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
             </ul>
           )}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Metric label="Non-compliant" value={decision.assessment.blocking} tone={decision.assessment.blocking ? 'bad' : 'ok'} />
-            <Metric label="Needs evidence" value={decision.assessment.needsEvidence} tone={decision.assessment.needsEvidence ? 'warn' : 'ok'} />
+            <Metric label="Non-compliant" value={decision.assessment.blocking} tone={badTone(decision.assessment.blocking)} />
+            <Metric label="Needs evidence" value={decision.assessment.needsEvidence} tone={warnTone(decision.assessment.needsEvidence)} />
             <Metric label="Controls assessed" value={decision.assessment.total} />
             <Metric label="Exit difficulty" value={decision.exit.difficulty} />
           </div>
@@ -141,7 +160,7 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
             )}
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Advisory only — the {decision.gate.canApproveOnboarding ? 'approve / reject onboarding' : 'onboarding'} decision
+            Advisory only — the {gateDecisionLabel(decision.gate.canApproveOnboarding)} decision
             is yours (use the lifecycle controls above).
           </p>
         </Card>
@@ -158,7 +177,7 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
               {pack.cif && <Badge variant="outline" className="text-[10px]">CIF — incl. Art. 30(3)</Badge>}
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs hover:bg-muted">
                 <UploadCloud className="h-3.5 w-3.5" />
-                {gapCheck.isPending ? 'Checking…' : 'Gap-check a draft'}
+                {gapCheckLabel(gapCheck.isPending)}
                 <input
                   type="file"
                   accept=".pdf,.docx,.xlsx"
@@ -211,9 +230,28 @@ export function OnboardingPanel({ id, lifecycleStatus }: { id: string; lifecycle
   );
 }
 
+function blockerBadgeLabel(cleared: boolean, blockerCount: number): string {
+  if (cleared) return 'Cleared to activate';
+  const count = blockerCount || 'Not';
+  const plural = blockerCount === 1 ? '' : 's';
+  return `${count} blocker${plural}`;
+}
+
+// Type-guard so the JSX block below narrows `intake` to defined (it is, when true).
+function showIntakeSummary(intake: Intake | undefined, cost: string | null): intake is Intake {
+  return Boolean(intake && (intake.businessPurpose || cost || intake.requestedStartDate));
+}
+
+function clearedBadgeClass(cleared: boolean): string {
+  return cleared
+    ? 'bg-green-100 text-green-700 border-green-200'
+    : 'bg-amber-100 text-amber-700 border-amber-200';
+}
+
 function ReadinessCard({ readiness, intake }: { readiness: Readiness; intake?: Intake }) {
   const cleared = readiness.canActivate;
   const cost = money(intake);
+  const badgeClass = clearedBadgeClass(cleared);
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between gap-2">
@@ -225,11 +263,8 @@ function ReadinessCard({ readiness, intake }: { readiness: Readiness; intake?: I
           )}
           Pre-contract readiness
         </h2>
-        <Badge
-          variant="outline"
-          className={`text-[11px] ${cleared ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}
-        >
-          {cleared ? 'Cleared to activate' : `${readiness.blockers.length || 'Not'} blocker${readiness.blockers.length === 1 ? '' : 's'}`}
+        <Badge variant="outline" className={`text-[11px] ${badgeClass}`}>
+          {blockerBadgeLabel(cleared, readiness.blockers.length)}
         </Badge>
       </div>
 
@@ -249,7 +284,7 @@ function ReadinessCard({ readiness, intake }: { readiness: Readiness; intake?: I
       </ul>
 
       {/* intake summary (Workflow B step 1) */}
-      {intake && (intake.businessPurpose || cost || intake.requestedStartDate) && (
+      {showIntakeSummary(intake, cost) && (
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
           {intake.businessPurpose && (
             <span>

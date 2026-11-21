@@ -24,8 +24,8 @@ export function useRunUpdates(): void {
   useEffect(() => {
     const s = getSocket();
     const onUpdate = () => {
-      qc.invalidateQueries({ queryKey: ['assessment-runs'] });
-      qc.invalidateQueries({ queryKey: ['approvals'] });
+      void qc.invalidateQueries({ queryKey: ['assessment-runs'] });
+      void qc.invalidateQueries({ queryKey: ['approvals'] });
     };
     s.on('run.updated', onUpdate);
     return () => {

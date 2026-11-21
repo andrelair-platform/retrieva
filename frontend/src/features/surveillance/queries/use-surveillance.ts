@@ -16,7 +16,7 @@ export function useAcknowledgeEventMutation() {
   return useMutation({
     mutationFn: (id: string) => surveillanceApi.acknowledge(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['surveillance-events'] });
+      void qc.invalidateQueries({ queryKey: ['surveillance-events'] });
     },
   });
 }
@@ -27,7 +27,7 @@ export function useResolveEventMutation() {
   return useMutation({
     mutationFn: (id: string) => surveillanceApi.resolve(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['surveillance-events'] });
+      void qc.invalidateQueries({ queryKey: ['surveillance-events'] });
     },
   });
 }

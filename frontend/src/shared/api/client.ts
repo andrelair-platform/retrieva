@@ -93,25 +93,31 @@ const processQueue = (error: Error | null) => {
   failedQueue = [];
 };
 
+// Return the value as a non-empty string, or null otherwise.
+function asNonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+// Pull a `workspaceId` property off a params/data object that may be unknown-typed.
+function pluckWorkspaceId(source: unknown): unknown {
+  return source && typeof source === 'object' && 'workspaceId' in (source as Record<string, unknown>)
+    ? (source as Record<string, unknown>).workspaceId
+    : null;
+}
+
 function getWorkspaceIdFromConfig(config: InternalAxiosRequestConfig): string | null {
-  const headerWorkspaceId = config.headers?.['X-Workspace-Id'];
-  if (typeof headerWorkspaceId === 'string' && headerWorkspaceId.length > 0) {
+  const headerWorkspaceId = asNonEmptyString(config.headers?.['X-Workspace-Id']);
+  if (headerWorkspaceId) {
     return headerWorkspaceId;
   }
 
-  const paramsWorkspaceId =
-    config.params && typeof config.params === 'object' && 'workspaceId' in config.params
-      ? config.params.workspaceId
-      : null;
-  if (typeof paramsWorkspaceId === 'string' && paramsWorkspaceId.length > 0) {
+  const paramsWorkspaceId = asNonEmptyString(pluckWorkspaceId(config.params));
+  if (paramsWorkspaceId) {
     return paramsWorkspaceId;
   }
 
-  const dataWorkspaceId =
-    config.data && typeof config.data === 'object' && 'workspaceId' in (config.data as Record<string, unknown>)
-      ? (config.data as Record<string, unknown>).workspaceId
-      : null;
-  if (typeof dataWorkspaceId === 'string' && dataWorkspaceId.length > 0) {
+  const dataWorkspaceId = asNonEmptyString(pluckWorkspaceId(config.data));
+  if (dataWorkspaceId) {
     return dataWorkspaceId;
   }
 
@@ -130,6 +136,46 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Auth endpoints (and /auth/me init check) must not trigger a refresh-retry loop.
+const NO_REFRESH_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/me'];
+function isNoRefreshRetryUrl(url: string | undefined): boolean {
+  return NO_REFRESH_RETRY_PATHS.some((p) => url?.includes(p));
+}
+
+// Clear auth state and send the user back to login after a failed refresh.
+function handleRefreshFailure(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  clearActiveWorkspaceContextId();
+  // ISSUE #40 FIX: Dispatch secure logout event with token
+  // This prevents malicious scripts from triggering forced logouts
+  dispatchSecureLogout();
+
+  // Only redirect if not already on a public page
+  const currentPath = window.location.pathname;
+  if (!isPublicAuthPath(currentPath)) {
+    redirectToLogin();
+  }
+}
+
+// Perform the refresh + replay the original request; on failure, clean up + reject.
+async function refreshAndRetry(originalRequest: InternalAxiosRequestConfig) {
+  isRefreshing = true;
+  try {
+    // ISSUE #48 FIX: Attempt to refresh the token with retries and backoff
+    await attemptTokenRefresh();
+    processQueue(null);
+    return apiClient(originalRequest);
+  } catch (refreshError) {
+    processQueue(refreshError as Error);
+    handleRefreshFailure();
+    return Promise.reject(refreshError);
+  } finally {
+    isRefreshing = false;
+  }
+}
+
 // Response interceptor - handle 401 and token refresh
 apiClient.interceptors.response.use(
   (response) => response,
@@ -141,12 +187,7 @@ apiClient.interceptors.response.use(
     // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Don't retry for auth endpoints or /auth/me (initialization check)
-      if (
-        originalRequest.url?.includes('/auth/login') ||
-        originalRequest.url?.includes('/auth/register') ||
-        originalRequest.url?.includes('/auth/refresh') ||
-        originalRequest.url?.includes('/auth/me')
-      ) {
+      if (isNoRefreshRetryUrl(originalRequest.url)) {
         return Promise.reject(error);
       }
 
@@ -164,32 +205,7 @@ apiClient.interceptors.response.use(
       }
 
       originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // ISSUE #48 FIX: Attempt to refresh the token with retries and backoff
-        await attemptTokenRefresh();
-        processQueue(null);
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError as Error);
-        // Clear auth state and redirect to login
-        if (typeof window !== 'undefined') {
-          clearActiveWorkspaceContextId();
-          // ISSUE #40 FIX: Dispatch secure logout event with token
-          // This prevents malicious scripts from triggering forced logouts
-          dispatchSecureLogout();
-
-          // Only redirect if not already on a public page
-          const currentPath = window.location.pathname;
-          if (!isPublicAuthPath(currentPath)) {
-            redirectToLogin();
-          }
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+      return refreshAndRetry(originalRequest);
     }
 
     return Promise.reject(error);
@@ -214,65 +230,84 @@ const ERROR_MESSAGES: Record<string, string> = {
   'Request failed with status code 504': 'The server took too long to respond. Please try again.',
 };
 
+// User-friendly copy for specific HTTP status codes.
+const STATUS_MESSAGES: Record<number, string> = {
+  401: 'Invalid email or password. Please try again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested resource was not found.',
+  429: 'Too many requests. Please wait a moment and try again.',
+};
+
+// First ERROR_MESSAGES copy whose pattern the message contains, else null.
+function matchErrorPattern(message: string): string | null {
+  for (const [pattern, friendlyMessage] of Object.entries(ERROR_MESSAGES)) {
+    if (message.includes(pattern)) {
+      return friendlyMessage;
+    }
+  }
+  return null;
+}
+
+// Extract a backend `message`, preferring the first field-level validation error.
+function getBackendMessage(responseData: ApiResponse | undefined): string | null {
+  if (!responseData?.message) {
+    return null;
+  }
+  const errors = (responseData as unknown as Record<string, unknown>).errors;
+  if (Array.isArray(errors) && errors.length > 0 && errors[0]?.message) {
+    return errors[0].message;
+  }
+  return responseData.message;
+}
+
+// Friendly copy for a transport-level error code (no HTTP response), else null.
+function matchNetworkCode(axiosError: AxiosError<ApiResponse>): string | null {
+  if (!axiosError.response && axiosError.code) {
+    return ERROR_MESSAGES[axiosError.code] ?? null;
+  }
+  return null;
+}
+
+function getAxiosErrorMessage(axiosError: AxiosError<ApiResponse>): string {
+  // Check for specific HTTP status codes
+  const status = axiosError.response?.status;
+  const statusMessage = status ? STATUS_MESSAGES[status] : undefined;
+  if (statusMessage) {
+    return statusMessage;
+  }
+
+  // Check for backend error message with field-level validation errors
+  const backendMessage = getBackendMessage(axiosError.response?.data);
+  if (backendMessage) {
+    return backendMessage;
+  }
+
+  // Check for known error patterns and return user-friendly message
+  const errorMsg = axiosError.message || '';
+  const patternMessage = matchErrorPattern(errorMsg);
+  if (patternMessage) {
+    return patternMessage;
+  }
+
+  // Check for network errors without response
+  const networkMessage = matchNetworkCode(axiosError);
+  if (networkMessage) {
+    return networkMessage;
+  }
+
+  // Fallback
+  return errorMsg || 'An error occurred. Please try again.';
+}
+
 // Helper function to extract error message from API response
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiResponse>;
-
-    // Check for specific HTTP status codes
-    const status = axiosError.response?.status;
-    if (status === 401) {
-      return 'Invalid email or password. Please try again.';
-    }
-    if (status === 403) {
-      return 'You do not have permission to perform this action.';
-    }
-    if (status === 404) {
-      return 'The requested resource was not found.';
-    }
-    if (status === 429) {
-      return 'Too many requests. Please wait a moment and try again.';
-    }
-
-    // Check for backend error message with field-level validation errors
-    const responseData = axiosError.response?.data;
-    if (responseData?.message) {
-      // If there are detailed validation errors, include the first field message
-      const errors = (responseData as unknown as Record<string, unknown>).errors;
-      if (Array.isArray(errors) && errors.length > 0 && errors[0]?.message) {
-        return errors[0].message;
-      }
-      return responseData.message;
-    }
-
-    // Check for known error patterns and return user-friendly message
-    const errorMsg = axiosError.message || '';
-    for (const [pattern, friendlyMessage] of Object.entries(ERROR_MESSAGES)) {
-      if (errorMsg.includes(pattern)) {
-        return friendlyMessage;
-      }
-    }
-
-    // Check for network errors without response
-    if (!axiosError.response && axiosError.code) {
-      const friendlyMessage = ERROR_MESSAGES[axiosError.code];
-      if (friendlyMessage) {
-        return friendlyMessage;
-      }
-    }
-
-    // Fallback
-    return errorMsg || 'An error occurred. Please try again.';
+    return getAxiosErrorMessage(error as AxiosError<ApiResponse>);
   }
 
   if (error instanceof Error) {
     // Check for known error patterns
-    for (const [pattern, friendlyMessage] of Object.entries(ERROR_MESSAGES)) {
-      if (error.message.includes(pattern)) {
-        return friendlyMessage;
-      }
-    }
-    return error.message;
+    return matchErrorPattern(error.message) ?? error.message;
   }
 
   return 'An unexpected error occurred. Please try again.';

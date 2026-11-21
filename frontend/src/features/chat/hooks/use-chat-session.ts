@@ -1,5 +1,6 @@
 'use client';
 
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -16,6 +17,106 @@ import type { Conversation, Message } from '@/types';
 
 const EMPTY_MESSAGES: Message[] = [];
 
+function buildUserMessage(messageId: string, conversationId: string, question: string): Message {
+  return {
+    id: messageId,
+    conversationId,
+    role: 'user',
+    content: question,
+    createdAt: new Date().toISOString(),
+    feedback: null,
+  };
+}
+
+/** Drop a trailing empty assistant placeholder before a retry/regenerate re-stream. */
+function dropTrailingEmptyAssistant(messages: Message[]): Message[] {
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage?.role === 'assistant' && !lastMessage.content) {
+    return messages.slice(0, -1);
+  }
+  return messages;
+}
+
+/** Find the user message preceding a given assistant message id, or null if not regenerable. */
+function findUserMessageToRegenerate(messages: Message[], messageId: string): Message | null {
+  const messageIndex = messages.findIndex((message) => message.id === messageId);
+  if (messageIndex <= 0) return null;
+
+  const userMessage = messages[messageIndex - 1];
+  if (userMessage?.role !== 'user') return null;
+  return userMessage;
+}
+
+interface SendDispatchDeps {
+  canQuery: boolean;
+  activeWorkspace: ReturnType<typeof useActiveWorkspace>;
+  conversation?: Conversation;
+  setPendingQuestion: (value: string | null) => void;
+  createConversationMutation: ReturnType<typeof useCreateConversationMutation>;
+  sendWithConversation: (question: string, conversationId: string, workspaceId: string | null) => void;
+}
+
+/**
+ * First-message handoff (issue #397): when this conversation page mounts right
+ * after being created on /chat, send the stashed question once. takePending…
+ * clears it, so StrictMode's double-invoke can't double-send.
+ */
+function usePendingFirstMessageHandoff(
+  conversationId: string | undefined,
+  send: (question: string, conversationId: string, workspaceId: string | null) => void
+): void {
+  useEffect(() => {
+    if (!conversationId) return;
+    const handoff = takePendingFirstMessage(conversationId);
+    if (handoff) {
+      send(handoff.question, conversationId, handoff.workspaceId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+}
+
+interface RegenerateDeps {
+  localMessages: Message[];
+  setLocalMessages: Dispatch<SetStateAction<Message[]>>;
+  conversation?: Conversation;
+  startStreaming: ReturnType<typeof useStreaming>['startStreaming'];
+  activeWorkspace: ReturnType<typeof useActiveWorkspace>;
+}
+
+/** Drop the last assistant message and re-stream the preceding user message. */
+function regenerate(messageId: string, deps: RegenerateDeps): void {
+  const { localMessages, setLocalMessages, conversation, startStreaming, activeWorkspace } = deps;
+  const userMessage = findUserMessageToRegenerate(localMessages, messageId);
+  if (!userMessage) return;
+
+  setLocalMessages((prev) => prev.slice(0, -1));
+  if (conversation?.id) {
+    void startStreaming(userMessage.content, conversation.id, activeWorkspace?.id);
+  }
+}
+
+/** Validate + route a send: permission/workspace guards, then create-conversation or stream. */
+function dispatchSend(question: string, deps: SendDispatchDeps): void {
+  const { canQuery, activeWorkspace, conversation, setPendingQuestion, createConversationMutation, sendWithConversation } = deps;
+  if (!canQuery) {
+    toast.error('You do not have permission to ask questions');
+    return;
+  }
+
+  if (!activeWorkspace) {
+    toast.error('Please select a workspace');
+    return;
+  }
+
+  if (!conversation) {
+    setPendingQuestion(question);
+    createConversationMutation.mutate(question);
+    return;
+  }
+
+  sendWithConversation(question, conversation.id, activeWorkspace.id);
+}
+
 interface UseChatSessionOptions {
   conversation?: Conversation;
   messages?: Message[];
@@ -23,113 +124,14 @@ interface UseChatSessionOptions {
   onMessageAdded?: (message: Message) => void;
 }
 
-export function useChatSession({
-  conversation,
-  messages,
-  onConversationCreated,
-  onMessageAdded,
-}: UseChatSessionOptions) {
-  const queryClient = useQueryClient();
-  const activeWorkspace = useActiveWorkspace();
-  const { canQuery, canViewSources } = usePermissions();
-  const canViewSourcesRef = useRef(canViewSources);
-  const stableMessages = messages ?? EMPTY_MESSAGES;
-  const [localMessages, setLocalMessages] = useState<Message[]>(stableMessages);
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const lastQuestionRef = useRef<{
-    question: string;
-    conversationId: string;
-    workspaceId: string | null;
-  } | null>(null);
-  const optimisticUserMessageIdRef = useRef<string | null>(null);
-  const [hasLastQuestion, setHasLastQuestion] = useState(false);
-
-  useEffect(() => {
-    canViewSourcesRef.current = canViewSources;
-  }, [canViewSources]);
-
-  useEffect(() => {
-    if (stableMessages.length > 0 || localMessages.length > 0) {
-      // Keep the optimistic message buffer aligned with server-driven message resets.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLocalMessages(stableMessages);
-    }
-  }, [stableMessages, localMessages.length]);
-
-  const {
-    content: streamingContent,
-    status: streamingStatus,
-    sources: streamingSources,
-    isStreaming,
-    error: streamingError,
-    startStreaming,
-    stopStreaming,
-  } = useStreaming({
-    onComplete: (content, sources) => {
-      optimisticUserMessageIdRef.current = null;
-      const assistantMessage: Message = {
-        id: `temp-${Date.now()}`,
-        conversationId: conversation?.id || '',
-        role: 'assistant',
-        content,
-        sources: canViewSourcesRef.current ? sources : undefined,
-        createdAt: new Date().toISOString(),
-        feedback: null,
-      };
-      setLocalMessages((prev) => [...prev, assistantMessage]);
-      onMessageAdded?.(assistantMessage);
-
-      if (conversation?.id) {
-        queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
-      }
-    },
-    onError: (error) => {
-      if (optimisticUserMessageIdRef.current) {
-        setLocalMessages((prev) =>
-          prev.filter((message) => message.id !== optimisticUserMessageIdRef.current)
-        );
-        optimisticUserMessageIdRef.current = null;
-      }
-      toast.error(error);
-    },
-  });
-
-  const handleSendWithConversation = useCallback(
-    async (question: string, conversationId: string, workspaceId: string | null) => {
-      lastQuestionRef.current = { question, conversationId, workspaceId };
-      setHasLastQuestion(true);
-
-      const messageId = `user-${Date.now()}`;
-      const userMessage: Message = {
-        id: messageId,
-        conversationId,
-        role: 'user',
-        content: question,
-        createdAt: new Date().toISOString(),
-        feedback: null,
-      };
-
-      optimisticUserMessageIdRef.current = messageId;
-      setLocalMessages((prev) => [...prev, userMessage]);
-      startStreaming(question, conversationId, workspaceId ?? undefined);
-    },
-    [startStreaming]
-  );
-
-  // First-message handoff (issue #397): when this conversation page mounts right
-  // after being created on /chat, send the stashed question once. takePending…
-  // clears it, so StrictMode's double-invoke can't double-send.
-  useEffect(() => {
-    if (!conversation?.id) return;
-    const handoff = takePendingFirstMessage(conversation.id);
-    if (handoff) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      handleSendWithConversation(handoff.question, conversation.id, handoff.workspaceId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id]);
-
-  const createConversationMutation = useMutation({
+function useCreateConversationMutation(opts: {
+  activeWorkspace: ReturnType<typeof useActiveWorkspace>;
+  pendingQuestion: string | null;
+  setPendingQuestion: (value: string | null) => void;
+  onConversationCreated?: (conversation: Conversation) => void;
+}) {
+  const { activeWorkspace, pendingQuestion, setPendingQuestion, onConversationCreated } = opts;
+  return useMutation({
     mutationFn: async (question: string) => {
       if (!activeWorkspace) {
         throw new Error('No workspace selected');
@@ -162,8 +164,61 @@ export function useChatSession({
       setPendingQuestion(null);
     },
   });
+}
 
-  const feedbackMutation = useMutation({
+function useChatStreaming(opts: {
+  conversation?: Conversation;
+  canViewSourcesRef: MutableRefObject<boolean>;
+  optimisticUserMessageIdRef: MutableRefObject<string | null>;
+  setLocalMessages: Dispatch<SetStateAction<Message[]>>;
+  onMessageAdded?: (message: Message) => void;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const {
+    conversation,
+    canViewSourcesRef,
+    optimisticUserMessageIdRef,
+    setLocalMessages,
+    onMessageAdded,
+    queryClient,
+  } = opts;
+  return useStreaming({
+    onComplete: (content, sources) => {
+      optimisticUserMessageIdRef.current = null;
+      const assistantMessage: Message = {
+        id: `temp-${Date.now()}`,
+        conversationId: conversation?.id || '',
+        role: 'assistant',
+        content,
+        sources: canViewSourcesRef.current ? sources : undefined,
+        createdAt: new Date().toISOString(),
+        feedback: null,
+      };
+      setLocalMessages((prev) => [...prev, assistantMessage]);
+      onMessageAdded?.(assistantMessage);
+
+      if (conversation?.id) {
+        void queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+      }
+    },
+    onError: (error) => {
+      if (optimisticUserMessageIdRef.current) {
+        setLocalMessages((prev) =>
+          prev.filter((message) => message.id !== optimisticUserMessageIdRef.current)
+        );
+        optimisticUserMessageIdRef.current = null;
+      }
+      toast.error(error);
+    },
+  });
+}
+
+function useFeedbackMutation(opts: {
+  conversation?: Conversation;
+  setLocalMessages: Dispatch<SetStateAction<Message[]>>;
+}) {
+  const { conversation, setLocalMessages } = opts;
+  return useMutation({
     mutationFn: async ({
       messageId,
       feedback,
@@ -183,28 +238,66 @@ export function useChatSession({
       toast.error('Failed to submit feedback');
     },
   });
+}
+
+function useChatHandlers({
+  conversation,
+  activeWorkspace,
+  canQuery,
+  localMessages,
+  setLocalMessages,
+  optimisticUserMessageIdRef,
+  startStreaming,
+  createConversationMutation,
+  feedbackMutation,
+  setPendingQuestion,
+}: {
+  conversation?: Conversation;
+  activeWorkspace: ReturnType<typeof useActiveWorkspace>;
+  canQuery: boolean;
+  localMessages: Message[];
+  setLocalMessages: Dispatch<SetStateAction<Message[]>>;
+  optimisticUserMessageIdRef: MutableRefObject<string | null>;
+  startStreaming: ReturnType<typeof useStreaming>['startStreaming'];
+  createConversationMutation: ReturnType<typeof useCreateConversationMutation>;
+  feedbackMutation: ReturnType<typeof useFeedbackMutation>;
+  setPendingQuestion: (value: string | null) => void;
+}) {
+  const lastQuestionRef = useRef<{
+    question: string;
+    conversationId: string;
+    workspaceId: string | null;
+  } | null>(null);
+  const [hasLastQuestion, setHasLastQuestion] = useState(false);
+
+  const handleSendWithConversation = useCallback(
+    async (question: string, conversationId: string, workspaceId: string | null) => {
+      lastQuestionRef.current = { question, conversationId, workspaceId };
+      setHasLastQuestion(true);
+      const messageId = `user-${Date.now()}`;
+      optimisticUserMessageIdRef.current = messageId;
+      setLocalMessages((prev) => [...prev, buildUserMessage(messageId, conversationId, question)]);
+      void startStreaming(question, conversationId, workspaceId ?? undefined);
+    },
+    [startStreaming, optimisticUserMessageIdRef, setLocalMessages]
+  );
+
+  usePendingFirstMessageHandoff(conversation?.id, (q, cId, wsId) =>
+    void handleSendWithConversation(q, cId, wsId)
+  );
 
   const handleSend = useCallback(
     async (question: string) => {
-      if (!canQuery) {
-        toast.error('You do not have permission to ask questions');
-        return;
-      }
-
-      if (!activeWorkspace) {
-        toast.error('Please select a workspace');
-        return;
-      }
-
-      if (!conversation) {
-        setPendingQuestion(question);
-        createConversationMutation.mutate(question);
-        return;
-      }
-
-      handleSendWithConversation(question, conversation.id, activeWorkspace.id);
+      dispatchSend(question, {
+        canQuery,
+        activeWorkspace,
+        conversation,
+        setPendingQuestion,
+        createConversationMutation,
+        sendWithConversation: (q, cId, wsId) => void handleSendWithConversation(q, cId, wsId),
+      });
     },
-    [activeWorkspace, canQuery, conversation, createConversationMutation, handleSendWithConversation]
+    [activeWorkspace, canQuery, conversation, createConversationMutation, handleSendWithConversation, setPendingQuestion]
   );
 
   const handleRetry = useCallback(() => {
@@ -214,15 +307,9 @@ export function useChatSession({
     }
 
     const { question, conversationId, workspaceId } = lastQuestionRef.current;
-    setLocalMessages((prev) => {
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage?.role === 'assistant' && !lastMessage.content) {
-        return prev.slice(0, -1);
-      }
-      return prev;
-    });
-    startStreaming(question, conversationId, workspaceId ?? undefined);
-  }, [startStreaming]);
+    setLocalMessages(dropTrailingEmptyAssistant);
+    void startStreaming(question, conversationId, workspaceId ?? undefined);
+  }, [startStreaming, setLocalMessages]);
 
   const handleFeedback = useCallback(
     (messageId: string, feedback: 'positive' | 'negative' | null) => {
@@ -231,18 +318,78 @@ export function useChatSession({
     [feedbackMutation]
   );
 
-  function handleRegenerate(messageId: string) {
-    const messageIndex = localMessages.findIndex((message) => message.id === messageId);
-    if (messageIndex <= 0) return;
+  const handleRegenerate = (messageId: string) =>
+    regenerate(messageId, { localMessages, setLocalMessages, conversation, startStreaming, activeWorkspace });
 
-    const userMessage = localMessages[messageIndex - 1];
-    if (userMessage?.role !== 'user') return;
+  return { hasLastQuestion, handleSend, handleRetry, handleFeedback, handleRegenerate };
+}
 
-    setLocalMessages((prev) => prev.slice(0, -1));
-    if (conversation?.id) {
-      startStreaming(userMessage.content, conversation.id, activeWorkspace?.id);
+export function useChatSession({
+  conversation,
+  messages,
+  onConversationCreated,
+  onMessageAdded,
+}: UseChatSessionOptions) {
+  const queryClient = useQueryClient();
+  const activeWorkspace = useActiveWorkspace();
+  const { canQuery, canViewSources } = usePermissions();
+  const canViewSourcesRef = useRef(canViewSources);
+  const stableMessages = messages ?? EMPTY_MESSAGES;
+  const [localMessages, setLocalMessages] = useState<Message[]>(stableMessages);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const optimisticUserMessageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    canViewSourcesRef.current = canViewSources;
+  }, [canViewSources]);
+
+  useEffect(() => {
+    if (stableMessages.length > 0 || localMessages.length > 0) {
+      // Keep the optimistic message buffer aligned with server-driven message resets.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocalMessages(stableMessages);
     }
-  }
+  }, [stableMessages, localMessages.length]);
+
+  const {
+    content: streamingContent,
+    status: streamingStatus,
+    sources: streamingSources,
+    isStreaming,
+    error: streamingError,
+    startStreaming,
+    stopStreaming,
+  } = useChatStreaming({
+    conversation,
+    canViewSourcesRef,
+    optimisticUserMessageIdRef,
+    setLocalMessages,
+    onMessageAdded,
+    queryClient,
+  });
+
+  const createConversationMutation = useCreateConversationMutation({
+    activeWorkspace,
+    pendingQuestion,
+    setPendingQuestion,
+    onConversationCreated,
+  });
+
+  const feedbackMutation = useFeedbackMutation({ conversation, setLocalMessages });
+
+  const { hasLastQuestion, handleSend, handleRetry, handleFeedback, handleRegenerate } =
+    useChatHandlers({
+      conversation,
+      activeWorkspace,
+      canQuery,
+      localMessages,
+      setLocalMessages,
+      optimisticUserMessageIdRef,
+      startStreaming,
+      createConversationMutation,
+      feedbackMutation,
+      setPendingQuestion,
+    });
 
   return {
     activeWorkspace,

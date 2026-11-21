@@ -19,6 +19,18 @@ import { useWorkspaceListQuery } from '@/lib/hooks';
 import { getRoleDisplayName, getRoleBadgeColor } from '@/lib/utils/permissions';
 import type { VendorTier, VendorStatus } from '@/types';
 
+const SYNC_DOT_CLASS: Record<string, string> = {
+  syncing: 'bg-yellow-500 animate-pulse',
+  error: 'bg-destructive',
+};
+const syncDotClass = (status: string): string => SYNC_DOT_CLASS[status] ?? 'bg-success';
+
+const SYNC_LABEL_KEY: Record<string, string> = {
+  syncing: 'workspaces.sync.syncing',
+  error: 'workspaces.sync.error',
+};
+const syncLabelKey = (status: string): string => SYNC_LABEL_KEY[status] ?? 'workspaces.sync.synced';
+
 function TierBadge({ tier }: { tier: VendorTier }) {
   const { t } = useTranslation();
   if (tier === 'critical') {
@@ -90,7 +102,7 @@ export function WorkspacesPage() {
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       router.replace('/workspaces', { scroll: false });
     } else if (error) {
       toast.error(t('workspaces.toast.connectFailed'), {
@@ -173,19 +185,9 @@ export function WorkspacesPage() {
                   {workspace.syncStatus && (
                     <span className="flex items-center gap-1">
                       <span
-                        className={`h-2 w-2 rounded-full ${
-                          workspace.syncStatus === 'syncing'
-                            ? 'bg-yellow-500 animate-pulse'
-                            : workspace.syncStatus === 'error'
-                              ? 'bg-destructive'
-                              : 'bg-success'
-                        }`}
+                        className={`h-2 w-2 rounded-full ${syncDotClass(workspace.syncStatus)}`}
                       />
-                      {workspace.syncStatus === 'syncing'
-                        ? t('workspaces.sync.syncing')
-                        : workspace.syncStatus === 'error'
-                          ? t('workspaces.sync.error')
-                          : t('workspaces.sync.synced')}
+                      {t(syncLabelKey(workspace.syncStatus))}
                     </span>
                   )}
                 </div>

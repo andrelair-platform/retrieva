@@ -15,6 +15,19 @@ import { MonitoringCard } from '@/features/workspaces/components/monitoring-card
 import { WorkspaceAssessmentsCard } from '@/features/workspaces/components/workspace-assessments-card';
 import { WorkspaceHeader } from '@/features/workspaces/components/workspace-header';
 import { useWorkspaceOverview } from '@/features/workspaces/hooks/use-workspace-overview';
+import type { WorkspaceWithMembership } from '@/types';
+
+// Any vendor-profile field is populated.
+function hasVendorProfile(ws: WorkspaceWithMembership): boolean {
+  return Boolean(
+    ws.vendorTier || ws.country || ws.serviceType || ws.contractStart || ws.contractEnd
+  );
+}
+
+// None of the contract/review dates are set.
+function hasNoContractDates(ws: WorkspaceWithMembership): boolean {
+  return !ws.contractStart && !ws.contractEnd && !ws.nextReviewDate;
+}
 
 function ContractDaysChip({ contractEnd }: { contractEnd: string }) {
   const { t } = useTranslation();
@@ -31,6 +44,7 @@ interface WorkspaceOverviewPageProps {
   params: Promise<{ id: string }>;
 }
 
+// eslint-disable-next-line complexity -- residual complexity is the two loading/not-found guard clauses plus ~8 intrinsic `field && <JSX>` conditional-render guards for the profile/contract cards; the extractable boolean logic (vendor-profile / no-dates) is already in helpers; cannot extract JSX per clean-code floor; tracked minicloud-gitops#2353
 export function WorkspaceOverviewPage({ params }: WorkspaceOverviewPageProps) {
   const { t } = useTranslation();
   const { id } = use(params);
@@ -66,12 +80,8 @@ export function WorkspaceOverviewPage({ params }: WorkspaceOverviewPageProps) {
   }
 
   const isOwner = workspace.membership.role === 'owner';
-  const hasVendorProfile =
-    workspace.vendorTier ||
-    workspace.country ||
-    workspace.serviceType ||
-    workspace.contractStart ||
-    workspace.contractEnd;
+  const showNoProfile = !hasVendorProfile(workspace);
+  const showNoDates = hasNoContractDates(workspace);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -114,7 +124,7 @@ export function WorkspaceOverviewPage({ params }: WorkspaceOverviewPageProps) {
                 <span>{workspace.country}</span>
               </div>
             )}
-            {!hasVendorProfile && (
+            {showNoProfile && (
               <p className="text-muted-foreground text-sm">
                 {t('workspaces.overview.noProfile1')}
                 {isOwner ? (
@@ -155,7 +165,7 @@ export function WorkspaceOverviewPage({ params }: WorkspaceOverviewPageProps) {
                 <span>{t('workspaces.overview.nextReview', { date: format(new Date(workspace.nextReviewDate), 'dd MMM yyyy') })}</span>
               </div>
             )}
-            {!workspace.contractStart && !workspace.contractEnd && !workspace.nextReviewDate && (
+            {showNoDates && (
               <p className="text-muted-foreground">{t('workspaces.overview.noDates')}</p>
             )}
           </CardContent>

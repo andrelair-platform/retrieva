@@ -61,6 +61,22 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
+// Derived view flags for the import dialog (keeps the ||/&& branches out of the component body).
+function estateImportState(
+  done: EstateImportSummary | null,
+  preview: EstateImportSummary | null,
+  busy: boolean
+) {
+  const summary = done ?? preview;
+  return {
+    summary,
+    showLoadingRow: busy && !summary,
+    hasErrors: (summary?.errors.length ?? 0) > 0,
+    importDisabled: busy || !preview || preview.created === 0,
+    importLabel: preview ? `Import ${preview.created} arrangements` : 'Import',
+  };
+}
+
 export function EstateImportDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -110,7 +126,11 @@ export function EstateImportDialog({ open, onOpenChange }: Props) {
     }
   };
 
-  const summary = done ?? preview;
+  const { summary, showLoadingRow, hasErrors, importDisabled, importLabel } = estateImportState(
+    done,
+    preview,
+    busy
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : close())}>
@@ -150,7 +170,7 @@ export function EstateImportDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {busy && !summary && (
+        {showLoadingRow && (
           <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Reading your file…
           </div>
@@ -173,7 +193,7 @@ export function EstateImportDialog({ open, onOpenChange }: Props) {
               </div>
             </div>
 
-            {summary.errors.length > 0 && (
+            {hasErrors && (
               <div className="max-h-48 overflow-y-auto rounded-md border">
                 {summary.errors.slice(0, 50).map((e) => (
                   <div key={e.row} className="flex items-start gap-2 border-b px-3 py-2 text-xs last:border-0">
@@ -204,9 +224,9 @@ export function EstateImportDialog({ open, onOpenChange }: Props) {
               <Button variant="ghost" onClick={close} disabled={busy}>
                 Cancel
               </Button>
-              <Button onClick={doImport} disabled={busy || !preview || preview.created === 0}>
+              <Button onClick={doImport} disabled={importDisabled}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {preview ? `Import ${preview.created} arrangements` : 'Import'}
+                {importLabel}
               </Button>
             </>
           )}

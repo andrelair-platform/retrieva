@@ -18,6 +18,7 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: 'Viewer',
 };
 
+// eslint-disable-next-line complexity -- complexity is the token/loading/error/no-invite guard-clause chain plus the authenticated-vs-register JSX branches; reducing further means collapsing guard clauses or extracting JSX, both disallowed by the clean-code floor; tracked minicloud-gitops#2353
 function JoinPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

@@ -37,108 +37,7 @@ type PageState =
     }
   | { type: 'submitted' };
 
-export default function VendorQuestionnairePage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
-  const { token } = use(params);
-
-  const [pageState, setPageState] = useState<PageState>({ type: 'loading' });
-  const [answers, setAnswers] = useState<Map<string, string>>(new Map());
-  const [currentCategoryIdx, setCurrentCategoryIdx] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Load form on mount
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await questionnairesApi.getPublicForm(token);
-
-        if (res.data?.alreadyComplete) {
-          setPageState({ type: 'already_complete' });
-          return;
-        }
-
-        const questions = res.data?.questions ?? [];
-        const vendorName = res.data?.vendorName ?? '';
-
-        // Pre-populate with any existing partial answers
-        const map = new Map<string, string>();
-        questions.forEach((q) => {
-          if (q.answer) map.set(q.id, q.answer);
-        });
-        setAnswers(map);
-        setPageState({ type: 'form', vendorName, questions });
-      } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'response' in err
-            ? (err as { response?: { status?: number } }).response?.status
-            : undefined;
-        if (status === 410) {
-          setPageState({ type: 'expired' });
-        } else if (status === 404) {
-          setPageState({ type: 'error', message: 'Questionnaire not found.' });
-        } else {
-          setPageState({ type: 'error', message: 'Unable to load questionnaire. Please try again.' });
-        }
-      }
-    };
-    load();
-  }, [token]);
-
-  const getQuestionsForCategory = useCallback(
-    (questions: QuestionnaireQuestion[], category: string) =>
-      questions.filter((q) => q.category === category),
-    []
-  );
-
-  const getCategories = useCallback((questions: QuestionnaireQuestion[]) => {
-    const presentCategories = new Set(questions.map((q) => q.category));
-    return CATEGORY_ORDER.filter((cat) => presentCategories.has(cat));
-  }, []);
-
-  const saveProgress = useCallback(
-    async (questions: QuestionnaireQuestion[], isFinal: boolean) => {
-      setIsSaving(true);
-      try {
-        const answersPayload = questions.map((q) => ({
-          id: q.id,
-          answer: answers.get(q.id) || '',
-        }));
-
-        await questionnairesApi.submitResponse(token, {
-          answers: answersPayload,
-          final: isFinal,
-        });
-
-        if (isFinal) {
-          setPageState({ type: 'submitted' });
-        }
-      } catch {
-        toast.error('Failed to save progress. Please try again.');
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [token, answers]
-  );
-
-  const handleNext = async (questions: QuestionnaireQuestion[], categories: string[]) => {
-    // Save partial progress on each step transition
-    await saveProgress(questions, false);
-    if (currentCategoryIdx < categories.length - 1) {
-      setCurrentCategoryIdx((i) => i + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const handleSubmit = async (questions: QuestionnaireQuestion[]) => {
-    await saveProgress(questions, true);
-  };
-
-  // ── Render states ─────────────────────────────────────────────────────────
-
+function renderTerminalState(pageState: PageState): React.ReactNode | null {
   if (pageState.type === 'loading') {
     return (
       <PublicLayout>
@@ -213,6 +112,118 @@ export default function VendorQuestionnairePage({
       </PublicLayout>
     );
   }
+
+  return null;
+}
+
+function getErrorStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'response' in err) {
+    return (err as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
+function errorStateForStatus(status: number | undefined): PageState {
+  if (status === 410) return { type: 'expired' };
+  if (status === 404) return { type: 'error', message: 'Questionnaire not found.' };
+  return { type: 'error', message: 'Unable to load questionnaire. Please try again.' };
+}
+
+export default function VendorQuestionnairePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = use(params);
+
+  const [pageState, setPageState] = useState<PageState>({ type: 'loading' });
+  const [answers, setAnswers] = useState<Map<string, string>>(new Map());
+  const [currentCategoryIdx, setCurrentCategoryIdx] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load form on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await questionnairesApi.getPublicForm(token);
+
+        if (res.data?.alreadyComplete) {
+          setPageState({ type: 'already_complete' });
+          return;
+        }
+
+        const questions = res.data?.questions ?? [];
+        const vendorName = res.data?.vendorName ?? '';
+
+        // Pre-populate with any existing partial answers
+        const map = new Map<string, string>();
+        questions.forEach((q) => {
+          if (q.answer) map.set(q.id, q.answer);
+        });
+        setAnswers(map);
+        setPageState({ type: 'form', vendorName, questions });
+      } catch (err: unknown) {
+        setPageState(errorStateForStatus(getErrorStatus(err)));
+      }
+    };
+    void load();
+  }, [token]);
+
+  const getQuestionsForCategory = useCallback(
+    (questions: QuestionnaireQuestion[], category: string) =>
+      questions.filter((q) => q.category === category),
+    []
+  );
+
+  const getCategories = useCallback((questions: QuestionnaireQuestion[]) => {
+    const presentCategories = new Set(questions.map((q) => q.category));
+    return CATEGORY_ORDER.filter((cat) => presentCategories.has(cat));
+  }, []);
+
+  const saveProgress = useCallback(
+    async (questions: QuestionnaireQuestion[], isFinal: boolean) => {
+      setIsSaving(true);
+      try {
+        const answersPayload = questions.map((q) => ({
+          id: q.id,
+          answer: answers.get(q.id) || '',
+        }));
+
+        await questionnairesApi.submitResponse(token, {
+          answers: answersPayload,
+          final: isFinal,
+        });
+
+        if (isFinal) {
+          setPageState({ type: 'submitted' });
+        }
+      } catch {
+        toast.error('Failed to save progress. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [token, answers]
+  );
+
+  const handleNext = async (questions: QuestionnaireQuestion[], categories: string[]) => {
+    // Save partial progress on each step transition
+    await saveProgress(questions, false);
+    if (currentCategoryIdx < categories.length - 1) {
+      setCurrentCategoryIdx((i) => i + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleSubmit = async (questions: QuestionnaireQuestion[]) => {
+    await saveProgress(questions, true);
+  };
+
+  // ── Render states ─────────────────────────────────────────────────────────
+
+  const terminalState = renderTerminalState(pageState);
+  if (terminalState) return terminalState;
+  if (pageState.type !== 'form') return null;
 
   // ── Main form ─────────────────────────────────────────────────────────────
 

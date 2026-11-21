@@ -109,6 +109,34 @@ function daysToDue(iso: string | null): number | null {
   return Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
+/**
+ * Classify a risk's remediation-due state into a single discriminant so the render markup
+ * reads one value instead of chaining several numeric comparisons (keeps complexity down).
+ * - 'overdue'   → past the deadline (dd < 0)
+ * - 'due-soon'  → within the next 7 days (0 ≤ dd ≤ 7)
+ * - 'none'      → not applicable / not in the remediation loop / no imminent deadline
+ */
+type DueState = { kind: 'overdue' | 'due-soon'; days: number } | { kind: 'none' };
+function dueState(inLoop: boolean, dd: number | null): DueState {
+  if (!inLoop || dd === null) return { kind: 'none' };
+  if (dd < 0) return { kind: 'overdue', days: Math.abs(dd) };
+  if (dd <= 7) return { kind: 'due-soon', days: dd };
+  return { kind: 'none' };
+}
+
+// Finding-status → Badge styling (lookup maps keep the render markup free of nested ternaries).
+type FindingStatus = 'draft' | 'approved' | 'rejected';
+const FINDING_BADGE_VARIANT: Record<FindingStatus, 'default' | 'destructive' | 'outline'> = {
+  approved: 'default',
+  rejected: 'destructive',
+  draft: 'outline',
+};
+const FINDING_BADGE_CLASS: Record<FindingStatus, string> = {
+  approved: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100',
+  rejected: '',
+  draft: '',
+};
+
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -118,6 +146,20 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/** Non-null fallback mirroring the original inline `value || '—'` (empty string → dash). */
+function orDash(v: string | null | undefined): string {
+  return v || '—';
+}
+/** Nullish fallback mirroring the original inline `value ?? '—'` (empty string preserved). */
+function nullishDash(v: string | null | undefined): string {
+  return v ?? '—';
+}
+/** Comma-joined data classes, or a dash when empty — mirrors the original inline ternary. */
+function dataClassesLabel(classes: string[] | null | undefined): string {
+  return classes?.length ? classes.join(', ') : '—';
+}
+
+// eslint-disable-next-line complexity -- residual complexity is conditional JSX rendering (type-narrowing `{x && <…>}` / `{x ? <…> : <…>}` gates) that cannot be collapsed without splitting the render markup into sub-components; all reducible non-JSX logic was extracted (dueState/FINDING_BADGE_* maps, orDash/nullishDash/dataClassesLabel, assessInFlight/assessDisabled); tracked minicloud-gitops#2353
 export function ArrangementDetailPage({ id }: { id: string }) {
   const router = useRouter();
   const qc = useQueryClient();
@@ -137,7 +179,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     mutationFn: () => arrangementsApi.runAssessment(id),
     onSuccess: () => {
       toast.success('Assessment queued — findings will appear shortly');
-      qc.invalidateQueries({ queryKey: ['findings', id] });
+      void qc.invalidateQueries({ queryKey: ['findings', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -157,11 +199,11 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     mutationFn: (t: string) => arrangementsApi.setLifecycle(id, t),
     onSuccess: (_res, t) => {
       toast.success(`${TRANSITION_LABEL[t] ?? t} — done`);
-      qc.invalidateQueries({ queryKey: ['arrangement-lifecycle', id] });
-      qc.invalidateQueries({ queryKey: ['arrangement', id] });
-      qc.invalidateQueries({ queryKey: ['arrangements'] });
+      void qc.invalidateQueries({ queryKey: ['arrangement-lifecycle', id] });
+      void qc.invalidateQueries({ queryKey: ['arrangement', id] });
+      void qc.invalidateQueries({ queryKey: ['arrangements'] });
       // lifecycle change → the pre-contract gate/transitions change → refresh the readiness pack
-      qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
+      void qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
     },
     onError: (e) => {
       const msg = getErrorMessage(e);
@@ -184,7 +226,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   // without a manual reload (fixes the stale "Assessment run ❌" after a run completes).
   const findingsUpdatedAt = findingsQuery.dataUpdatedAt;
   useEffect(() => {
-    if (preContract) qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
+    if (preContract) void qc.invalidateQueries({ queryKey: ['onboarding-decision', id] });
   }, [findingsUpdatedAt, preContract, id, qc]);
   // RTV-43 — the remediation loop: gaps a checker approved into tracked Risks.
   const { data: risks = [] } = useRisksQuery(id);
@@ -204,8 +246,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       setCat('');
       setExpiry('');
       setEvOpen(false);
-      qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
-      qc.invalidateQueries({ queryKey: ['evidence-checklist', id] });
+      void qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
+      void qc.invalidateQueries({ queryKey: ['evidence-checklist', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -224,7 +266,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       setReqLink(token ? `${window.location.origin}/v/evidence/${token}` : null);
       setReqEmail('');
       setReqMessage('');
-      qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
+      void qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
       toast.success('Evidence request created — share the link with the vendor');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -232,7 +274,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
   const revokeRequest = useMutation({
     mutationFn: (requestId: string) => arrangementsApi.revokeEvidenceRequest(id, requestId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
+      void qc.invalidateQueries({ queryKey: ['evidence-requests', id] });
       toast.success('Request revoked');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -243,7 +285,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     onSuccess: () => {
       toast.success('Document ingested — the next assessment can cite it');
       setEvOpen(false);
-      qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
+      void qc.invalidateQueries({ queryKey: ['arrangement-evidence', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -254,8 +296,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
     onSuccess: (res) => {
       // approving a gap verdict opens a Risk (RTV-43) → surface it + refresh the remediation loop.
       toast.success(res.data?.risk ? 'Approved — a risk was opened in the remediation loop' : 'Decision recorded');
-      qc.invalidateQueries({ queryKey: ['findings', id] });
-      qc.invalidateQueries({ queryKey: ['risks', id] });
+      void qc.invalidateQueries({ queryKey: ['findings', id] });
+      void qc.invalidateQueries({ queryKey: ['risks', id] });
     },
     onError: (e) => {
       const msg = getErrorMessage(e);
@@ -272,7 +314,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       arrangementsApi.updateRisk(id, v.riskId, v.status, v.reason),
     onSuccess: (_res, v) => {
       toast.success(v.status === 'accepted' ? 'Risk accepted' : `Risk moved to ${v.status}`);
-      qc.invalidateQueries({ queryKey: ['risks', id] });
+      void qc.invalidateQueries({ queryKey: ['risks', id] });
       setAcceptFor(null);
       setAcceptReason('');
     },
@@ -290,7 +332,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
       arrangementsApi.setRiskDueDate(id, v.riskId, v.dueDate),
     onSuccess: (_res, v) => {
       toast.success(v.dueDate ? 'Remediation deadline set' : 'Deadline cleared');
-      qc.invalidateQueries({ queryKey: ['risks', id] });
+      void qc.invalidateQueries({ queryKey: ['risks', id] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -313,8 +355,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           ? 'Notice logged — the arrangement was reopened for reassessment'
           : 'Notice logged'
       );
-      qc.invalidateQueries({ queryKey: ['arrangement', id] });
-      qc.invalidateQueries({ queryKey: ['risks', id] });
+      void qc.invalidateQueries({ queryKey: ['arrangement', id] });
+      void qc.invalidateQueries({ queryKey: ['risks', id] });
       setNoticeOpen(false);
       setNoticeSummary('');
       setNoticeRef('');
@@ -324,6 +366,10 @@ export function ArrangementDetailPage({ id }: { id: string }) {
 
   if (isLoading) return <div className="page-container max-w-5xl mx-auto space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
   if (!arrangement) return <div className="page-container max-w-5xl mx-auto">Arrangement not found.</div>;
+
+  // Reused derived display booleans (hoisted so each operator is counted once, not per JSX use).
+  const assessInFlight = assessing && findings.length === 0;
+  const assessDisabled = assess.isPending || assessInFlight;
 
   return (
     <div className="page-container max-w-5xl mx-auto">
@@ -343,10 +389,10 @@ export function ArrangementDetailPage({ id }: { id: string }) {
             <Button
               size="sm"
               onClick={() => assess.mutate()}
-              disabled={assess.isPending || (assessing && findings.length === 0)}
+              disabled={assessDisabled}
             >
               <Play className="h-4 w-4 mr-2" />
-              {assessing && findings.length === 0 ? 'Assessing…' : 'Run assessment'}
+              {assessInFlight ? 'Assessing…' : 'Run assessment'}
             </Button>
           </div>
         }
@@ -395,10 +441,10 @@ export function ArrangementDetailPage({ id }: { id: string }) {
         <Field label="Type" value={<ArrangementTypeBadge value={arrangement.arrangementType} />} />
         <Field label="Criticality" value={<CriticalityBadge value={arrangement.criticality} />} />
         <Field label="ICT service" value={arrangement.ictServiceName} />
-        <Field label="Data residency" value={arrangement.dataResidency || '—'} />
-        <Field label="Dependency" value={arrangement.dependency ?? '—'} />
-        <Field label="Exit difficulty" value={arrangement.exitDifficulty ?? '—'} />
-        <Field label="Data classes" value={arrangement.dataClasses?.length ? arrangement.dataClasses.join(', ') : '—'} />
+        <Field label="Data residency" value={orDash(arrangement.dataResidency)} />
+        <Field label="Dependency" value={nullishDash(arrangement.dependency)} />
+        <Field label="Exit difficulty" value={nullishDash(arrangement.exitDifficulty)} />
+        <Field label="Data classes" value={dataClassesLabel(arrangement.dataClasses)} />
         <Field label="CIF" value={arrangement.criticalOrImportant ? <Badge variant="destructive" className="text-xs">Yes</Badge> : 'No'} />
       </div>
 
@@ -474,7 +520,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
                     )}
                     {r.status === 'pending' && r.token && (
                       <Button size="icon" variant="ghost" className="h-6 w-6" title="Copy vendor link"
-                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/v/evidence/${r.token}`); toast.success('Link copied'); }}>
+                        onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/v/evidence/${r.token}`); toast.success('Link copied'); }}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -537,7 +583,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
             <span>
               {findings.filter((f) => f.stale).length} finding(s) are out of date — evidence changed since the last assessment.
             </span>
-            <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => assess.mutate()} disabled={assess.isPending || (assessing && findings.length === 0)}>
+            <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => assess.mutate()} disabled={assessDisabled}>
               Re-assess
             </Button>
           </div>
@@ -570,8 +616,8 @@ export function ArrangementDetailPage({ id }: { id: string }) {
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <Badge
-                            variant={f.status === 'approved' ? 'default' : f.status === 'rejected' ? 'destructive' : 'outline'}
-                            className={`text-[10px] ${f.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' : ''}`}
+                            variant={FINDING_BADGE_VARIANT[f.status]}
+                            className={`text-[10px] ${FINDING_BADGE_CLASS[f.status]}`}
                           >
                             {f.status}
                           </Badge>
@@ -636,19 +682,19 @@ export function ArrangementDetailPage({ id }: { id: string }) {
           <div className="rounded-md border divide-y">
             {risks.map((r) => {
               const nexts = RISK_TRANSITIONS[r.status] ?? [];
-              const dd = daysToDue(r.dueDate);
               const inLoop = r.status === 'open' || r.status === 'mitigating';
+              const due = dueState(inLoop, daysToDue(r.dueDate));
               return (
                 <div key={r.id} className="px-3 py-2.5 text-sm space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs">{r.controlId}</span>
                     <RiskSeverityBadge value={r.severity} />
                     <RiskStatusBadge value={r.status} />
-                    {inLoop && dd !== null && dd < 0 && (
-                      <Badge variant="destructive" className="text-[10px]">overdue {Math.abs(dd)}d</Badge>
+                    {due.kind === 'overdue' && (
+                      <Badge variant="destructive" className="text-[10px]">overdue {due.days}d</Badge>
                     )}
-                    {inLoop && dd !== null && dd >= 0 && dd <= 7 && (
-                      <Badge variant="outline" className="text-[10px] text-amber-600">due in {dd}d</Badge>
+                    {due.kind === 'due-soon' && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600">due in {due.days}d</Badge>
                     )}
                   </div>
                   {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
@@ -832,7 +878,7 @@ export function ArrangementDetailPage({ id }: { id: string }) {
               <div className="flex items-center gap-2">
                 <Input readOnly value={reqLink} className="text-xs" onFocus={(e) => e.target.select()} />
                 <Button size="icon" variant="outline" className="shrink-0" title="Copy"
-                  onClick={() => { navigator.clipboard.writeText(reqLink); toast.success('Link copied'); }}>
+                  onClick={() => { void navigator.clipboard.writeText(reqLink); toast.success('Link copied'); }}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>

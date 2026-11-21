@@ -3,6 +3,7 @@
 import { useActiveWorkspace } from '@/lib/hooks';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import type { WorkspacePermissions, WorkspaceRole } from '@/types';
 
 // Granular permissions stored in membership
 type GranularPermission = 'canQuery' | 'canViewSources' | 'canInvite';
@@ -16,6 +17,31 @@ interface RequirePermissionProps {
   fallback?: React.ReactNode;
 }
 
+// Resolve whether the given role/permissions grant a permission (shared by both components).
+function computeHasPermission(
+  role: WorkspaceRole | undefined,
+  permissions: WorkspacePermissions | undefined,
+  permission: Permission
+): boolean {
+  const isOwner = role === 'owner';
+  const isMember = role === 'member';
+
+  // Owners always have all permissions
+  if (isOwner) {
+    return true;
+  }
+  if (permission === 'canTriggerSync' || permission === 'canViewAnalytics') {
+    // These are available to members and owners
+    return isMember;
+  }
+  if (permission === 'canManageMembers') {
+    // Only owners can manage members
+    return false;
+  }
+  // Granular permissions from membership
+  return permissions?.[permission as GranularPermission] === true;
+}
+
 /**
  * Component that renders children only if user has the specified permission.
  * Used for hiding UI elements based on granular workspace permissions.
@@ -27,28 +53,8 @@ export function RequirePermission({
 }: RequirePermissionProps) {
   const activeWorkspace = useActiveWorkspace();
   const membership = activeWorkspace?.membership;
-  const role = membership?.role;
-  const permissions = membership?.permissions;
 
-  // Owners always have all permissions
-  const isOwner = role === 'owner';
-  const isMember = role === 'member';
-
-  // Check permission based on type
-  let hasPermission = false;
-
-  if (isOwner) {
-    hasPermission = true;
-  } else if (permission === 'canTriggerSync' || permission === 'canViewAnalytics') {
-    // These are available to members and owners
-    hasPermission = isMember;
-  } else if (permission === 'canManageMembers') {
-    // Only owners can manage members
-    hasPermission = false;
-  } else {
-    // Granular permissions from membership
-    hasPermission = permissions?.[permission as GranularPermission] === true;
-  }
+  const hasPermission = computeHasPermission(membership?.role, membership?.permissions, permission);
 
   if (!hasPermission) {
     return <>{fallback}</>;
@@ -84,23 +90,9 @@ export function DisabledWithTooltip({
 }: DisabledWithTooltipProps) {
   const activeWorkspace = useActiveWorkspace();
   const membership = activeWorkspace?.membership;
-  const role = membership?.role;
-  const permissions = membership?.permissions;
-  const isOwner = role === 'owner';
-  const isMember = role === 'member';
 
   // Check permission based on type (same logic as RequirePermission)
-  let hasPermission = false;
-
-  if (isOwner) {
-    hasPermission = true;
-  } else if (permission === 'canTriggerSync' || permission === 'canViewAnalytics') {
-    hasPermission = isMember;
-  } else if (permission === 'canManageMembers') {
-    hasPermission = false;
-  } else {
-    hasPermission = permissions?.[permission as GranularPermission] === true;
-  }
+  const hasPermission = computeHasPermission(membership?.role, membership?.permissions, permission);
 
   if (hasPermission) {
     return children;

@@ -16,10 +16,10 @@ export function useDecisionQueueQuery() {
 function useInvalidateDecisionState() {
   const qc = useQueryClient();
   return (arrangementId?: string) => {
-    qc.invalidateQueries({ queryKey: ['decision-queue'] });
+    void qc.invalidateQueries({ queryKey: ['decision-queue'] });
     if (arrangementId) {
-      qc.invalidateQueries({ queryKey: ['findings', arrangementId] });
-      qc.invalidateQueries({ queryKey: ['risks', arrangementId] });
+      void qc.invalidateQueries({ queryKey: ['findings', arrangementId] });
+      void qc.invalidateQueries({ queryKey: ['risks', arrangementId] });
     }
   };
 }

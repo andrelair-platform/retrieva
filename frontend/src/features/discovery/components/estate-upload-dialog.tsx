@@ -24,6 +24,35 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+/** Derived flags for the upload dialog's render (keeps the component branch-light). */
+function uploadFlags(preview: GenericPreview | null, busy: boolean, file: File | null) {
+  const hasProvider = Boolean(preview?.mapping.provider);
+  return {
+    hasProvider,
+    showPreviewSpinner: busy && !preview,
+    showRunSpinner: busy && Boolean(preview),
+    runDisabled: busy || !preview || !hasProvider,
+    pv: preview ? previewDisplay(preview) : null,
+    fileName: file ? file.name : 'Choose a CSV / XLSX export',
+    runLabel: preview ? `Add ${preview.rowCount} vendors to the inbox` : 'Upload',
+  };
+}
+
+/** Preview-derived display strings for the mapping badge + sample list. */
+function previewDisplay(preview: GenericPreview) {
+  return {
+    providerLabel: preview.mapping.provider || '(none found)',
+    badgeVariant: preview.usedFallback ? ('outline' as const) : ('secondary' as const),
+    sourceLabel: preview.usedFallback ? 'heuristic' : 'AI',
+    hasSample: preview.sample.length > 0,
+    confidencePct: pct(preview.confidence),
+    rowCount: preview.rowCount,
+    sample: preview.sample,
+  };
+}
+
 export function EstateUploadDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -73,7 +102,8 @@ export function EstateUploadDialog({ open, onOpenChange }: Props) {
     }
   };
 
-  const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const { hasProvider, showPreviewSpinner, showRunSpinner, runDisabled, pv, fileName, runLabel } =
+    uploadFlags(preview, busy, file);
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : close())}>
@@ -91,7 +121,7 @@ export function EstateUploadDialog({ open, onOpenChange }: Props) {
           <div className="space-y-4">
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed py-8 text-center hover:border-primary/40">
               <UploadCloud className="h-8 w-8 text-muted-foreground/60" />
-              <span className="text-sm">{file ? file.name : 'Choose a CSV / XLSX export'}</span>
+              <span className="text-sm">{fileName}</span>
               <Input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -100,39 +130,39 @@ export function EstateUploadDialog({ open, onOpenChange }: Props) {
               />
             </label>
 
-            {busy && !preview && (
+            {showPreviewSpinner && (
               <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Inferring the column mapping…
               </div>
             )}
 
-            {preview && (
+            {pv && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span>
-                    Vendor column: <strong>{preview.mapping.provider || '(none found)'}</strong>
+                    Vendor column: <strong>{pv.providerLabel}</strong>
                   </span>
-                  <Badge variant={preview.usedFallback ? 'outline' : 'secondary'}>
-                    {preview.usedFallback ? 'heuristic' : 'AI'} · {pct(preview.confidence)}
+                  <Badge variant={pv.badgeVariant}>
+                    {pv.sourceLabel} · {pv.confidencePct}
                   </Badge>
-                  <span className="text-muted-foreground">· {preview.rowCount} rows</span>
+                  <span className="text-muted-foreground">· {pv.rowCount} rows</span>
                 </div>
 
-                {!preview.mapping.provider && (
+                {!hasProvider && (
                   <div className="flex items-start gap-2 rounded-md border border-amber-600/30 bg-amber-600/5 p-2 text-xs">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
                     No vendor-name column was found — check that your export has a provider/supplier column.
                   </div>
                 )}
 
-                {preview.sample.length > 0 && (
+                {pv.hasSample && (
                   <div className="rounded-md border">
                     <p className="border-b px-3 py-1.5 text-xs text-muted-foreground">
-                      Preview — first {preview.sample.length} vendors
+                      Preview — first {pv.sample.length} vendors
                     </p>
                     <ul className="max-h-40 divide-y overflow-y-auto">
-                      {preview.sample.map((a, i) => (
+                      {pv.sample.map((a, i) => (
                         <li key={`${a.id}-${i}`} className="px-3 py-1.5 text-sm">
                           {a.label || a.name}
                         </li>
@@ -160,9 +190,9 @@ export function EstateUploadDialog({ open, onOpenChange }: Props) {
               <Button variant="ghost" onClick={close} disabled={busy}>
                 Cancel
               </Button>
-              <Button onClick={run} disabled={busy || !preview || !preview.mapping.provider}>
-                {busy && preview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {preview ? `Add ${preview.rowCount} vendors to the inbox` : 'Upload'}
+              <Button onClick={run} disabled={runDisabled}>
+                {showRunSpinner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {runLabel}
               </Button>
             </>
           )}

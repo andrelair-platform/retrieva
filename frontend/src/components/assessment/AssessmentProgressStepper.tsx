@@ -31,6 +31,75 @@ interface AssessmentProgressStepperProps {
   statusMessage?: string;
 }
 
+type StepIconKind = 'failed' | 'done' | 'active' | 'upcoming';
+
+interface StepState {
+  isLast: boolean;
+  iconKind: StepIconKind;
+  connectorClass: string;
+  circleClass: string;
+  labelClass: string;
+}
+
+function pickIconKind(
+  isFailed: boolean,
+  isPendingStep: boolean,
+  isDone: boolean,
+  isActive: boolean,
+): StepIconKind {
+  if (isFailed && isPendingStep) return 'failed';
+  if (isDone) return 'done';
+  if (isActive) return 'active';
+  return 'upcoming';
+}
+
+interface StepFlags {
+  isDone: boolean;
+  isActive: boolean;
+  isUpcoming: boolean;
+  isFailedHere: boolean;
+  labelActive: boolean;
+}
+
+function stepClasses(flags: StepFlags) {
+  const { isDone, isActive, isUpcoming, isFailedHere, labelActive } = flags;
+  return {
+    connectorClass: isDone ? 'bg-primary' : 'bg-border',
+    circleClass: cn(
+      isDone && 'border-primary text-primary',
+      isActive && 'border-primary text-primary',
+      isUpcoming && 'border-border text-muted-foreground',
+      isFailedHere && 'border-destructive text-destructive',
+    ),
+    labelClass: labelActive ? 'text-foreground' : 'text-muted-foreground',
+  };
+}
+
+function computeStepState(args: {
+  step: Step;
+  i: number;
+  currentOrder: number;
+  isFailed: boolean;
+  status: AssessmentStatus;
+}): StepState {
+  const { step, i, currentOrder, isFailed, status } = args;
+  const stepOrder = STATUS_ORDER[step.key];
+  const isDone = !isFailed && currentOrder > stepOrder;
+  const isActive = !isFailed && currentOrder === stepOrder;
+  const flags: StepFlags = {
+    isDone,
+    isActive,
+    isUpcoming: currentOrder < stepOrder,
+    isFailedHere: isFailed && step.key === status,
+    labelActive: (isDone || isActive) && !isFailed,
+  };
+  return {
+    isLast: i === STEPS.length - 1,
+    iconKind: pickIconKind(isFailed, step.key === 'pending', isDone, isActive),
+    ...stepClasses(flags),
+  };
+}
+
 export function AssessmentProgressStepper({ status, statusMessage }: AssessmentProgressStepperProps) {
   const { t } = useTranslation();
   const currentOrder = STATUS_ORDER[status];
@@ -40,11 +109,13 @@ export function AssessmentProgressStepper({ status, statusMessage }: AssessmentP
     <div className="w-full">
       <ol className="flex items-start gap-0">
         {STEPS.map((step, i) => {
-          const stepOrder = STATUS_ORDER[step.key];
-          const isDone = !isFailed && currentOrder > stepOrder;
-          const isActive = !isFailed && currentOrder === stepOrder;
-          const isUpcoming = currentOrder < stepOrder;
-          const isLast = i === STEPS.length - 1;
+          const { isLast, iconKind, connectorClass, circleClass, labelClass } = computeStepState({
+            step,
+            i,
+            currentOrder,
+            isFailed,
+            status,
+          });
 
           return (
             <li key={step.key} className={cn('flex-1 flex flex-col', !isLast && 'relative')}>
@@ -53,7 +124,7 @@ export function AssessmentProgressStepper({ status, statusMessage }: AssessmentP
                 <div
                   className={cn(
                     'absolute top-4 left-1/2 w-full h-0.5 -translate-y-1/2',
-                    isDone ? 'bg-primary' : 'bg-border'
+                    connectorClass
                   )}
                 />
               )}
@@ -63,17 +134,14 @@ export function AssessmentProgressStepper({ status, statusMessage }: AssessmentP
                 <div
                   className={cn(
                     'flex items-center justify-center w-8 h-8 rounded-full border-2 bg-background',
-                    isDone && 'border-primary text-primary',
-                    isActive && !isFailed && 'border-primary text-primary',
-                    isUpcoming && 'border-border text-muted-foreground',
-                    isFailed && step.key === status && 'border-destructive text-destructive'
+                    circleClass
                   )}
                 >
-                  {isFailed && step.key === 'pending' ? (
+                  {iconKind === 'failed' ? (
                     <XCircle className="h-5 w-5 text-destructive" />
-                  ) : isDone ? (
+                  ) : iconKind === 'done' ? (
                     <CheckCircle2 className="h-5 w-5" />
-                  ) : isActive ? (
+                  ) : iconKind === 'active' ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Circle className="h-4 w-4" />
@@ -84,7 +152,7 @@ export function AssessmentProgressStepper({ status, statusMessage }: AssessmentP
                 <p
                   className={cn(
                     'mt-2 text-xs font-medium text-center',
-                    (isDone || isActive) && !isFailed ? 'text-foreground' : 'text-muted-foreground'
+                    labelClass
                   )}
                 >
                   {t(step.labelKey)}

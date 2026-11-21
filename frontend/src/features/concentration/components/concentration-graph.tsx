@@ -10,6 +10,23 @@ const COL_X = [90, 400, 710];
 const ROW_H = 46;
 const PAD_Y = 28;
 
+// Per-node geometry + styling for the layered graph (pure derivation; keeps the render simple).
+function nodeGeometry(n: GraphNode, p: { x: number; y: number }) {
+  const isProvider = n.type === 'provider';
+  const r = isProvider ? 6 + Math.min(8, n.concentrationScore ?? 0) : 5;
+  const fill =
+    n.type === 'function'
+      ? 'fill-background stroke-foreground'
+      : n.type === 'provider'
+        ? 'fill-primary stroke-primary'
+        : 'fill-muted stroke-muted-foreground';
+  const anchor: 'end' | 'start' | 'middle' =
+    n.type === 'subprovider' ? 'end' : n.type === 'function' ? 'start' : 'middle';
+  const tx = n.type === 'subprovider' ? p.x - r - 6 : n.type === 'function' ? p.x + r + 6 : p.x;
+  const ty = n.type === 'provider' ? p.y - r - 5 : p.y + 3;
+  return { r, fill, anchor, tx, ty };
+}
+
 export function ConcentrationGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
   // group nodes into their three columns, preserving order
   const byCol: GraphNode[][] = [[], [], []];
@@ -50,17 +67,7 @@ export function ConcentrationGraph({ nodes, edges }: { nodes: GraphNode[]; edges
         {nodes.map((n) => {
           const p = pos.get(n.id);
           if (!p) return null;
-          const isProvider = n.type === 'provider';
-          const r = isProvider ? 6 + Math.min(8, (n.concentrationScore ?? 0)) : 5;
-          const fill =
-            n.type === 'function'
-              ? 'fill-background stroke-foreground'
-              : n.type === 'provider'
-                ? 'fill-primary stroke-primary'
-                : 'fill-muted stroke-muted-foreground';
-          const anchor = n.type === 'subprovider' ? 'end' : n.type === 'function' ? 'start' : 'middle';
-          const tx = n.type === 'subprovider' ? p.x - r - 6 : n.type === 'function' ? p.x + r + 6 : p.x;
-          const ty = n.type === 'provider' ? p.y - r - 5 : p.y + 3;
+          const { r, fill, anchor, tx, ty } = nodeGeometry(n, p);
           return (
             <g key={n.id}>
               <circle cx={p.x} cy={p.y} r={r} className={fill} strokeWidth={1.5} />

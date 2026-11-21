@@ -17,6 +17,31 @@ interface ChatInputProps {
   maxLength?: number;
 }
 
+// Derived flags/strings for the chat input (keeps the branch logic out of the render body).
+function chatInputState(args: {
+  disabled: boolean;
+  isLoading: boolean;
+  isStreaming: boolean;
+  message: string;
+  maxLength: number;
+  onStop?: () => void;
+  placeholder?: string;
+  translatedDisabled: string;
+  translatedPlaceholder: string;
+}) {
+  const { disabled, isLoading, isStreaming, message, maxLength, onStop } = args;
+  const charCount = message.length;
+  return {
+    charCount,
+    isDisabled: disabled || (!isStreaming && (isLoading || !message.trim())),
+    showStop: isStreaming && Boolean(onStop),
+    isNearLimit: charCount > maxLength * 0.9,
+    overLimit: charCount >= maxLength,
+    textareaDisabled: disabled || isLoading,
+    resolvedPlaceholder: disabled ? args.translatedDisabled : (args.placeholder ?? args.translatedPlaceholder),
+  };
+}
+
 export function ChatInput({
   onSend,
   onStop,
@@ -72,10 +97,25 @@ export function ChatInput({
     }
   };
 
-  const isDisabled = disabled || (!isStreaming && (isLoading || !message.trim()));
-  const showStop = isStreaming && onStop;
-  const charCount = message.length;
-  const isNearLimit = charCount > maxLength * 0.9;
+  const {
+    charCount,
+    isDisabled,
+    showStop,
+    isNearLimit,
+    overLimit,
+    textareaDisabled,
+    resolvedPlaceholder,
+  } = chatInputState({
+    disabled,
+    isLoading,
+    isStreaming,
+    message,
+    maxLength,
+    onStop,
+    placeholder,
+    translatedDisabled: t('chat.ui.input.disabledSend'),
+    translatedPlaceholder: t('chat.ui.input.placeholder'),
+  });
 
   return (
     <div className="border-t bg-background p-4">
@@ -86,8 +126,8 @@ export function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value.slice(0, maxLength))}
             onKeyDown={handleKeyDown}
-            placeholder={disabled ? t('chat.ui.input.disabledSend') : (placeholder ?? t('chat.ui.input.placeholder'))}
-            disabled={disabled || isLoading}
+            placeholder={resolvedPlaceholder}
+            disabled={textareaDisabled}
             className={cn(
               'min-h-[52px] max-h-[200px] resize-none pr-24 py-3',
               disabled && 'opacity-50 cursor-not-allowed'
@@ -100,7 +140,7 @@ export function ChatInput({
               <span
                 className={cn(
                   'text-xs',
-                  charCount >= maxLength ? 'text-destructive' : 'text-muted-foreground'
+                  overLimit ? 'text-destructive' : 'text-muted-foreground'
                 )}
               >
                 {charCount}/{maxLength}

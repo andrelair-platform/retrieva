@@ -16,8 +16,8 @@ export function useConfirmProposalMutation() {
   return useMutation({
     mutationFn: (id: string) => discoveryApi.confirm(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['discovery-proposals'] });
-      qc.invalidateQueries({ queryKey: ['arrangements'] });
+      void qc.invalidateQueries({ queryKey: ['discovery-proposals'] });
+      void qc.invalidateQueries({ queryKey: ['arrangements'] });
     },
   });
 }

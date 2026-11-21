@@ -17,13 +17,60 @@ import {
   workspaceSettingsSchema,
 } from '@/features/workspaces/settings/workspace-settings-schema';
 
-export function useWorkspaceSettings(workspaceId: string) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { isWorkspaceOwner } = usePermissions();
-  const { data: workspace } = useWorkspaceQuery(workspaceId);
+function useUpdateWorkspaceMutation(workspaceId: string, queryClient: ReturnType<typeof useQueryClient>) {
+  return useMutation({
+    mutationFn: async (data: SettingsFormData) => {
+      await workspacesApi.update(workspaceId, {
+        name: data.name,
+        description: data.description,
+        vendorTier: data.vendorTier,
+        country: data.country,
+        serviceType: data.serviceType,
+        contractStart: data.contractStart || null,
+        contractEnd: data.contractEnd || null,
+        nextReviewDate: data.nextReviewDate || null,
+        vendorStatus: data.vendorStatus,
+        certifications: data.certifications?.map((certification) => ({
+          type: certification.type,
+          validUntil: certification.validUntil,
+        })),
+        vendorFunctions: data.vendorFunctions,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      toast.success('Workspace updated successfully');
+    },
+    onError: () => {
+      toast.error('Failed to update workspace');
+    },
+  });
+}
 
-  const latestQuestionnaireQuery = useQuery({
+function useDeleteWorkspaceMutation(
+  workspaceId: string,
+  queryClient: ReturnType<typeof useQueryClient>,
+  router: ReturnType<typeof useRouter>,
+) {
+  return useMutation({
+    mutationFn: async () => {
+      await workspacesApi.delete(workspaceId);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.removeQueries({ queryKey: ['workspace', workspaceId] });
+      toast.success('Workspace deleted');
+      router.push('/workspaces');
+    },
+    onError: () => {
+      toast.error('Failed to delete workspace');
+    },
+  });
+}
+
+function useLatestQuestionnaireQuery(workspaceId: string) {
+  return useQuery({
     queryKey: ['questionnaire-score-card', workspaceId],
     queryFn: async () => {
       const response = await questionnairesApi.list({
@@ -36,6 +83,15 @@ export function useWorkspaceSettings(workspaceId: string) {
     },
     enabled: !!workspaceId,
   });
+}
+
+export function useWorkspaceSettings(workspaceId: string) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isWorkspaceOwner } = usePermissions();
+  const { data: workspace } = useWorkspaceQuery(workspaceId);
+
+  const latestQuestionnaireQuery = useLatestQuestionnaireQuery(workspaceId);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(workspaceSettingsSchema),
@@ -94,49 +150,9 @@ export function useWorkspaceSettings(workspaceId: string) {
     }
   }, [workspace, isWorkspaceOwner, router, workspaceId]);
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: SettingsFormData) => {
-      await workspacesApi.update(workspaceId, {
-        name: data.name,
-        description: data.description,
-        vendorTier: data.vendorTier,
-        country: data.country,
-        serviceType: data.serviceType,
-        contractStart: data.contractStart || null,
-        contractEnd: data.contractEnd || null,
-        nextReviewDate: data.nextReviewDate || null,
-        vendorStatus: data.vendorStatus,
-        certifications: data.certifications?.map((certification) => ({
-          type: certification.type,
-          validUntil: certification.validUntil,
-        })),
-        vendorFunctions: data.vendorFunctions,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      toast.success('Workspace updated successfully');
-    },
-    onError: () => {
-      toast.error('Failed to update workspace');
-    },
-  });
+  const updateMutation = useUpdateWorkspaceMutation(workspaceId, queryClient);
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await workspacesApi.delete(workspaceId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      queryClient.removeQueries({ queryKey: ['workspace', workspaceId] });
-      toast.success('Workspace deleted');
-      router.push('/workspaces');
-    },
-    onError: () => {
-      toast.error('Failed to delete workspace');
-    },
-  });
+  const deleteMutation = useDeleteWorkspaceMutation(workspaceId, queryClient, router);
 
   return {
     workspace,

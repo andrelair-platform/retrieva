@@ -26,6 +26,61 @@ interface PermissionState {
   canManageMembers: boolean;
 }
 
+type Membership = NonNullable<ReturnType<typeof useActiveWorkspace>>['membership'] | undefined;
+
+// Grant a permission to owners/members by default, otherwise fall back to the explicit flag.
+const grant = (base: boolean, explicit: boolean | undefined): boolean => base || (explicit ?? false);
+
+// The role/permission facts derived from the active-workspace membership.
+function membershipFacts(membership: Membership) {
+  const role = membership?.role;
+  const permissions = membership?.permissions;
+  const isOwner = role === 'owner';
+  const isMember = role === 'member';
+  return {
+    role,
+    permissions,
+    isOwner,
+    isMember,
+    ownerOrMember: isOwner || isMember,
+    hasAccess: !!membership && membership.status === 'active',
+  };
+}
+
+// Resolve the full permission matrix from the current user + active-workspace membership.
+// Extracted so the useMemo callback stays a simple delegation (keeps its complexity low).
+function computePermissions(
+  user: { role: string } | null | undefined,
+  isAuthenticated: boolean,
+  membership: Membership
+): PermissionState {
+  const { role, permissions, isOwner, isMember, ownerOrMember, hasAccess } =
+    membershipFacts(membership);
+
+  return {
+    // Global checks
+    isAdmin: user?.role === 'admin',
+    isAuthenticated,
+
+    // Workspace role checks
+    isWorkspaceOwner: isOwner,
+    isWorkspaceMember: isMember,
+    isWorkspaceViewer: role === 'viewer',
+    hasWorkspaceAccess: hasAccess,
+
+    // Permission checks - owners and members can query by default
+    canQuery: grant(ownerOrMember, permissions?.canQuery),
+    canViewSources: grant(ownerOrMember, permissions?.canViewSources),
+    canInvite: grant(isOwner, permissions?.canInvite),
+
+    // Compound checks
+    canManageWorkspace: isOwner,
+    canTriggerSync: ownerOrMember,
+    canViewAnalytics: ownerOrMember,
+    canManageMembers: isOwner,
+  };
+}
+
 /**
  * Hook to check user permissions at both global and workspace levels
  */
@@ -34,38 +89,10 @@ export function usePermissions(): PermissionState {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const activeWorkspace = useActiveWorkspace();
 
-  return useMemo(() => {
-    const membership = activeWorkspace?.membership;
-    const role = membership?.role;
-    const permissions = membership?.permissions;
-
-    // Owners have all permissions by default
-    const isOwner = role === 'owner';
-    const isMember = role === 'member';
-
-    return {
-      // Global checks
-      isAdmin: user?.role === 'admin',
-      isAuthenticated,
-
-      // Workspace role checks
-      isWorkspaceOwner: isOwner,
-      isWorkspaceMember: isMember,
-      isWorkspaceViewer: role === 'viewer',
-      hasWorkspaceAccess: !!membership && membership.status === 'active',
-
-      // Permission checks - owners and members can query by default
-      canQuery: isOwner || isMember || (permissions?.canQuery ?? false),
-      canViewSources: isOwner || isMember || (permissions?.canViewSources ?? false),
-      canInvite: isOwner || (permissions?.canInvite ?? false),
-
-      // Compound checks
-      canManageWorkspace: isOwner,
-      canTriggerSync: isOwner || isMember,
-      canViewAnalytics: isOwner || isMember,
-      canManageMembers: isOwner,
-    };
-  }, [user, isAuthenticated, activeWorkspace]);
+  return useMemo(
+    () => computePermissions(user, isAuthenticated, activeWorkspace?.membership),
+    [user, isAuthenticated, activeWorkspace]
+  );
 }
 
 /**

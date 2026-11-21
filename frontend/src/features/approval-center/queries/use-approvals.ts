@@ -21,8 +21,8 @@ export function useDecideApprovalMutation() {
   return useMutation({
     mutationFn: (v: { id: string; body: DecideBody }) => approvalsApi.decide(v.id, v.body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY });
-      qc.invalidateQueries({ queryKey: ['assessment-runs'] });
+      void qc.invalidateQueries({ queryKey: KEY });
+      void qc.invalidateQueries({ queryKey: ['assessment-runs'] });
     },
   });
 }

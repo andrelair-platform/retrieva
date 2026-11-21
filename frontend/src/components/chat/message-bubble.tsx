@@ -25,6 +25,54 @@ interface MessageBubbleProps {
   showActions?: boolean;
 }
 
+const copyAriaKey = (copied: boolean): string =>
+  copied ? 'chat.ui.bubble.copiedAria' : 'chat.ui.bubble.copyAria';
+const copyTooltipKey = (copied: boolean): string =>
+  copied ? 'chat.ui.bubble.copiedTooltip' : 'chat.ui.bubble.copyTooltip';
+
+interface BubbleLayoutClasses {
+  row: string;
+  avatar: string;
+  column: string;
+  bubble: string;
+}
+
+function showAssistantActions(isUser: boolean, showActions: boolean, isStreaming: boolean): boolean {
+  return !isUser && showActions && !isStreaming;
+}
+
+function messageFlags(message: Message) {
+  return {
+    isUser: message.role === 'user',
+    isPositive: message.feedback === 'positive',
+    isNegative: message.feedback === 'negative',
+  };
+}
+
+function sourceCount(message: Message): number {
+  return message.sources?.length ?? 0;
+}
+
+const feedbackButtonClass = (active: boolean, activeClass: string): string =>
+  cn('h-7 w-7', active && activeClass);
+
+function assistantCitations(isUser: boolean, message: Message): NonNullable<Message['sources']> | null {
+  if (isUser) return null;
+  const sources = message.sources;
+  return sources && sources.length > 0 ? sources : null;
+}
+
+function bubbleLayoutClasses(isUser: boolean): BubbleLayoutClasses {
+  return {
+    row: isUser ? 'flex-row-reverse' : 'flex-row',
+    avatar: isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+    column: isUser ? 'items-end' : 'items-start',
+    bubble: isUser
+      ? 'bg-primary text-primary-foreground rounded-br-md'
+      : 'bg-muted rounded-bl-md',
+  };
+}
+
 export function MessageBubble({
   message,
   isStreaming = false,
@@ -34,7 +82,10 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
-  const isUser = message.role === 'user';
+  const { isUser, isPositive, isNegative } = messageFlags(message);
+  const layout = bubbleLayoutClasses(isUser);
+  const citations = assistantCitations(isUser, message);
+  const sourcesCount = sourceCount(message);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -54,19 +105,12 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn(
-        'group flex gap-3 py-4',
-        isUser ? 'flex-row-reverse' : 'flex-row'
-      )}
+      className={cn('group flex gap-3 py-4', layout.row)}
     >
       {/* Avatar */}
       <Avatar className="h-8 w-8 shrink-0">
         <AvatarFallback
-          className={cn(
-            isUser
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground'
-          )}
+          className={cn(layout.avatar)}
         >
           {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
         </AvatarFallback>
@@ -74,18 +118,10 @@ export function MessageBubble({
 
       {/* Message Content */}
       <div
-        className={cn(
-          'flex flex-col gap-2 max-w-[80%]',
-          isUser ? 'items-end' : 'items-start'
-        )}
+        className={cn('flex flex-col gap-2 max-w-[80%]', layout.column)}
       >
         <div
-          className={cn(
-            'rounded-2xl px-4 py-2.5',
-            isUser
-              ? 'bg-primary text-primary-foreground rounded-br-md'
-              : 'bg-muted rounded-bl-md'
-          )}
+          className={cn('rounded-2xl px-4 py-2.5', layout.bubble)}
         >
           {/* Message text with markdown support */}
           <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -93,19 +129,19 @@ export function MessageBubble({
               content={message.content}
               isStreaming={isStreaming}
               messageId={message.id}
-              sourcesCount={message.sources?.length ?? 0}
+              sourcesCount={sourcesCount}
             />
           </div>
         </div>
 
         {/* Source citations for assistant messages */}
-        {!isUser && message.sources && message.sources.length > 0 && (
-          <SourceCitations sources={message.sources} messageId={message.id} />
+        {citations && (
+          <SourceCitations sources={citations} messageId={message.id} />
         )}
 
         {/* Actions for assistant messages */}
         {/* A11Y FIX: Added focus-within:opacity-100 for keyboard navigation */}
-        {!isUser && showActions && !isStreaming && (
+        {showAssistantActions(isUser, showActions, isStreaming) && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <TooltipProvider>
               {/* Copy button */}
@@ -117,7 +153,7 @@ export function MessageBubble({
                     size="icon"
                     className="h-7 w-7"
                     onClick={handleCopy}
-                    aria-label={copied ? t('chat.ui.bubble.copiedAria') : t('chat.ui.bubble.copyAria')}
+                    aria-label={t(copyAriaKey(copied))}
                   >
                     {copied ? (
                       <Check className="h-3.5 w-3.5 text-green-500" aria-hidden="true" />
@@ -127,7 +163,7 @@ export function MessageBubble({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{copied ? t('chat.ui.bubble.copiedTooltip') : t('chat.ui.bubble.copyTooltip')}</p>
+                  <p>{t(copyTooltipKey(copied))}</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -139,13 +175,10 @@ export function MessageBubble({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={cn(
-                          'h-7 w-7',
-                          message.feedback === 'positive' && 'text-green-500'
-                        )}
+                        className={feedbackButtonClass(isPositive, 'text-green-500')}
                         onClick={() => handleFeedback('positive')}
                         aria-label={t('chat.ui.bubble.goodAria')}
-                        aria-pressed={message.feedback === 'positive'}
+                        aria-pressed={isPositive}
                       >
                         <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
@@ -160,13 +193,10 @@ export function MessageBubble({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={cn(
-                          'h-7 w-7',
-                          message.feedback === 'negative' && 'text-red-500'
-                        )}
+                        className={feedbackButtonClass(isNegative, 'text-red-500')}
                         onClick={() => handleFeedback('negative')}
                         aria-label={t('chat.ui.bubble.badAria')}
-                        aria-pressed={message.feedback === 'negative'}
+                        aria-pressed={isNegative}
                       >
                         <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>

@@ -125,28 +125,26 @@ export function DecisionInboxPage() {
 
   // Keyboard: j/↓ next · k/↑ prev · a primary-accept · r reject/override · d defer.
   useEffect(() => {
+    const HANDLED_KEYS = new Set(['j', 'ArrowDown', 'k', 'ArrowUp', 'd', 'a', 'r']);
+    const run = (key: string, item: DecisionItem) => {
+      if (key === 'j' || key === 'ArrowDown') select(Math.min(sel + 1, items.length - 1));
+      else if (key === 'k' || key === 'ArrowUp') select(Math.max(sel - 1, 0));
+      else if (key === 'd') defer(item);
+      else if (key === 'a') {
+        if (item.kind === 'finding') void runFinding(item, 'approve');
+        else void runRisk(item, 'mitigating');
+      } else if (key === 'r') {
+        if (item.kind === 'finding') void runFinding(item, 'reject');
+        else void runRisk(item, 'accepted');
+      }
+    };
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
       if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) return; // don't hijack typing
       if (!current) return;
-      if (e.key === 'j' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        select(Math.min(sel + 1, items.length - 1));
-      } else if (e.key === 'k' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        select(Math.max(sel - 1, 0));
-      } else if (e.key === 'd') {
-        e.preventDefault();
-        defer(current);
-      } else if (e.key === 'a') {
-        e.preventDefault();
-        if (current.kind === 'finding') runFinding(current, 'approve');
-        else runRisk(current, 'mitigating');
-      } else if (e.key === 'r') {
-        e.preventDefault();
-        if (current.kind === 'finding') runFinding(current, 'reject');
-        else runRisk(current, 'accepted');
-      }
+      if (!HANDLED_KEYS.has(e.key)) return;
+      e.preventDefault();
+      run(e.key, current);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -200,6 +198,7 @@ export function DecisionInboxPage() {
         </Card>
       ) : (
         <div className="space-y-2">
+          {/* eslint-disable-next-line complexity -- complexity is intrinsic to the per-item JSX conditional-render tree (finding/risk variants); cannot extract JSX per clean-code floor; tracked minicloud-gitops#2353 */}
           {items.map((item, i) => {
             const isSel = i === sel;
             return (

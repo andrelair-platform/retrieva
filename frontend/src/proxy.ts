@@ -33,6 +33,40 @@ function decodeJWTPayload(token: string): { role?: string; exp?: number } | null
   }
 }
 
+// Auth-only public paths (redirect authenticated users away from these)
+const authOnlyPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
+
+function matchesPath(paths: string[], pathname: string): boolean {
+  return paths.some((path) => pathname.startsWith(path));
+}
+
+function getTokens(request: NextRequest) {
+  return {
+    accessToken: request.cookies.get('accessToken')?.value,
+    refreshToken: request.cookies.get('refreshToken')?.value,
+  };
+}
+
+function isTokenLive(payload: { exp?: number } | null): boolean {
+  return !!payload?.exp && payload.exp * 1000 > Date.now();
+}
+
+// If on an auth page and the user is authenticated with a live token, redirect to the app home
+// (the Command Center). Keep in sync with APP_HOME_ROUTE in shared/lib/navigation.
+function authOnlyRedirect(request: NextRequest, accessToken: string | undefined): NextResponse | null {
+  if (!accessToken) return null;
+  if (!isTokenLive(decodeJWTPayload(accessToken))) return null;
+  return NextResponse.redirect(new URL('/overview', request.url));
+}
+
+// If an admin path and the user is not an admin, redirect to home.
+function adminRedirect(request: NextRequest, accessToken: string | undefined): NextResponse | null {
+  if (!accessToken) return null;
+  const payload = decodeJWTPayload(accessToken);
+  if (payload?.role === 'admin') return null;
+  return NextResponse.redirect(new URL('/', request.url));
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -40,27 +74,14 @@ export function proxy(request: NextRequest) {
   // token cookie lives 7 days. A present refresh token means the client can
   // silently mint a new access token — so an expired access token must NOT bounce
   // the user to login.
-  const accessToken = request.cookies.get('accessToken')?.value;
-  const refreshToken = request.cookies.get('refreshToken')?.value;
+  const { accessToken, refreshToken } = getTokens(request);
 
   // Check if path is public (exact match for '/', startsWith for others)
-  const isPublicPath = pathname === '/' || publicPaths.some((path) => pathname.startsWith(path));
+  const isPublicPath = pathname === '/' || matchesPath(publicPaths, pathname);
 
-  // Check if path is admin-only
-  const isAdminPath = adminPaths.some((path) => pathname.startsWith(path));
-
-  // Auth-only public paths (redirect authenticated users away from these)
-  const authOnlyPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
-  const isAuthOnlyPath = authOnlyPaths.some((path) => pathname.startsWith(path));
-
-  // If on auth page (login, register, etc.) and user is authenticated, redirect to the app home
-  // (the Command Center). Keep in sync with APP_HOME_ROUTE in shared/lib/navigation.
-  if (isAuthOnlyPath && accessToken) {
-    const payload = decodeJWTPayload(accessToken);
-    // Only redirect if token is not expired
-    if (payload?.exp && payload.exp * 1000 > Date.now()) {
-      return NextResponse.redirect(new URL('/overview', request.url));
-    }
+  if (matchesPath(authOnlyPaths, pathname)) {
+    const redirect = authOnlyRedirect(request, accessToken);
+    if (redirect) return redirect;
   }
 
   // If protected path and the user has NO way to authenticate (neither a valid
@@ -74,13 +95,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If admin path, check if user has admin role
-  if (isAdminPath && accessToken) {
-    const payload = decodeJWTPayload(accessToken);
-    if (payload?.role !== 'admin') {
-      // Redirect non-admins to home page
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  if (matchesPath(adminPaths, pathname)) {
+    const redirect = adminRedirect(request, accessToken);
+    if (redirect) return redirect;
   }
 
   return NextResponse.next();

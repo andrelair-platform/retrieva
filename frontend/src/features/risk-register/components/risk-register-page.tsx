@@ -98,6 +98,16 @@ function RiskScoreChip({ m }: { m: RiskMatrixResult }) {
   );
 }
 
+// Colour class for a questionnaire score chip.
+function qScoreClass(score: number): string {
+  return score >= 70 ? 'text-green-600' : score >= 40 ? 'text-amber-600' : 'text-destructive';
+}
+
+// Colour class for the next-review date chip.
+function reviewDaysClass(days: number): string {
+  return days < 0 ? 'text-destructive' : days <= 30 ? 'text-amber-600' : 'text-muted-foreground';
+}
+
 // ── Risk register row data builder ────────────────────────────────────────────
 
 interface RegisterRow {
@@ -117,6 +127,73 @@ interface RegisterRow {
   contractOk:        boolean;
 }
 
+const byNewest = (a: { createdAt?: string | null }, b: { createdAt?: string | null }) =>
+  new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+
+// Most recent completed assessment of a given framework, or null.
+function latestComplete(assessments: Assessment[], framework: string): Assessment | null {
+  return assessments
+    .filter((a) => a.framework === framework && a.status === 'complete')
+    .sort(byNewest)[0] ?? null;
+}
+
+// Completed questionnaire's overall score, or null when not completed.
+function completedScore(latestQ: VendorQuestionnaire | null): number | null {
+  return latestQ?.status === 'complete' ? (latestQ.overallScore ?? null) : null;
+}
+
+// The "review scheduled with certifications on file" step is complete.
+function hasReviewStep(workspace: WorkspaceWithMembership): boolean {
+  return (workspace.certifications?.length ?? 0) > 0 && !!workspace.nextReviewDate;
+}
+
+// Step completion count (mirrors ComplianceChecklist logic).
+function countSteps(
+  workspace: WorkspaceWithMembership,
+  latestQ: VendorQuestionnaire | null,
+  latestDora: Assessment | null,
+  latestA30: Assessment | null
+): number {
+  let steps = 0;
+  if (workspace.vendorTier && workspace.serviceType) steps++;
+  if (latestQ?.status === 'complete') steps++;
+  if (latestDora) steps++;
+  if (latestA30) steps++;
+  if (hasReviewStep(workspace)) steps++;
+  return steps;
+}
+
+// Soonest certification expiry (in days), or null when there are no cert dates.
+function nearestCertExpiry(workspace: WorkspaceWithMembership): number | null {
+  const certDays = (workspace.certifications ?? [])
+    .map((c) => daysFrom(c.validUntil))
+    .filter((d): d is number => d !== null);
+  return certDays.length > 0 ? Math.min(...certDays) : null;
+}
+
+// Count missing/partial gaps in a completed assessment's results, or null when absent.
+function countDoraGaps(latestDora: Assessment | null): { missing: number | null; partial: number | null } {
+  if (!latestDora?.results?.gaps) return { missing: null, partial: null };
+  let missing = 0;
+  let partial = 0;
+  for (const g of latestDora.results.gaps) {
+    if (g.gapLevel === 'missing') missing++;
+    else if (g.gapLevel === 'partial') partial++;
+  }
+  return { missing, partial };
+}
+
+// Number of 'missing' gaps on an A30 contract assessment.
+function countA30Missing(latestA30: Assessment | null): number {
+  let a30Missing = 0;
+  if (latestA30?.results?.gaps) {
+    for (const g of latestA30.results.gaps) {
+      if (g.gapLevel === 'missing') a30Missing++;
+    }
+  }
+  return a30Missing;
+}
+
 function buildRow(
   workspace: WorkspaceWithMembership,
   assessments: Assessment[],
@@ -125,56 +202,23 @@ function buildRow(
   const wsAssessments = assessments.filter((a) => a.workspaceId === workspace.id);
   const wsQs          = questionnaires.filter((q) => q.workspaceId === workspace.id);
 
-  const latestDora = wsAssessments
-    .filter((a) => a.framework === 'DORA' && a.status === 'complete')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+  const latestDora = latestComplete(wsAssessments, 'DORA');
+  const latestA30 = latestComplete(wsAssessments, 'CONTRACT_A30');
+  const latestQ = wsQs.sort(byNewest)[0] ?? null;
 
-  const latestA30 = wsAssessments
-    .filter((a) => a.framework === 'CONTRACT_A30' && a.status === 'complete')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
-
-  const latestQ = wsQs
-    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())[0] ?? null;
-
-  // Step completion count (mirrors ComplianceChecklist logic)
-  let steps = 0;
-  if (workspace.vendorTier && workspace.serviceType) steps++;
-  if (latestQ?.status === 'complete') steps++;
-  if (latestDora) steps++;
-  if (latestA30) steps++;
-  if ((workspace.certifications?.length ?? 0) > 0 && workspace.nextReviewDate) steps++;
-
-  // Nearest cert expiry
-  const certDays = (workspace.certifications ?? [])
-    .map((c) => daysFrom(c.validUntil))
-    .filter((d): d is number => d !== null);
-  const nearestCertDays = certDays.length > 0 ? Math.min(...certDays) : null;
+  const steps = countSteps(workspace, latestQ, latestDora, latestA30);
+  const nearestCertDays = nearestCertExpiry(workspace);
 
   const riskMatrix = buildRiskMatrix(
     workspace.vendorTier,
     workspace.vendorFunctions,
     latestDora?.results?.gaps ?? null,
-    latestQ?.status === 'complete' ? (latestQ.overallScore ?? null) : null,
+    completedScore(latestQ),
   );
 
   // Pre-compute gap counts in one pass rather than filtering per column in render
-  let missingGaps: number | null = null;
-  let partialGaps: number | null = null;
-  if (latestDora?.results?.gaps) {
-    missingGaps = 0;
-    partialGaps = 0;
-    for (const g of latestDora.results.gaps) {
-      if (g.gapLevel === 'missing') missingGaps++;
-      else if (g.gapLevel === 'partial') partialGaps++;
-    }
-  }
-
-  let a30Missing = 0;
-  if (latestA30?.results?.gaps) {
-    for (const g of latestA30.results.gaps) {
-      if (g.gapLevel === 'missing') a30Missing++;
-    }
-  }
+  const { missing: missingGaps, partial: partialGaps } = countDoraGaps(latestDora);
+  const a30Missing = countA30Missing(latestA30);
 
   return {
     workspace,
@@ -188,7 +232,7 @@ function buildRow(
     riskMatrix,
     missingGaps,
     partialGaps,
-    qScore: latestQ?.status === 'complete' ? (latestQ.overallScore ?? null) : null,
+    qScore: completedScore(latestQ),
     contractOk: latestA30?.status === 'complete' && a30Missing === 0,
   };
 }
@@ -350,7 +394,7 @@ export function RiskRegisterPage() {
                     </TableCell>
                     <TableCell>
                       {qScore !== null ? (
-                        <span className={`text-xs font-medium ${qScore >= 70 ? 'text-green-600' : qScore >= 40 ? 'text-amber-600' : 'text-destructive'}`}>
+                        <span className={`text-xs font-medium ${qScoreClass(qScore)}`}>
                           {qScore}/100
                         </span>
                       ) : (
@@ -369,7 +413,7 @@ export function RiskRegisterPage() {
                     <TableCell><CertChip days={nearestCertDays} /></TableCell>
                     <TableCell>
                       {reviewDays !== null ? (
-                        <span className={`text-xs font-medium ${reviewDays < 0 ? 'text-destructive' : reviewDays <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs font-medium ${reviewDaysClass(reviewDays)}`}>
                           {reviewDays < 0 ? t('riskRegister.overdue', { n: Math.abs(reviewDays) }) : format(new Date(workspace.nextReviewDate!), 'dd MMM yy')}
                         </span>
                       ) : (

@@ -41,6 +41,46 @@ import type { VendorQuestionnaire, QuestionnaireQuestion, QuestionnaireStatus, G
 
 const STEP_KEYS = ['draft', 'sent', 'responding', 'scoring', 'complete'] as const;
 
+interface QuestionnaireViewFlags {
+  isPolling: boolean;
+  canResend: boolean;
+  isScored: boolean;
+  isScoring: boolean;
+  isFailed: boolean;
+  hasGapBreakdown: boolean;
+  hasResponses: boolean;
+  summary: string | undefined;
+  generatedAt: string | undefined;
+}
+
+function getFailureMessageKey(q: VendorQuestionnaire): string {
+  return q.status === 'expired' ? 'questionnaireDetail.expiredMsg' : 'questionnaireDetail.failedMsg';
+}
+
+function getFailureText(q: VendorQuestionnaire, t: (key: string) => string): string {
+  return q.statusMessage || t(getFailureMessageKey(q));
+}
+
+function getRiskForQuestionnaire(q: VendorQuestionnaire) {
+  return q.overallScore !== undefined ? getRiskLabelKey(q.overallScore) : null;
+}
+
+function getQuestionnaireViewFlags(q: VendorQuestionnaire): QuestionnaireViewFlags {
+  const isSentOrPartial = q.status === 'sent' || q.status === 'partial';
+  const isScored = q.status === 'complete' && q.overallScore !== undefined;
+  return {
+    isPolling: isSentOrPartial,
+    canResend: isSentOrPartial,
+    isScored,
+    isScoring: q.status === 'partial',
+    isFailed: q.status === 'failed' || q.status === 'expired',
+    hasGapBreakdown: q.status === 'complete' && q.questions.some((question) => question.gapLevel),
+    hasResponses: q.questions.some((question) => question.answer),
+    summary: q.results?.summary,
+    generatedAt: q.results?.generatedAt,
+  };
+}
+
 const GAP_VARIANT: Record<GapLevel, 'default' | 'secondary' | 'destructive'> = {
   covered: 'default',
   partial: 'secondary',
@@ -318,6 +358,7 @@ interface QuestionnaireDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+// eslint-disable-next-line complexity -- irreducible render-branch floor: 15+ single-flag JSX conditionals, each gating a distinct subtree; non-JSX logic already hoisted to module helpers (getQuestionnaireViewFlags/getRiskForQuestionnaire/getFailureText); extracting the subtrees would create sub-components. tracked minicloud-gitops#2353
 export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps) {
   const { t } = useTranslation();
   const { id } = use(params);
@@ -341,7 +382,7 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
     mutationFn: () => questionnairesApi.send(id),
     onSuccess: () => {
       toast.success(t('questionnaireDetail.toast.resent'));
-      queryClient.invalidateQueries({ queryKey: ['questionnaire', id] });
+      void queryClient.invalidateQueries({ queryKey: ['questionnaire', id] });
     },
     onError: () => toast.error(t('questionnaireDetail.toast.resendFailed')),
   });
@@ -356,7 +397,7 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
       window.__ENV__?.API_URL?.replace('/api', '') || window.location.origin;
     const link = `${baseUrl}/q/${data.token}`;
 
-    navigator.clipboard.writeText(link).then(() => {
+    void navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       toast.success(t('questionnaireDetail.toast.linkCopied'));
       setTimeout(() => setCopied(false), 2000);
@@ -382,9 +423,10 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
     );
   }
 
-  const questionnaire = data;
-  const risk = questionnaire.overallScore !== undefined ? getRiskLabelKey(questionnaire.overallScore) : null;
-  const isPolling = questionnaire.status === 'sent' || questionnaire.status === 'partial';
+  const questionnaire: VendorQuestionnaire = data;
+  const risk = getRiskForQuestionnaire(questionnaire);
+  const flags = getQuestionnaireViewFlags(questionnaire);
+  const { isPolling, canResend, isScored, isScoring, isFailed, hasGapBreakdown, hasResponses, summary, generatedAt } = flags;
 
   return (
     <div className="page-container max-w-5xl mx-auto">
@@ -412,7 +454,7 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
               {t('questionnaireDetail.waitingForVendor')}
             </span>
           )}
-          {(questionnaire.status === 'sent' || questionnaire.status === 'partial') && (
+          {canResend && (
             <Button
               variant="outline"
               size="sm"
@@ -444,7 +486,7 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
         </CardContent>
       </Card>
 
-      {questionnaire.status === 'complete' && questionnaire.overallScore !== undefined && risk && (
+      {isScored && questionnaire.overallScore !== undefined && risk && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('questionnaireDetail.assessmentResult')}</CardTitle>
@@ -462,23 +504,23 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
               </div>
             </div>
             <Progress value={questionnaire.overallScore} className="h-2" />
-            {questionnaire.results?.summary && (
-              <p className="text-sm text-muted-foreground leading-relaxed">{questionnaire.results.summary}</p>
+            {summary && (
+              <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
             )}
-            {questionnaire.results?.generatedAt && (
+            {generatedAt && (
               <p className="text-xs text-muted-foreground">
-                {t('questionnaireDetail.generatedOn', { date: format(new Date(questionnaire.results.generatedAt), 'dd MMM yyyy HH:mm') })}
+                {t('questionnaireDetail.generatedOn', { date: format(new Date(generatedAt), 'dd MMM yyyy HH:mm') })}
               </p>
             )}
           </CardContent>
         </Card>
       )}
 
-      {questionnaire.status === 'complete' && questionnaire.overallScore !== undefined && (
+      {isScored && (
         <RiskDecisionPanel q={questionnaire} />
       )}
 
-      {questionnaire.status === 'partial' && (
+      {isScoring && (
         <Card className="border-warning-muted bg-warning-muted">
           <CardContent className="flex items-center gap-3 pt-5 pb-5">
             <Loader2 className="h-5 w-5 animate-spin text-warning" />
@@ -490,23 +532,21 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
         </Card>
       )}
 
-      {(questionnaire.status === 'failed' || questionnaire.status === 'expired') && (
+      {isFailed && (
         <Card className="border-destructive/50">
           <CardContent className="flex items-center gap-3 pt-5 pb-5">
             <AlertCircle className="h-5 w-5 text-destructive" />
             <div>
               <p className="font-medium text-sm">{t(`questionnaires.status.${questionnaire.status}`)}</p>
               <p className="text-xs text-muted-foreground">
-                {questionnaire.statusMessage || (questionnaire.status === 'expired'
-                  ? t('questionnaireDetail.expiredMsg')
-                  : t('questionnaireDetail.failedMsg'))}
+                {getFailureText(questionnaire, t)}
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {questionnaire.status === 'complete' && questionnaire.questions.some((question) => question.gapLevel) && (
+      {hasGapBreakdown && (
         <div className="space-y-2">
           <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
             {t('questionnaireDetail.byCategory')}
@@ -515,7 +555,7 @@ export function QuestionnaireDetailPage({ params }: QuestionnaireDetailPageProps
         </div>
       )}
 
-      {questionnaire.questions.some((question) => question.answer) && (
+      {hasResponses && (
         <div className="space-y-2">
           <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
             {t('questionnaireDetail.vendorResponses')}
