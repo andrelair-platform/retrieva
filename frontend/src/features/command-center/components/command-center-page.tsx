@@ -99,6 +99,16 @@ const SEVERITY_DOT: Record<RiskSeverity, string> = {
   low: 'bg-info',
 };
 
+// The primary label for a decision-queue item, falling back through its identifiers.
+function decisionItemLabel(it: DecisionItem): string {
+  return it.title || it.providerName || it.businessFunctionName || it.controlId;
+}
+
+// Show the onboarding band once arrangements have loaded and none exist yet.
+function isEmptyRegister(loading: boolean, count: number): boolean {
+  return !loading && count === 0;
+}
+
 export function CommandCenterPage() {
   const { t } = useTranslation();
   const { data, isLoading } = useDecisionQueueQuery();
@@ -108,7 +118,7 @@ export function CommandCenterPage() {
   const posture = computePosture(items);
   const topItems = items.slice(0, 5);
   const bandStyle = BAND_STYLES[posture.band];
-  const emptyRegister = !loadingArrangements && arrangements.length === 0;
+  const emptyRegister = isEmptyRegister(loadingArrangements, arrangements.length);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-5 text-foreground sm:p-6">
@@ -279,7 +289,7 @@ export function CommandCenterPage() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
-                          {it.title || it.providerName || it.businessFunctionName || it.controlId}
+                          {decisionItemLabel(it)}
                         </p>
                         <p className="truncate font-mono text-[11px] text-muted-foreground">
                           {it.kind === 'risk'

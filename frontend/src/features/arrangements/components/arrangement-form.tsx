@@ -39,6 +39,105 @@ interface Props {
 
 const NONE = '__none__';
 
+interface CreateArrangementFields {
+  legalEntityId: string;
+  businessFunctionId: string;
+  providerId: string;
+  ictServiceId: string;
+  arrangementType: ArrangementType;
+  criticality: Criticality | '';
+  dependency: Level | '';
+  exitDifficulty: Level | '';
+  dataClasses: string;
+  dataResidency: string;
+  trigger: Trigger;
+  businessPurpose: string;
+  expectedCost: string;
+  expectedCostCurrency: string;
+  requestedStartDate: string;
+}
+
+function buildCreatePayload(f: CreateArrangementFields) {
+  const intake =
+    f.trigger === 'new'
+      ? {
+          businessPurpose: f.businessPurpose.trim() || null,
+          expectedCost: f.expectedCost.trim() || null,
+          expectedCostCurrency: f.expectedCost.trim() ? f.expectedCostCurrency : null,
+          requestedStartDate: f.requestedStartDate || null,
+        }
+      : {};
+  return {
+    legalEntityId: f.legalEntityId,
+    businessFunctionId: f.businessFunctionId,
+    providerId: f.providerId,
+    ictServiceId: f.ictServiceId || null,
+    arrangementType: f.arrangementType,
+    criticality: f.criticality || null,
+    dependency: f.dependency || null,
+    exitDifficulty: f.exitDifficulty || null,
+    dataResidency: f.dataResidency,
+    trigger: f.trigger,
+    dataClasses: f.dataClasses
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    // Workflow B intake — only meaningful for a new-provider prospect.
+    ...intake,
+  };
+}
+
+function deriveFormView(args: {
+  legalEntityId: string;
+  businessFunctionId: string;
+  providerId: string;
+  serviceCount: number;
+  submitPending: boolean;
+  criticality: Criticality | '';
+  dependency: Level | '';
+  exitDifficulty: Level | '';
+}) {
+  return {
+    canSubmit:
+      !!args.legalEntityId && !!args.businessFunctionId && !!args.providerId && !args.submitPending,
+    showServiceSelect: !!args.providerId && args.serviceCount > 0,
+    criticalityValue: args.criticality || NONE,
+    dependencyValue: args.dependency || NONE,
+    exitDifficultyValue: args.exitDifficulty || NONE,
+    functionPlaceholder: args.legalEntityId ? 'Select a function' : 'Pick an entity first',
+    submitLabel: args.submitPending ? 'Creating…' : 'Create arrangement',
+  };
+}
+
+function useArrangementLookups(open: boolean, legalEntityId: string, providerId: string) {
+  const entities = useQuery({
+    queryKey: ['legal-entities'],
+    queryFn: async () => (await arrangementsApi.listLegalEntities()).data?.legalEntities ?? [],
+    enabled: open,
+  });
+  const functions = useQuery({
+    queryKey: ['business-functions', legalEntityId],
+    queryFn: async () => (await arrangementsApi.listBusinessFunctions(legalEntityId)).data?.businessFunctions ?? [],
+    enabled: open && !!legalEntityId,
+  });
+  const providers = useQuery({
+    queryKey: ['providers'],
+    queryFn: async () => (await arrangementsApi.listProviders()).data?.providers ?? [],
+    enabled: open,
+  });
+  const services = useQuery({
+    queryKey: ['ict-services', providerId],
+    queryFn: async () => (await arrangementsApi.listIctServices(providerId)).data?.ictServices ?? [],
+    enabled: open && !!providerId,
+  });
+  return {
+    entityList: entities.data ?? [],
+    functionList: functions.data ?? [],
+    providerList: providers.data ?? [],
+    serviceList: services.data ?? [],
+  };
+}
+
 export function ArrangementForm({ open, onOpenChange }: Props) {
   const qc = useQueryClient();
 
@@ -66,33 +165,18 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
   const [newFnCif, setNewFnCif] = useState(false);
   const [newProvider, setNewProvider] = useState('');
 
-  const entities = useQuery({
-    queryKey: ['legal-entities'],
-    queryFn: async () => (await arrangementsApi.listLegalEntities()).data?.legalEntities ?? [],
-    enabled: open,
-  });
-  const functions = useQuery({
-    queryKey: ['business-functions', legalEntityId],
-    queryFn: async () => (await arrangementsApi.listBusinessFunctions(legalEntityId)).data?.businessFunctions ?? [],
-    enabled: open && !!legalEntityId,
-  });
-  const providers = useQuery({
-    queryKey: ['providers'],
-    queryFn: async () => (await arrangementsApi.listProviders()).data?.providers ?? [],
-    enabled: open,
-  });
-  const services = useQuery({
-    queryKey: ['ict-services', providerId],
-    queryFn: async () => (await arrangementsApi.listIctServices(providerId)).data?.ictServices ?? [],
-    enabled: open && !!providerId,
-  });
+  const { entityList, functionList, providerList, serviceList } = useArrangementLookups(
+    open,
+    legalEntityId,
+    providerId,
+  );
 
   const createEntity = useMutation({
     mutationFn: () => arrangementsApi.createLegalEntity({ name: newEntity.trim() }),
     onSuccess: (res) => {
       const e = res.data?.legalEntity;
       setNewEntity('');
-      qc.invalidateQueries({ queryKey: ['legal-entities'] });
+      void qc.invalidateQueries({ queryKey: ['legal-entities'] });
       if (e) setLegalEntityId(e.id);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -108,7 +192,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
       const f = res.data?.businessFunction;
       setNewFn('');
       setNewFnCif(false);
-      qc.invalidateQueries({ queryKey: ['business-functions', legalEntityId] });
+      void qc.invalidateQueries({ queryKey: ['business-functions', legalEntityId] });
       if (f) setBusinessFunctionId(f.id);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -118,7 +202,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
     onSuccess: (res) => {
       const p = res.data?.provider;
       setNewProvider('');
-      qc.invalidateQueries({ queryKey: ['providers'] });
+      void qc.invalidateQueries({ queryKey: ['providers'] });
       if (p) setProviderId(p.id);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -126,40 +210,54 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
 
   const submit = useMutation({
     mutationFn: () =>
-      arrangementsApi.create({
-        legalEntityId,
-        businessFunctionId,
-        providerId,
-        ictServiceId: ictServiceId || null,
-        arrangementType,
-        criticality: criticality || null,
-        dependency: dependency || null,
-        exitDifficulty: exitDifficulty || null,
-        dataResidency,
-        trigger,
-        dataClasses: dataClasses
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        // Workflow B intake — only meaningful for a new-provider prospect.
-        ...(trigger === 'new'
-          ? {
-              businessPurpose: businessPurpose.trim() || null,
-              expectedCost: expectedCost.trim() || null,
-              expectedCostCurrency: expectedCost.trim() ? expectedCostCurrency : null,
-              requestedStartDate: requestedStartDate || null,
-            }
-          : {}),
-      }),
+      arrangementsApi.create(
+        buildCreatePayload({
+          legalEntityId,
+          businessFunctionId,
+          providerId,
+          ictServiceId,
+          arrangementType,
+          criticality,
+          dependency,
+          exitDifficulty,
+          dataClasses,
+          dataResidency,
+          trigger,
+          businessPurpose,
+          expectedCost,
+          expectedCostCurrency,
+          requestedStartDate,
+        }),
+      ),
     onSuccess: () => {
       toast.success('Arrangement created');
-      qc.invalidateQueries({ queryKey: ['arrangements'] });
+      void qc.invalidateQueries({ queryKey: ['arrangements'] });
       onOpenChange(false);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const canSubmit = legalEntityId && businessFunctionId && providerId && !submit.isPending;
+  const onCriticalityChange = (v: string) => setCriticality(v === NONE ? '' : (v as Criticality));
+  const onDependencyChange = (v: string) => setDependency(v === NONE ? '' : (v as Level));
+  const onExitDifficultyChange = (v: string) => setExitDifficulty(v === NONE ? '' : (v as Level));
+  const {
+    canSubmit,
+    showServiceSelect,
+    criticalityValue,
+    dependencyValue,
+    exitDifficultyValue,
+    functionPlaceholder,
+    submitLabel,
+  } = deriveFormView({
+    legalEntityId,
+    businessFunctionId,
+    providerId,
+    serviceCount: serviceList.length,
+    submitPending: submit.isPending,
+    criticality,
+    dependency,
+    exitDifficulty,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -239,7 +337,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
             <Select value={legalEntityId} onValueChange={setLegalEntityId}>
               <SelectTrigger><SelectValue placeholder="Select a legal entity" /></SelectTrigger>
               <SelectContent>
-                {(entities.data ?? []).map((e) => (
+                {entityList.map((e) => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -256,9 +354,9 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
           <div className="space-y-1.5">
             <Label>Business function *</Label>
             <Select value={businessFunctionId} onValueChange={setBusinessFunctionId} disabled={!legalEntityId}>
-              <SelectTrigger><SelectValue placeholder={legalEntityId ? 'Select a function' : 'Pick an entity first'} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={functionPlaceholder} /></SelectTrigger>
               <SelectContent>
-                {(functions.data ?? []).map((f) => (
+                {functionList.map((f) => (
                   <SelectItem key={f.id} value={f.id}>{f.name}{f.criticalOrImportant ? ' • CIF' : ''}</SelectItem>
                 ))}
               </SelectContent>
@@ -283,7 +381,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
             <Select value={providerId} onValueChange={setProviderId}>
               <SelectTrigger><SelectValue placeholder="Select a provider" /></SelectTrigger>
               <SelectContent>
-                {(providers.data ?? []).map((p) => (
+                {providerList.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.displayName}</SelectItem>
                 ))}
               </SelectContent>
@@ -297,13 +395,13 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
           </div>
 
           {/* ICT service (optional) */}
-          {providerId && (services.data ?? []).length > 0 && (
+          {showServiceSelect && (
             <div className="space-y-1.5">
               <Label>ICT service</Label>
               <Select value={ictServiceId} onValueChange={setIctServiceId}>
                 <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                 <SelectContent>
-                  {(services.data ?? []).map((s) => (
+                  {serviceList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -325,7 +423,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Criticality</Label>
-              <Select value={criticality || NONE} onValueChange={(v) => setCriticality(v === NONE ? '' : (v as Criticality))}>
+              <Select value={criticalityValue} onValueChange={onCriticalityChange}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>—</SelectItem>
@@ -337,7 +435,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Dependency</Label>
-              <Select value={dependency || NONE} onValueChange={(v) => setDependency(v === NONE ? '' : (v as Level))}>
+              <Select value={dependencyValue} onValueChange={onDependencyChange}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>—</SelectItem>
@@ -349,7 +447,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Exit difficulty</Label>
-              <Select value={exitDifficulty || NONE} onValueChange={(v) => setExitDifficulty(v === NONE ? '' : (v as Level))}>
+              <Select value={exitDifficultyValue} onValueChange={onExitDifficultyChange}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>—</SelectItem>
@@ -373,7 +471,7 @@ export function ArrangementForm({ open, onOpenChange }: Props) {
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button disabled={!canSubmit} onClick={() => submit.mutate()}>
-            {submit.isPending ? 'Creating…' : 'Create arrangement'}
+            {submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

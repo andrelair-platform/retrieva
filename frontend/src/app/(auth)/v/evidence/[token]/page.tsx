@@ -18,48 +18,26 @@ type PageState =
   | { type: 'form'; request: PublicEvidenceRequest }
   | { type: 'submitted' };
 
-export default function VendorEvidencePage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
-  const [pageState, setPageState] = useState<PageState>({ type: 'loading' });
-  // category → number of documents uploaded this session
-  const [uploaded, setUploaded] = useState<Record<string, number>>({});
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await publicEvidenceApi.getRequest(token);
-        const request = res.data?.request;
-        if (!request) return setPageState({ type: 'error', message: 'Evidence request not found.' });
-        setPageState({ type: 'form', request });
-      } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'response' in err
-            ? (err as { response?: { status?: number } }).response?.status
-            : undefined;
-        if (status === 410) setPageState({ type: 'expired' });
-        else if (status === 403) setPageState({ type: 'revoked' });
-        else if (status === 409) setPageState({ type: 'already_complete' });
-        else if (status === 404) setPageState({ type: 'error', message: 'Evidence request not found.' });
-        else setPageState({ type: 'error', message: 'Unable to load this request. Please try again.' });
-      }
-    };
-    load();
-  }, [token]);
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      await publicEvidenceApi.submit(token);
-      setPageState({ type: 'submitted' });
-    } catch {
-      toast.error('Failed to submit. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+// Map an HTTP status from a failed getRequest() to the page state to show.
+function pageStateForError(status: number | undefined): PageState {
+  const byStatus: Record<number, PageState> = {
+    410: { type: 'expired' },
+    403: { type: 'revoked' },
+    409: { type: 'already_complete' },
+    404: { type: 'error', message: 'Evidence request not found.' },
   };
+  return (
+    (status !== undefined && byStatus[status]) || {
+      type: 'error',
+      message: 'Unable to load this request. Please try again.',
+    }
+  );
+}
 
-  // ── Render states ─────────────────────────────────────────────────────────
+// Terminal (non-form) page states render a single status card. Returns null for the form state so
+// the main component renders the upload form. Kept as a plain helper (not a component) so the
+// rendered tree is identical.
+function renderStatusScreen(pageState: PageState): React.ReactNode | null {
   if (pageState.type === 'loading') {
     return (
       <PublicLayout>
@@ -136,8 +114,52 @@ export default function VendorEvidencePage({ params }: { params: Promise<{ token
     );
   }
 
+  return null;
+}
+
+export default function VendorEvidencePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
+  const [pageState, setPageState] = useState<PageState>({ type: 'loading' });
+  // category → number of documents uploaded this session
+  const [uploaded, setUploaded] = useState<Record<string, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await publicEvidenceApi.getRequest(token);
+        const request = res.data?.request;
+        if (!request) return setPageState({ type: 'error', message: 'Evidence request not found.' });
+        setPageState({ type: 'form', request });
+      } catch (err: unknown) {
+        const status =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined;
+        setPageState(pageStateForError(status));
+      }
+    };
+    void load();
+  }, [token]);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await publicEvidenceApi.submit(token);
+      setPageState({ type: 'submitted' });
+    } catch {
+      toast.error('Failed to submit. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Render states ─────────────────────────────────────────────────────────
+  const statusScreen = renderStatusScreen(pageState);
+  if (statusScreen) return statusScreen;
+
   // ── Main form ─────────────────────────────────────────────────────────────
-  const { request } = pageState;
+  const { request } = pageState as Extract<PageState, { type: 'form' }>;
   const totalUploaded = Object.values(uploaded).reduce((a, b) => a + b, 0);
 
   return (

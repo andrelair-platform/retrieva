@@ -67,7 +67,7 @@ export function AssessmentsPage() {
     mutationFn: (id: string) => assessmentsApi.delete(id),
     onSuccess: () => {
       toast.success(t('assessments.toast.deleted'));
-      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
     onError: () => toast.error(t('assessments.toast.deleteFailed')),
     onSettled: () => setDeletingId(null),

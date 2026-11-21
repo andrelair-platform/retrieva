@@ -34,7 +34,7 @@ function VerifyEmailContent() {
       }
     };
 
-    verifyEmail();
+    void verifyEmail();
   }, [token, t]);
 
   if (status === 'loading') {

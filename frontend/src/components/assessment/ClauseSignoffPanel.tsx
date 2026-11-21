@@ -87,6 +87,58 @@ export function NegotiationRoundBadge({
 
 // ── Clause sign-off row ────────────────────────────────────────────────────────
 
+type GapLevel = 'covered' | 'partial' | 'missing';
+
+/** Derive the icon / colour / row styling + badge variant for a clause's gap level. */
+function gapLevelStyles(gapLevel: GapLevel): {
+  GapIcon: React.ElementType;
+  gapIconClass: string;
+  rowClass: string;
+  badgeVariant: 'default' | 'secondary' | 'destructive';
+  recommendationClass: string;
+} {
+  const GapIcon =
+    gapLevel === 'covered'
+      ? CheckCircle2
+      : gapLevel === 'partial'
+        ? AlertTriangle
+        : XCircle;
+  const gapIconClass =
+    gapLevel === 'covered'
+      ? 'text-green-500'
+      : gapLevel === 'partial'
+        ? 'text-amber-500'
+        : 'text-destructive';
+  const rowClass =
+    gapLevel === 'missing'
+      ? 'bg-destructive/5'
+      : gapLevel === 'partial'
+        ? 'bg-amber-50/50 dark:bg-amber-950/10'
+        : '';
+  const badgeVariant =
+    gapLevel === 'covered' ? 'default' : gapLevel === 'partial' ? 'secondary' : 'destructive';
+  const recommendationClass =
+    gapLevel === 'missing' ? 'text-destructive' : 'text-amber-600 dark:text-amber-400';
+  return { GapIcon, gapIconClass, rowClass, badgeVariant, recommendationClass };
+}
+
+/** Whether to show a clause's recommendation text (present + the clause isn't fully covered). */
+function hasRecommendation(gap: Gap | undefined, gapLevel: GapLevel): boolean {
+  return !!gap?.recommendation && gapLevel !== 'covered';
+}
+
+/** Build the "signed by" display line (signer name + optional note suffix) for a sign-off. */
+function signoffDisplay(
+  signoff: ClauseSignoff | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): { signedByName: string; noteSuffix: string } {
+  const signedByName = signoff?.signedByName || t('assessments.decision.complianceOfficer');
+  const noteSuffix = signoff?.note
+    ? t('assessments.signoff.noteSuffix', { note: signoff.note })
+    : '';
+  return { signedByName, noteSuffix };
+}
+
 function ClauseSignoffRow({
   clause,
   gap,
@@ -107,31 +159,22 @@ function ClauseSignoffRow({
     mutationFn: (status: ClauseSignoffStatus) =>
       assessmentsApi.setClauseSignoff(assessmentId, clause.ref, status, note),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
-      toast.success(
-        note
-          ? t('assessments.signoff.toastNotedAnd', { ref: clause.ref })
-          : t('assessments.signoff.toastSignedOff', { ref: clause.ref })
-      );
+      void queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
+      const toastKey = note
+        ? 'assessments.signoff.toastNotedAnd'
+        : 'assessments.signoff.toastSignedOff';
+      toast.success(t(toastKey, { ref: clause.ref }));
       setExpanded(false);
       setNote('');
     },
     onError: () => toast.error(t('assessments.signoff.toastFailed')),
   });
 
-  const gapLevel = gap?.gapLevel ?? 'covered';
-  const GapIcon =
-    gapLevel === 'covered'  ? CheckCircle2
-    : gapLevel === 'partial' ? AlertTriangle
-    : XCircle;
-  const gapIconClass =
-    gapLevel === 'covered'  ? 'text-green-500'
-    : gapLevel === 'partial' ? 'text-amber-500'
-    : 'text-destructive';
-  const rowClass =
-    gapLevel === 'missing' ? 'bg-destructive/5'
-    : gapLevel === 'partial' ? 'bg-amber-50/50 dark:bg-amber-950/10'
-    : '';
+  const gapLevel: GapLevel = (gap?.gapLevel ?? 'covered') as GapLevel;
+  const { GapIcon, gapIconClass, rowClass, badgeVariant, recommendationClass } =
+    gapLevelStyles(gapLevel);
+  const showRecommendation = hasRecommendation(gap, gapLevel);
+  const { signedByName, noteSuffix } = signoffDisplay(signoff, t);
 
   return (
     <div className={`px-4 py-3 ${rowClass}`}>
@@ -141,10 +184,7 @@ function ClauseSignoffRow({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs font-semibold text-muted-foreground">{clause.ref}</span>
             <Badge variant="outline" className="text-xs">{t(`assessments.clauses.categories.${CATEGORY_KEY[clause.category]}`)}</Badge>
-            <Badge
-              variant={gapLevel === 'covered' ? 'default' : gapLevel === 'partial' ? 'secondary' : 'destructive'}
-              className="text-xs"
-            >
+            <Badge variant={badgeVariant} className="text-xs">
               {t(`assessments.gapTable.level.${gapLevel}`)}
             </Badge>
             {signoff && (
@@ -157,19 +197,19 @@ function ClauseSignoffRow({
             )}
           </div>
           <p className="text-sm mt-1">{t(`assessments.clauses.text.${clause.textId}`, { defaultValue: clause.text })}</p>
-          {gap?.recommendation && gapLevel !== 'covered' && (
-            <p className={`text-xs mt-1 ${gapLevel === 'missing' ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'}`}>
-              → {gap.recommendation}
+          {showRecommendation && (
+            <p className={`text-xs mt-1 ${recommendationClass}`}>
+              → {gap?.recommendation}
             </p>
           )}
           {signoff && (
             <p className="text-xs text-muted-foreground mt-1">
               {t('assessments.signoff.signedBy', {
                 label: t(SIGNOFF_CONFIG[signoff.status].labelKey),
-                name: signoff.signedByName || t('assessments.decision.complianceOfficer'),
+                name: signedByName,
                 date: format(new Date(signoff.signedAt), 'dd MMM yyyy'),
               })}
-              {signoff.note ? t('assessments.signoff.noteSuffix', { note: signoff.note }) : ''}
+              {noteSuffix}
             </p>
           )}
         </div>

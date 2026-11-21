@@ -79,6 +79,26 @@ interface WorkspaceMembersPageProps {
   id: string;
 }
 
+const ROLE_ICONS: Record<WorkspaceRole, typeof Shield> = {
+  owner: Shield,
+  member: User,
+  viewer: Eye,
+};
+
+const getRoleIcon = (role: WorkspaceRole) => ROLE_ICONS[role];
+
+const isRoleDowngrade = (currentRole: WorkspaceRole, newRole: WorkspaceRole): boolean => {
+  const roleOrder: Record<WorkspaceRole, number> = { owner: 3, member: 2, viewer: 1 };
+  return roleOrder[newRole] < roleOrder[currentRole];
+};
+
+const countMembers = (list: { length: number } | null | undefined): number => list?.length ?? 0;
+
+// Type-guard: the post-guard fall-through narrows `workspace` to non-null.
+const hasAccess = <T,>(workspace: T | null | undefined, isWorkspaceOwner: boolean): workspace is T =>
+  Boolean(workspace) && isWorkspaceOwner;
+
+// eslint-disable-next-line complexity -- residual complexity is the access-guard + loading/empty/members-list JSX render branches; non-JSX logic is in countMembers/hasAccess; reducing further needs JSX extraction. tracked minicloud-gitops#2353
 export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -107,7 +127,7 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
     }
   }, [workspace, isWorkspaceOwner, router, id, t]);
 
-  const { data: members, isLoading } = useQuery({
+  const { data: members = [], isLoading } = useQuery({
     queryKey: ['workspace-members', id],
     queryFn: async () => {
       const response = await workspacesApi.members.list(id);
@@ -132,7 +152,7 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
       toast.success(t('workspaces.members.toastInviteSent'));
       setInviteDialogOpen(false);
       form.reset();
-      queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
     },
     onError: () => {
       toast.error(t('workspaces.members.toastInviteFailed'));
@@ -147,7 +167,7 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
       toast.success(t('workspaces.members.toastMemberRemoved'));
       setRemoveDialogOpen(false);
       setMemberToRemove(null);
-      queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
     },
     onError: () => {
       toast.error(t('workspaces.members.toastRemoveFailed'));
@@ -168,17 +188,12 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
       toast.success(t('workspaces.members.toastRoleUpdated'));
       setRoleChangeDialogOpen(false);
       setPendingRoleChange(null);
-      queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-members', id] });
     },
     onError: () => {
       toast.error(t('workspaces.members.toastRoleFailed'));
     },
   });
-
-  const isRoleDowngrade = (currentRole: WorkspaceRole, newRole: WorkspaceRole): boolean => {
-    const roleOrder: Record<WorkspaceRole, number> = { owner: 3, member: 2, viewer: 1 };
-    return roleOrder[newRole] < roleOrder[currentRole];
-  };
 
   const handleRoleChange = (
     memberId: string,
@@ -194,24 +209,16 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
     }
   };
 
-  if (!workspace || !isWorkspaceOwner) {
+  const memberCount = countMembers(members);
+  const isEmpty = memberCount === 0;
+
+  if (!hasAccess(workspace, isWorkspaceOwner)) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
-
-  const getRoleIcon = (role: WorkspaceRole) => {
-    switch (role) {
-      case 'owner':
-        return Shield;
-      case 'member':
-        return User;
-      case 'viewer':
-        return Eye;
-    }
-  };
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -321,7 +328,7 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
       {/* Members list */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('workspaces.members.membersCount', { count: members?.length || 0 })}</CardTitle>
+          <CardTitle>{t('workspaces.members.membersCount', { count: memberCount })}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -336,7 +343,7 @@ export function WorkspaceMembersPage({ id }: WorkspaceMembersPageProps) {
                 </div>
               ))}
             </div>
-          ) : !members || members.length === 0 ? (
+          ) : isEmpty ? (
             <p className="text-muted-foreground text-center py-8">
               {t('workspaces.members.noMembers')}
             </p>

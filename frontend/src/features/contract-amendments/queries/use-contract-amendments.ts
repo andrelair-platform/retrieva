@@ -16,7 +16,7 @@ export function useAcceptAmendmentMutation() {
   return useMutation({
     mutationFn: (id: string) => amendmentsApi.accept(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contract-amendments'] });
+      void qc.invalidateQueries({ queryKey: ['contract-amendments'] });
     },
   });
 }
@@ -27,7 +27,7 @@ export function useRejectAmendmentMutation() {
   return useMutation({
     mutationFn: (id: string) => amendmentsApi.reject(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contract-amendments'] });
+      void qc.invalidateQueries({ queryKey: ['contract-amendments'] });
     },
   });
 }

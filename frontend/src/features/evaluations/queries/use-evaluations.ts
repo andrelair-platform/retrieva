@@ -58,9 +58,9 @@ export function useSelectWinner(evaluationId: string) {
   return useMutation({
     mutationFn: (candidateId: string) => evaluationsApi.selectWinner(evaluationId, candidateId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['evaluation', evaluationId] });
-      qc.invalidateQueries({ queryKey: ['evaluations'] });
-      qc.invalidateQueries({ queryKey: ['arrangements'] });
+      void qc.invalidateQueries({ queryKey: ['evaluation', evaluationId] });
+      void qc.invalidateQueries({ queryKey: ['evaluations'] });
+      void qc.invalidateQueries({ queryKey: ['arrangements'] });
     },
   });
 }

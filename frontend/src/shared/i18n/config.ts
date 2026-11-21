@@ -12,7 +12,7 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const LANGUAGE_STORAGE_KEY = 'retrieva_lang';
 
 if (!i18n.isInitialized) {
-  i18n
+  void i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({

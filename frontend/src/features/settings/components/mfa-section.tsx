@@ -21,17 +21,40 @@ import { authApi, getErrorMessage } from '@/shared/api';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { MfaSetupResponse } from '@/types';
 
+/** A 6+ digit TOTP code is required to enable/disable. */
+const TOTP_MIN_LENGTH = 6;
+
+/** Render flags for the MFA section, derived from enabled state + in-flight setup. */
+function mfaRenderFlags(enabled: boolean, hasSetup: boolean) {
+  return {
+    showEnrollButton: !enabled && !hasSetup,
+    showVerifyStep: !enabled && hasSetup,
+    descKey: enabled ? 'settings.mfa.descEnabled' : 'settings.mfa.descDisabled',
+  };
+}
+
+/** The enable button is disabled while in-flight or until a full-length code is entered. */
+function enableDisabled(pending: boolean, code: string): boolean {
+  return pending || code.trim().length < TOTP_MIN_LENGTH;
+}
+
+/** The disable button needs a password and a full-length code, and not be in-flight. */
+function disableDisabled(pending: boolean, password: string, code: string): boolean {
+  return pending || password.length < 1 || code.trim().length < TOTP_MIN_LENGTH;
+}
+
 /**
  * Two-factor authentication (TOTP) enrollment + teardown.
  *
  * Flow: Set up → scan/enter the secret in an authenticator app → confirm a code
  * → MFA enabled, recovery codes shown once. Disable requires password + a code.
  */
+// eslint-disable-next-line complexity -- residual complexity is the enabled/setup/verify JSX render branches (incl. the `setup` narrowing guard); non-JSX logic is in mfaRenderFlags; reducing further needs JSX extraction. tracked minicloud-gitops#2353
 export function MfaSection() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
-  const enabled = !!user?.mfaEnabled;
+  const enabled = Boolean(user?.mfaEnabled);
 
   const [setup, setSetup] = useState<MfaSetupResponse | null>(null);
   const [code, setCode] = useState('');
@@ -73,10 +96,14 @@ export function MfaSection() {
 
   const copyRecoveryCodes = () => {
     if (recoveryCodes) {
-      navigator.clipboard?.writeText(recoveryCodes.join('\n'));
+      void navigator.clipboard?.writeText(recoveryCodes.join('\n'));
       toast.success(t('settings.mfa.toastCopied'));
     }
   };
+
+  const { showEnrollButton, showVerifyStep, descKey } = mfaRenderFlags(enabled, Boolean(setup));
+  const isEnableDisabled = enableDisabled(enableMutation.isPending, code);
+  const isDisableDisabled = disableDisabled(disableMutation.isPending, disablePassword, disableCode);
 
   return (
     <Card>
@@ -90,9 +117,7 @@ export function MfaSection() {
           {t('settings.mfa.title')}
         </CardTitle>
         <CardDescription>
-          {enabled
-            ? t('settings.mfa.descEnabled')
-            : t('settings.mfa.descDisabled')}
+          {t(descKey)}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -115,14 +140,14 @@ export function MfaSection() {
         )}
 
         {/* Disabled → enrollment */}
-        {!enabled && !setup && (
+        {showEnrollButton && (
           <Button onClick={() => setupMutation.mutate()} disabled={setupMutation.isPending}>
             {setupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('settings.mfa.setup')}
           </Button>
         )}
 
-        {!enabled && setup && (
+        {showVerifyStep && setup && (
           <div className="space-y-4">
             <div className="space-y-3">
               <p className="text-sm font-medium">{t('settings.mfa.step1')}</p>
@@ -151,7 +176,7 @@ export function MfaSection() {
               <div className="flex gap-2">
                 <Button
                   onClick={() => enableMutation.mutate()}
-                  disabled={enableMutation.isPending || code.trim().length < 6}
+                  disabled={isEnableDisabled}
                 >
                   {enableMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t('settings.mfa.enable')}
@@ -196,11 +221,7 @@ export function MfaSection() {
             <Button
               variant="destructive"
               onClick={() => disableMutation.mutate()}
-              disabled={
-                disableMutation.isPending ||
-                disablePassword.length < 1 ||
-                disableCode.trim().length < 6
-              }
+              disabled={isDisableDisabled}
             >
               {disableMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('settings.mfa.disable')}

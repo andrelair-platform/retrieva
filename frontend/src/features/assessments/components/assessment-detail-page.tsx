@@ -42,17 +42,131 @@ const RISK_VARIANT: Record<OverallRisk, 'default' | 'secondary' | 'destructive'>
   High: 'destructive',
 };
 
+/** Count missing + partial gaps from an assessment's gap list. */
+function countGaps(gaps: NonNullable<Assessment['results']>['gaps'] | undefined): {
+  missing: number;
+  partial: number;
+} {
+  let missing = 0;
+  let partial = 0;
+  for (const g of gaps ?? []) {
+    if (g.gapLevel === 'missing') missing++;
+    else if (g.gapLevel === 'partial') partial++;
+  }
+  return { missing, partial };
+}
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+/** Body sentence for the CONTRACT_A30 next-steps panel (ok / missing(+partial tail) / partial). */
+function contractBodyText(
+  t: TFn,
+  state: { contractOk: boolean; clausesMissing: number; clausesPartial: number }
+): string {
+  const { contractOk, clausesMissing, clausesPartial } = state;
+  if (contractOk) {
+    return t('assessments.detail.nextSteps.contractOk');
+  }
+  if (clausesMissing > 0) {
+    const partialTail =
+      clausesPartial > 0
+        ? t('assessments.detail.nextSteps.contractMissingPartialTail', { count: clausesPartial })
+        : '';
+    return `${t('assessments.detail.nextSteps.contractMissing', { count: clausesMissing })}${partialTail}`;
+  }
+  return t('assessments.detail.nextSteps.contractPartial', { count: clausesPartial });
+}
+
+/** Pick the A30 or DORA i18n key by framework. */
+function byFramework(isA30: boolean, a30Key: string, doraKey: string): string {
+  return isA30 ? a30Key : doraKey;
+}
+
+/** The three summary stat cards (total clauses/gaps · missing · partial). */
+function buildStatCards(
+  t: TFn,
+  s: { isA30: boolean; gapsLength: number; missing: number; partial: number }
+): { label: string; value: number; className?: string }[] {
+  return [
+    {
+      label: t(byFramework(s.isA30, 'assessments.detail.totalClauses', 'assessments.detail.totalGaps')),
+      value: s.isA30 ? 12 : s.gapsLength,
+    },
+    { label: t('assessments.detail.missing'), value: s.missing, className: 'text-destructive' },
+    { label: t('assessments.detail.partial'), value: s.partial, className: 'text-warning' },
+  ];
+}
+
+/** In-progress helper text: indexing message, else A30/DORA analysing message. */
+function inProgressText(t: TFn, status: string, isA30: boolean): string {
+  if (status === 'indexing') return t('assessments.detail.inProgressIndexing');
+  return isA30 ? t('assessments.detail.inProgressA30') : t('assessments.detail.inProgressDora');
+}
+
+/** Low-risk critical-functions sentence (partial count vs. none). */
+function lowRiskText(t: TFn, partialN: number): string {
+  return partialN > 0
+    ? t('assessments.detail.nextSteps.lowRiskPartial', { count: partialN })
+    : t('assessments.detail.nextSteps.lowRiskNoCritical');
+}
+
+/** `/assessments/new` href, carrying the workspace id when present. */
+function assessmentsNewHref(wsId: string | undefined): string {
+  return `/assessments/new${wsId ? `?workspaceId=${wsId}` : ''}`;
+}
+
+/** Card chrome (border colour + header icon) for the DORA high/low-risk next-steps panel. */
+function doraCardChrome(isHighRisk: boolean): {
+  cardClass: string;
+  Icon: React.ElementType;
+  iconClass: string;
+} {
+  if (isHighRisk) {
+    return {
+      cardClass: 'border-destructive/40 bg-destructive/5',
+      Icon: AlertTriangle,
+      iconClass: 'text-destructive',
+    };
+  }
+  return { cardClass: 'border-primary/30 bg-primary/5', Icon: CheckCircle2, iconClass: 'text-success' };
+}
+
+/** Card chrome (border colour + header icon) for the CONTRACT_A30 next-steps panel. */
+function contractCardChrome(clausesMissing: number, clausesPartial: number): {
+  cardClass: string;
+  Icon: React.ElementType;
+  iconClass: string;
+} {
+  if (clausesMissing > 0) {
+    return { cardClass: 'border-destructive/40 bg-destructive/5', Icon: XCircle, iconClass: 'text-destructive' };
+  }
+  if (clausesPartial > 0) {
+    return {
+      cardClass: 'border-warning-muted bg-warning-muted/50',
+      Icon: AlertTriangle,
+      iconClass: 'text-warning',
+    };
+  }
+  return {
+    cardClass: 'border-success-muted bg-success-muted/50',
+    Icon: CheckCircle2,
+    iconClass: 'text-success',
+  };
+}
+
+// Derivable logic (gap counts, card chrome, body/label text, hrefs) is hoisted into the pure
+// helpers above; the residual complexity is three mutually-exclusive JSX panels (reject / DORA /
+// contract) with per-section conditional gates, reducible only by extracting render subtrees into
+// sub-components — explicitly out of scope for this clean-code pass (JSX tree must stay identical).
+// Tracked: minicloud-gitops#2353.
+// eslint-disable-next-line complexity -- residual count is JSX panel/section gates only; logic fully extracted; tracked minicloud-gitops#2353
 function NextStepsPanel({ assessment }: { assessment: Assessment }) {
   const { t } = useTranslation();
   const router = useRouter();
   const isDora = assessment.framework === 'DORA';
   const risk = assessment.results?.overallRisk;
   const wsId = assessment.workspaceId;
-  let missingN = 0, partialN = 0;
-  for (const g of assessment.results?.gaps ?? []) {
-    if (g.gapLevel === 'missing') missingN++;
-    else if (g.gapLevel === 'partial') partialN++;
-  }
+  const { missing: missingN, partial: partialN } = countGaps(assessment.results?.gaps);
 
   if (isDora) {
     if (assessment.riskDecision?.decision === 'reject') {
@@ -87,15 +201,14 @@ function NextStepsPanel({ assessment }: { assessment: Assessment }) {
     }
 
     const isHighRisk = risk === 'High';
+    const dora = doraCardChrome(isHighRisk);
+    const lowRiskCriticalText = lowRiskText(t, partialN);
+    const reviewHref = assessmentsNewHref(wsId);
     return (
-      <Card className={isHighRisk ? 'border-destructive/40 bg-destructive/5' : 'border-primary/30 bg-primary/5'}>
+      <Card className={dora.cardClass}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            {isHighRisk ? (
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5 text-success" />
-            )}
+            <dora.Icon className={`h-5 w-5 ${dora.iconClass}`} />
             {t('assessments.detail.nextSteps.contractReviewTitle')}
           </CardTitle>
         </CardHeader>
@@ -109,9 +222,7 @@ function NextStepsPanel({ assessment }: { assessment: Assessment }) {
             <p className="text-sm text-muted-foreground">
               {t('assessments.detail.nextSteps.lowRiskComplete')}
               {' '}
-              {partialN > 0
-                ? t('assessments.detail.nextSteps.lowRiskPartial', { count: partialN })
-                : t('assessments.detail.nextSteps.lowRiskNoCritical')}
+              {lowRiskCriticalText}
               {' '}
               {t('assessments.detail.nextSteps.lowRiskTail')}
             </p>
@@ -119,9 +230,7 @@ function NextStepsPanel({ assessment }: { assessment: Assessment }) {
           <div className="flex gap-2 flex-wrap">
             <Button
               size="sm"
-              onClick={() =>
-                router.push(`/assessments/new${wsId ? `?workspaceId=${wsId}` : ''}`)
-              }
+              onClick={() => router.push(reviewHref)}
             >
               <FileText className="h-4 w-4 mr-1.5" />
               {t('assessments.detail.nextSteps.reviewContract')}
@@ -139,34 +248,22 @@ function NextStepsPanel({ assessment }: { assessment: Assessment }) {
     );
   }
 
-  let clausesMissing = 0, clausesPartial = 0;
-  for (const g of assessment.results?.gaps ?? []) {
-    if (g.gapLevel === 'missing') clausesMissing++;
-    else if (g.gapLevel === 'partial') clausesPartial++;
-  }
+  const { missing: clausesMissing, partial: clausesPartial } = countGaps(assessment.results?.gaps);
   const contractOk = clausesMissing === 0 && clausesPartial === 0;
+  const { cardClass, Icon, iconClass } = contractCardChrome(clausesMissing, clausesPartial);
+  const contractBody = contractBodyText(t, { contractOk, clausesMissing, clausesPartial });
 
   return (
-    <Card className={clausesMissing > 0 ? 'border-destructive/40 bg-destructive/5' : clausesPartial > 0 ? 'border-warning-muted bg-warning-muted/50' : 'border-success-muted bg-success-muted/50'}>
+    <Card className={cardClass}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
-          {clausesMissing > 0 ? (
-            <XCircle className="h-5 w-5 text-destructive" />
-          ) : clausesPartial > 0 ? (
-            <AlertTriangle className="h-5 w-5 text-warning" />
-          ) : (
-            <CheckCircle2 className="h-5 w-5 text-success" />
-          )}
+          <Icon className={`h-5 w-5 ${iconClass}`} />
           {t('assessments.detail.nextSteps.contractCompleteTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          {contractOk
-            ? t('assessments.detail.nextSteps.contractOk')
-            : clausesMissing > 0
-              ? `${t('assessments.detail.nextSteps.contractMissing', { count: clausesMissing })}${clausesPartial > 0 ? t('assessments.detail.nextSteps.contractMissingPartialTail', { count: clausesPartial }) : ''}`
-              : t('assessments.detail.nextSteps.contractPartial', { count: clausesPartial })}
+          {contractBody}
         </p>
         <div className="flex gap-2 flex-wrap">
           {wsId && (
@@ -192,6 +289,12 @@ interface AssessmentDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Derivable logic (gap counts, framework/status flags, in-progress + stat-card builders, query
+// enabled flags) is hoisted into the pure helpers above; the residual complexity is the many
+// per-section JSX gates (loading / error / in-progress / complete sub-sections / failed), reducible
+// only by extracting render subtrees into sub-components — explicitly out of scope for this
+// clean-code pass (JSX tree must stay identical). Tracked: minicloud-gitops#2353.
+// eslint-disable-next-line complexity -- residual count is JSX section gates only; logic fully extracted; tracked minicloud-gitops#2353
 export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
   const { t } = useTranslation();
   const { id } = use(params);
@@ -213,31 +316,36 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
     },
   });
 
+  const workspaceId = assessment?.workspaceId;
+  const framework = assessment?.framework;
+  const enabledDora = !!workspaceId && framework === 'DORA';
+  const enabledA30 = !!workspaceId && framework === 'CONTRACT_A30';
+
   const { data: workspace } = useQuery({
-    queryKey: ['workspace', assessment?.workspaceId],
+    queryKey: ['workspace', workspaceId],
     queryFn: async () => {
       const res = await workspacesApi.get(assessment!.workspaceId);
       return res.data?.workspace ?? null;
     },
-    enabled: !!assessment?.workspaceId && assessment?.framework === 'DORA',
+    enabled: enabledDora,
   });
 
   const { data: siblingA30 } = useQuery({
-    queryKey: ['assessments', assessment?.workspaceId, 'CONTRACT_A30'],
+    queryKey: ['assessments', workspaceId, 'CONTRACT_A30'],
     queryFn: async () => {
       const res = await assessmentsApi.list({ workspaceId: assessment!.workspaceId, limit: 50 });
       return (res.data?.assessments ?? []).filter((currentAssessment) => currentAssessment.framework === 'CONTRACT_A30');
     },
-    enabled: !!assessment?.workspaceId && assessment?.framework === 'CONTRACT_A30',
+    enabled: enabledA30,
   });
 
   const { data: wsQuestionnaires } = useQuery({
-    queryKey: ['questionnaires', assessment?.workspaceId, 'risk'],
+    queryKey: ['questionnaires', workspaceId, 'risk'],
     queryFn: async () => {
       const res = await questionnairesApi.list({ workspaceId: assessment!.workspaceId });
       return (res.data?.questionnaires ?? []) as VendorQuestionnaire[];
     },
-    enabled: !!assessment?.workspaceId && assessment?.framework === 'DORA',
+    enabled: enabledDora,
   });
 
   const latestCompletedQ = useMemo(() => {
@@ -329,7 +437,7 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="page-title">{assessment.vendorName}</h1>
             <Badge variant="outline" className="text-xs">
-              {isA30 ? t('assessments.detail.badgeA30') : t('assessments.detail.badgeDora')}
+              {t(byFramework(isA30, 'assessments.detail.badgeA30', 'assessments.detail.badgeDora'))}
             </Badge>
             {isA30 && siblingA30 && (
               <NegotiationRoundBadge assessments={siblingA30} currentId={id} />
@@ -403,11 +511,7 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="font-medium">{t('assessments.detail.inProgressTitle')}</p>
           <p className="text-sm text-muted-foreground max-w-sm">
-            {assessment.status === 'indexing'
-              ? t('assessments.detail.inProgressIndexing')
-              : isA30
-                ? t('assessments.detail.inProgressA30')
-                : t('assessments.detail.inProgressDora')}
+            {inProgressText(t, assessment.status, isA30)}
           </p>
         </div>
       )}
@@ -425,9 +529,13 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
                 {t(`assessments.risk.${assessment.results.overallRisk}`)}
               </Badge>
               <p className="text-sm text-muted-foreground">
-                {isA30
-                  ? t(`assessments.detail.riskDescContract.${assessment.results.overallRisk}`)
-                  : t(`assessments.detail.riskDescDora.${assessment.results.overallRisk}`)}
+                {t(
+                  byFramework(
+                    isA30,
+                    `assessments.detail.riskDescContract.${assessment.results.overallRisk}`,
+                    `assessments.detail.riskDescDora.${assessment.results.overallRisk}`
+                  )
+                )}
               </p>
             </div>
             <div className="flex-1 rounded-lg border p-4 space-y-2">
@@ -439,11 +547,12 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: isA30 ? t('assessments.detail.totalClauses') : t('assessments.detail.totalGaps'), value: isA30 ? 12 : assessment.results.gaps.length },
-              { label: t('assessments.detail.missing'), value: gapCounts.missing, className: 'text-destructive' },
-              { label: t('assessments.detail.partial'), value: gapCounts.partial, className: 'text-warning' },
-            ].map((stat) => (
+            {buildStatCards(t, {
+              isA30,
+              gapsLength: assessment.results.gaps.length,
+              missing: gapCounts.missing,
+              partial: gapCounts.partial,
+            }).map((stat) => (
               <div key={stat.label} className="rounded-lg border p-4 text-center">
                 <p className={`text-3xl font-bold ${stat.className ?? ''}`}>{stat.value}</p>
                 <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
@@ -464,7 +573,7 @@ export function AssessmentDetailPage({ params }: AssessmentDetailPageProps) {
 
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">
-              {isA30 ? t('assessments.detail.scorecardA30') : t('assessments.detail.scorecardDora')}
+              {t(byFramework(isA30, 'assessments.detail.scorecardA30', 'assessments.detail.scorecardDora'))}
             </h2>
             {isA30 ? (
               <Art30ClauseScorecardWithSignoff assessment={assessment} />

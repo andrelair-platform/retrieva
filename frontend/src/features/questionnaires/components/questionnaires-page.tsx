@@ -78,7 +78,7 @@ export function QuestionnairesPage() {
     mutationFn: (id: string) => questionnairesApi.delete(id),
     onSuccess: () => {
       toast.success(t('questionnaires.toast.deleted'));
-      queryClient.invalidateQueries({ queryKey: ['questionnaires'] });
+      void queryClient.invalidateQueries({ queryKey: ['questionnaires'] });
     },
     onError: () => toast.error(t('questionnaires.toast.deleteFailed')),
     onSettled: () => setDeletingId(null),
@@ -99,7 +99,7 @@ export function QuestionnairesPage() {
 
     const baseUrl = window.__ENV__?.API_URL?.replace('/api', '') || window.location.origin;
     const link = `${baseUrl}/q/${questionnaire.token}`;
-    navigator.clipboard.writeText(link).then(() => {
+    void navigator.clipboard.writeText(link).then(() => {
       setCopiedId(questionnaire._id);
       toast.success(t('questionnaires.toast.linkCopied'));
       setTimeout(() => setCopiedId(null), 2000);

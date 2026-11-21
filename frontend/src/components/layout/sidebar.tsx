@@ -19,6 +19,25 @@ import {
   type NavItem,
 } from '@/lib/constants/nav-items';
 
+/** Href→active matching for a nav item, honouring section sub-routes. */
+function isSectionNavActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  const subRoutes = ['/conversations', '/assessments', '/workspaces'];
+  return subRoutes.includes(href) && pathname.startsWith(href + '/');
+}
+
+/** Collapsed-dependent class strings, resolved once so the JSX stays branch-light. */
+function sidebarClasses(collapsed: boolean) {
+  return {
+    aside: collapsed ? 'w-16' : 'w-64',
+    header: collapsed ? 'justify-center px-0' : '',
+    toggle: collapsed ? '' : 'ml-auto',
+    navPadding: collapsed ? 'px-2' : 'px-3',
+    bottomPadding: collapsed ? 'px-2' : 'px-3',
+    toggleAria: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+  };
+}
+
 export function Sidebar() {
   const { t } = useTranslation();
   const pathname = usePathname();
@@ -26,6 +45,9 @@ export function Sidebar() {
   const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
   const permissions = usePermissions();
   const user = useAuthStore((state) => state.user);
+  const expanded = !sidebarCollapsed;
+  const orgName = user?.organization?.name;
+  const cls = sidebarClasses(sidebarCollapsed);
 
   const filterNavItems = (items: NavItem[]) => {
     // Scope-down (AUD-P1): drop feature-flagged-off items first, then the workspace-role filter.
@@ -49,17 +71,17 @@ export function Sidebar() {
       data-sidebar
       className={cn(
         'flex h-full flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300',
-        sidebarCollapsed ? 'w-16' : 'w-64'
+        cls.aside
       )}
     >
       {/* ── Logo header ── */}
       <div
         className={cn(
           'flex h-14 shrink-0 items-center border-b border-sidebar-border px-4',
-          sidebarCollapsed && 'justify-center px-0'
+          cls.header
         )}
       >
-        {!sidebarCollapsed && (
+        {expanded && (
           <Link href="/overview" className="flex items-center gap-2.5 min-w-0">
             <ShieldCheck className="h-5 w-5 shrink-0 text-sidebar-primary" />
             <span className="font-display text-lg font-semibold text-sidebar-foreground tracking-tight truncate">
@@ -72,11 +94,11 @@ export function Sidebar() {
           size="icon"
           className={cn(
             'h-7 w-7 shrink-0 text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent',
-            sidebarCollapsed ? '' : 'ml-auto'
+            cls.toggle
           )}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!sidebarCollapsed}
+          aria-label={cls.toggleAria}
+          aria-expanded={expanded}
         >
           {sidebarCollapsed
             ? <PanelLeft className="h-4 w-4" aria-hidden />
@@ -85,11 +107,11 @@ export function Sidebar() {
       </div>
 
       {/* ── Org label + workspace switcher ── */}
-      {!sidebarCollapsed && (
+      {expanded && (
         <div className="px-4 pt-3 pb-3 border-b border-sidebar-border space-y-2">
-          {user?.organization && (
+          {orgName && (
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70 truncate">
-              {user.organization.name}
+              {orgName}
             </p>
           )}
           <WorkspaceSwitcher />
@@ -98,7 +120,7 @@ export function Sidebar() {
 
       {/* ── Main Navigation ── */}
       <ScrollArea className="flex-1 py-3">
-        <nav className={cn('flex flex-col', sidebarCollapsed ? 'px-2' : 'px-3')}>
+        <nav className={cn('flex flex-col', cls.navPadding)}>
           {desktopNavSections.map((section, idx) => {
             const visibleItems = filterNavItems(section.items);
             if (visibleItems.length === 0) return null;
@@ -106,7 +128,7 @@ export function Sidebar() {
             return (
               <div key={section.label} className={cn(idx > 0 && 'mt-4')}>
                 {/* Section label — hidden when collapsed */}
-                {!sidebarCollapsed && (
+                {expanded && (
                   <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70 select-none">
                     {t(section.label)}
                   </p>
@@ -118,21 +140,14 @@ export function Sidebar() {
                 )}
 
                 <div className="flex flex-col gap-0.5">
-                  {visibleItems.map((item) => {
-                    const isActive =
-                      pathname === item.href ||
-                      (item.href === '/conversations' && pathname.startsWith('/conversations/')) ||
-                      (item.href === '/assessments' && pathname.startsWith('/assessments/')) ||
-                      (item.href === '/workspaces' && pathname.startsWith('/workspaces/'));
-                    return (
-                      <NavLink
-                        key={item.href}
-                        item={item}
-                        isActive={isActive}
-                        collapsed={sidebarCollapsed}
-                      />
-                    );
-                  })}
+                  {visibleItems.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      item={item}
+                      isActive={isSectionNavActive(pathname, item.href)}
+                      collapsed={sidebarCollapsed}
+                    />
+                  ))}
                 </div>
               </div>
             );
@@ -141,9 +156,9 @@ export function Sidebar() {
       </ScrollArea>
 
       {/* ── Bottom Navigation (Account: Team + Settings) ── */}
-      <div className={cn('shrink-0 border-t border-sidebar-border py-3', sidebarCollapsed ? 'px-2' : 'px-3')}>
+      <div className={cn('shrink-0 border-t border-sidebar-border py-3', cls.bottomPadding)}>
         {/* Section label so Team/Settings read as a grouped area, not stray footer icons */}
-        {!sidebarCollapsed && (
+        {expanded && (
           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70 select-none">
             {t('nav.sections.account')}
           </p>

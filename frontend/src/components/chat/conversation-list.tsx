@@ -48,6 +48,7 @@ interface ConversationListProps {
   selectedId?: string;
 }
 
+// eslint-disable-next-line complexity -- complexity is intrinsic to the render's loading/error/empty JSX branch chain + pinned/recent section guards; cannot extract JSX per clean-code floor; tracked minicloud-gitops#2353
 export function ConversationList({
   onNewConversation,
   selectedId,
@@ -89,7 +90,7 @@ export function ConversationList({
       await conversationsApi.togglePin(id, isPinned);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: () => {
       toast.error(t('chat.ui.sidebar.updateFailed'));
@@ -102,7 +103,7 @@ export function ConversationList({
       await conversationsApi.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast.success(t('chat.list.toast.deleted'));
       setDeleteDialogOpen(false);
       setConversationToDelete(null);

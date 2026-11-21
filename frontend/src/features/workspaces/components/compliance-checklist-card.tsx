@@ -65,6 +65,140 @@ function StatusBadge({ status }: { status: StepStatus }) {
   );
 }
 
+function questionnaireStatus(latestQ: VendorQuestionnaire | null): StepStatus {
+  if (latestQ?.status === 'complete') return 'done';
+  if (latestQ?.status === 'sent' || latestQ?.status === 'partial') return 'in-progress';
+  return 'pending';
+}
+
+function assessmentStatus(latest: Assessment | null): StepStatus {
+  if (latest?.status === 'complete') return 'done';
+  if (latest?.status === 'analyzing' || latest?.status === 'indexing') return 'in-progress';
+  return 'pending';
+}
+
+function monitorStatusOf(hasCerts: boolean, hasReview: boolean): StepStatus {
+  if (hasCerts && hasReview) return 'done';
+  if (hasCerts || hasReview) return 'in-progress';
+  return 'pending';
+}
+
+type TFunc = ReturnType<typeof useTranslation>['t'];
+
+interface ChecklistInputs {
+  t: TFunc;
+  workspace: WorkspaceWithMembership;
+  workspaceId: string;
+  classifyDone: boolean;
+  latestQ: VendorQuestionnaire | null;
+  qStatus: StepStatus;
+  latestDora: Assessment | null;
+  doraStatus: StepStatus;
+  latestA30: Assessment | null;
+  a30Status: StepStatus;
+  monitorStatus: StepStatus;
+  hasCerts: boolean;
+}
+
+function classifyStep({ t, workspace, workspaceId, classifyDone }: ChecklistInputs): ChecklistStep {
+  return {
+    n: 1,
+    Icon: Building2,
+    title: t('workspaces.checklist.s1Title'),
+    status: classifyDone ? 'done' : 'pending',
+    detail: classifyDone
+      ? t('workspaces.checklist.s1DetailDone', { tier: workspace.vendorTier, service: workspace.serviceType })
+      : t('workspaces.checklist.s1DetailPending'),
+    href: classifyDone ? undefined : `/workspaces/${workspaceId}/settings`,
+    actionLabel: classifyDone ? undefined : t('workspaces.checklist.s1Action'),
+  };
+}
+
+function questionnaireDetail(t: TFunc, latestQ: VendorQuestionnaire | null, qStatus: StepStatus): string {
+  if (qStatus === 'done') {
+    const score = latestQ?.overallScore ?? t('workspaces.checklist.emDash');
+    const date = latestQ?.respondedAt ? format(new Date(latestQ.respondedAt), 'dd MMM yyyy') : t('workspaces.checklist.emDash');
+    return t('workspaces.checklist.s2DetailDone', { score, date });
+  }
+  if (qStatus === 'in-progress') {
+    return t('workspaces.checklist.s2DetailProgress', { email: latestQ?.vendorEmail ?? t('workspaces.checklist.vendorFallback') });
+  }
+  return t('workspaces.checklist.s2DetailPending');
+}
+
+function questionnaireStep({ t, latestQ, qStatus }: ChecklistInputs): ChecklistStep {
+  return {
+    n: 2,
+    Icon: ClipboardList,
+    title: t('workspaces.checklist.s2Title'),
+    status: qStatus,
+    detail: questionnaireDetail(t, latestQ, qStatus),
+    href: qStatus === 'pending' ? '/questionnaires/new' : `/questionnaires/${latestQ?._id}`,
+    actionLabel: qStatus === 'pending' ? t('workspaces.checklist.s2ActionPending') : t('workspaces.checklist.s2ActionView'),
+  };
+}
+
+function doraStep({ t, latestDora, doraStatus }: ChecklistInputs): ChecklistStep {
+  return {
+    n: 3,
+    Icon: FileSearch,
+    title: t('workspaces.checklist.s3Title'),
+    status: doraStatus,
+    detail:
+      doraStatus === 'done'
+        ? t('workspaces.checklist.s3DetailDone', { risk: latestDora?.results?.overallRisk ?? t('workspaces.checklist.emDash'), date: format(new Date(latestDora!.createdAt), 'dd MMM yyyy') })
+        : doraStatus === 'in-progress'
+          ? t('workspaces.checklist.s3DetailProgress')
+          : t('workspaces.checklist.s3DetailPending'),
+    href: doraStatus === 'pending' ? '/assessments/new' : `/assessments/${latestDora?._id}`,
+    actionLabel: doraStatus === 'pending' ? t('workspaces.checklist.s3ActionPending') : t('workspaces.checklist.s3ActionView'),
+  };
+}
+
+function a30Step({ t, latestA30, a30Status }: ChecklistInputs): ChecklistStep {
+  return {
+    n: 4,
+    Icon: FileText,
+    title: t('workspaces.checklist.s4Title'),
+    status: a30Status,
+    detail:
+      a30Status === 'done'
+        ? t('workspaces.checklist.s4DetailDone', { date: format(new Date(latestA30!.createdAt), 'dd MMM yyyy') })
+        : a30Status === 'in-progress'
+          ? t('workspaces.checklist.s4DetailProgress')
+          : t('workspaces.checklist.s4DetailPending'),
+    href: a30Status === 'pending' ? '/assessments/new' : `/assessments/${latestA30?._id}`,
+    actionLabel: a30Status === 'pending' ? t('workspaces.checklist.s4ActionPending') : t('workspaces.checklist.s4ActionView'),
+  };
+}
+
+function monitorStep({ t, workspace, workspaceId, monitorStatus, hasCerts }: ChecklistInputs): ChecklistStep {
+  return {
+    n: 5,
+    Icon: Bell,
+    title: t('workspaces.checklist.s5Title'),
+    status: monitorStatus,
+    detail:
+      monitorStatus === 'done'
+        ? t('workspaces.checklist.s5DetailDone', { count: workspace.certifications?.length, date: format(new Date(workspace.nextReviewDate!), 'dd MMM yyyy') })
+        : monitorStatus === 'in-progress'
+          ? t('workspaces.checklist.s5DetailProgress', { which: hasCerts ? t('workspaces.checklist.certsAdded') : t('workspaces.checklist.reviewSet') })
+          : t('workspaces.checklist.s5DetailPending'),
+    href: `/workspaces/${workspaceId}/settings`,
+    actionLabel: monitorStatus === 'done' ? t('workspaces.checklist.s5ActionDone') : t('workspaces.checklist.s5ActionSetup'),
+  };
+}
+
+function buildSteps(inputs: ChecklistInputs): ChecklistStep[] {
+  return [
+    classifyStep(inputs),
+    questionnaireStep(inputs),
+    doraStep(inputs),
+    a30Step(inputs),
+    monitorStep(inputs),
+  ];
+}
+
 interface ComplianceChecklistCardProps {
   workspace: WorkspaceWithMembership;
   assessments: Assessment[];
@@ -81,104 +215,33 @@ export function ComplianceChecklistCard({
   const workspaceId = workspace.id;
   const classifyDone = !!(workspace.vendorTier && workspace.serviceType);
   const latestQ = questionnaires[0] ?? null;
-  const qStatus: StepStatus =
-    latestQ?.status === 'complete'
-      ? 'done'
-      : latestQ?.status === 'sent' || latestQ?.status === 'partial'
-        ? 'in-progress'
-        : 'pending';
+  const qStatus = questionnaireStatus(latestQ);
   const doraAssessments = assessments.filter((assessment) => assessment.framework === 'DORA');
   const latestDora = doraAssessments[0] ?? null;
-  const doraStatus: StepStatus =
-    latestDora?.status === 'complete'
-      ? 'done'
-      : latestDora?.status === 'analyzing' || latestDora?.status === 'indexing'
-        ? 'in-progress'
-        : 'pending';
+  const doraStatus = assessmentStatus(latestDora);
   const a30Assessments = assessments.filter(
     (assessment) => assessment.framework === 'CONTRACT_A30'
   );
   const latestA30 = a30Assessments[0] ?? null;
-  const a30Status: StepStatus =
-    latestA30?.status === 'complete'
-      ? 'done'
-      : latestA30?.status === 'analyzing' || latestA30?.status === 'indexing'
-        ? 'in-progress'
-        : 'pending';
+  const a30Status = assessmentStatus(latestA30);
   const hasCerts = (workspace.certifications?.length ?? 0) > 0;
   const hasReview = !!workspace.nextReviewDate;
-  const monitorStatus: StepStatus =
-    hasCerts && hasReview ? 'done' : hasCerts || hasReview ? 'in-progress' : 'pending';
+  const monitorStatus = monitorStatusOf(hasCerts, hasReview);
 
-  const steps: ChecklistStep[] = [
-    {
-      n: 1,
-      Icon: Building2,
-      title: t('workspaces.checklist.s1Title'),
-      status: classifyDone ? 'done' : 'pending',
-      detail: classifyDone
-        ? t('workspaces.checklist.s1DetailDone', { tier: workspace.vendorTier, service: workspace.serviceType })
-        : t('workspaces.checklist.s1DetailPending'),
-      href: classifyDone ? undefined : `/workspaces/${workspaceId}/settings`,
-      actionLabel: classifyDone ? undefined : t('workspaces.checklist.s1Action'),
-    },
-    {
-      n: 2,
-      Icon: ClipboardList,
-      title: t('workspaces.checklist.s2Title'),
-      status: qStatus,
-      detail:
-        qStatus === 'done'
-          ? t('workspaces.checklist.s2DetailDone', { score: latestQ?.overallScore ?? t('workspaces.checklist.emDash'), date: latestQ?.respondedAt ? format(new Date(latestQ.respondedAt), 'dd MMM yyyy') : t('workspaces.checklist.emDash') })
-          : qStatus === 'in-progress'
-            ? t('workspaces.checklist.s2DetailProgress', { email: latestQ?.vendorEmail ?? t('workspaces.checklist.vendorFallback') })
-            : t('workspaces.checklist.s2DetailPending'),
-      href: qStatus === 'pending' ? '/questionnaires/new' : `/questionnaires/${latestQ?._id}`,
-      actionLabel: qStatus === 'pending' ? t('workspaces.checklist.s2ActionPending') : t('workspaces.checklist.s2ActionView'),
-    },
-    {
-      n: 3,
-      Icon: FileSearch,
-      title: t('workspaces.checklist.s3Title'),
-      status: doraStatus,
-      detail:
-        doraStatus === 'done'
-          ? t('workspaces.checklist.s3DetailDone', { risk: latestDora?.results?.overallRisk ?? t('workspaces.checklist.emDash'), date: format(new Date(latestDora!.createdAt), 'dd MMM yyyy') })
-          : doraStatus === 'in-progress'
-            ? t('workspaces.checklist.s3DetailProgress')
-            : t('workspaces.checklist.s3DetailPending'),
-      href: doraStatus === 'pending' ? '/assessments/new' : `/assessments/${latestDora?._id}`,
-      actionLabel: doraStatus === 'pending' ? t('workspaces.checklist.s3ActionPending') : t('workspaces.checklist.s3ActionView'),
-    },
-    {
-      n: 4,
-      Icon: FileText,
-      title: t('workspaces.checklist.s4Title'),
-      status: a30Status,
-      detail:
-        a30Status === 'done'
-          ? t('workspaces.checklist.s4DetailDone', { date: format(new Date(latestA30!.createdAt), 'dd MMM yyyy') })
-          : a30Status === 'in-progress'
-            ? t('workspaces.checklist.s4DetailProgress')
-            : t('workspaces.checklist.s4DetailPending'),
-      href: a30Status === 'pending' ? '/assessments/new' : `/assessments/${latestA30?._id}`,
-      actionLabel: a30Status === 'pending' ? t('workspaces.checklist.s4ActionPending') : t('workspaces.checklist.s4ActionView'),
-    },
-    {
-      n: 5,
-      Icon: Bell,
-      title: t('workspaces.checklist.s5Title'),
-      status: monitorStatus,
-      detail:
-        monitorStatus === 'done'
-          ? t('workspaces.checklist.s5DetailDone', { count: workspace.certifications?.length, date: format(new Date(workspace.nextReviewDate!), 'dd MMM yyyy') })
-          : monitorStatus === 'in-progress'
-            ? t('workspaces.checklist.s5DetailProgress', { which: hasCerts ? t('workspaces.checklist.certsAdded') : t('workspaces.checklist.reviewSet') })
-            : t('workspaces.checklist.s5DetailPending'),
-      href: `/workspaces/${workspaceId}/settings`,
-      actionLabel: monitorStatus === 'done' ? t('workspaces.checklist.s5ActionDone') : t('workspaces.checklist.s5ActionSetup'),
-    },
-  ];
+  const steps = buildSteps({
+    t,
+    workspace,
+    workspaceId,
+    classifyDone,
+    latestQ,
+    qStatus,
+    latestDora,
+    doraStatus,
+    latestA30,
+    a30Status,
+    monitorStatus,
+    hasCerts,
+  });
 
   const doneCount = steps.filter((step) => step.status === 'done').length;
 

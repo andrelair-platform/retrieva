@@ -16,7 +16,7 @@ export function useApproveArtefactMutation() {
   return useMutation({
     mutationFn: (id: string) => exitStrategyApi.approve(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['exit-artefacts'] });
+      void qc.invalidateQueries({ queryKey: ['exit-artefacts'] });
     },
   });
 }
@@ -27,7 +27,7 @@ export function useRejectArtefactMutation() {
   return useMutation({
     mutationFn: (id: string) => exitStrategyApi.reject(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['exit-artefacts'] });
+      void qc.invalidateQueries({ queryKey: ['exit-artefacts'] });
     },
   });
 }

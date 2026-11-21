@@ -35,6 +35,170 @@ import {
   type VendorResearchResult,
 } from '@/features/evaluations/api/evaluations';
 
+const hasSubcontractors = (subs: unknown): boolean => Array.isArray(subs) && subs.length > 0;
+
+// Research failures are usually the egress gate being off → a friendlier message for that case.
+const researchErrorMessage = (msg: string): string =>
+  /disabled/i.test(msg) ? 'Web research is turned off for this environment' : msg;
+
+// Formatters for the researched-vendor preview block.
+const researchedSubprocessors = (r: VendorResearchResult): string =>
+  r.proposal.subcontractors?.length ? r.proposal.subcontractors.join(', ') : '— none evidenced';
+const researchedResidency = (r: VendorResearchResult): string =>
+  r.proposal.dataResidency || '— not stated';
+
+// Per-candidate derived view used by the ranked list render (keeps the map callback branch-free).
+function candidateView(
+  c: EvaluationCandidate,
+  r: { rank: number; scored: ScoredCandidate } | undefined
+) {
+  const scoreTotal = r?.scored.total ?? 0;
+  const isSelected = c.status === 'selected';
+  return {
+    rank: r?.rank,
+    isLeader: r?.rank === 1 && scoreTotal > 0,
+    scoreTotal,
+    completeness: r?.scored.completeness ?? 0,
+    needsVendorEvidence: !hasSubcontractors(c.proposal?.subcontractors),
+    isSelected,
+    isRejected: c.status === 'rejected',
+    cardClass: isSelected ? 'border-green-300' : '',
+  };
+}
+
+// Per-candidate control flags (keeps the ||/? branches out of the ranked-list render callback).
+function candidateControls(args: {
+  savePending: boolean;
+  hasEdits: boolean;
+  needsEntity: boolean;
+  selectPending: boolean;
+}) {
+  return {
+    saveDisabled: args.savePending || !args.hasEdits,
+    selectDisabled: args.needsEntity || args.selectPending,
+    selectTitle: args.needsEntity ? 'Set the legal entity first' : 'Select as the winner',
+  };
+}
+
+// The "add a candidate vendor" dialog. A plain render helper (not a component) so the rendered tree
+// is identical to inlining it — it keeps the component body's branch count down.
+function renderAddCandidateDialog(args: {
+  open: boolean;
+  setOpen: (o: boolean) => void;
+  resetAdd: () => void;
+  vendorName: string;
+  setVendorName: (v: string) => void;
+  setDoc: (f: File | null) => void;
+  researchUrl: string;
+  setResearchUrl: (v: string) => void;
+  researchPending: boolean;
+  researched: VendorResearchResult | null;
+  runResearch: () => void;
+  addPending: boolean;
+  addVendor: () => void;
+}): React.ReactNode {
+  const {
+    open,
+    setOpen,
+    resetAdd,
+    vendorName,
+    setVendorName,
+    setDoc,
+    researchUrl,
+    setResearchUrl,
+    researchPending,
+    researched,
+    runResearch,
+    addPending,
+    addVendor,
+  } = args;
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetAdd(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add a candidate vendor</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="cand-vendor">Vendor *</Label>
+            <Input
+              id="cand-vendor"
+              placeholder="e.g. Notion"
+              value={vendorName}
+              onChange={(e) => setVendorName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cand-doc">Vendor documents (optional)</Label>
+            <Input
+              id="cand-doc"
+              type="file"
+              accept=".pdf,.docx,.xlsx"
+              onChange={(e) => setDoc(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              SOC 2 / DPA / sub-processor list — grounds the vendor facts. Anything not evidenced stays flagged, never guessed.
+            </p>
+          </div>
+
+          {/* E5 — research the vendor's public trust page (egress-gated; disabled → a toast) */}
+          <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
+            <Label htmlFor="cand-url" className="flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5" /> …or fetch from the web (optional)
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="cand-url"
+                placeholder="https://trust.notion.so/…"
+                value={researchUrl}
+                onChange={(e) => setResearchUrl(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!vendorName.trim() || !researchUrl.trim() || researchPending}
+                onClick={runResearch}
+              >
+                {researchPending ? 'Fetching…' : 'Research'}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Fetches the vendor&apos;s own trust-centre / sub-processor page (allow-listed domains only).
+              Facts are shown with their source for you to verify — never auto-applied.
+            </p>
+            {researched && (
+              <div className="mt-1 rounded bg-muted/50 p-2 text-[11px]">
+                <p className="text-muted-foreground">
+                  From <span className="text-foreground">{researched.provenance.host}</span>:
+                </p>
+                <p className="mt-0.5">
+                  Sub-processors:{' '}
+                  <span className="text-foreground">{researchedSubprocessors(researched)}</span>
+                </p>
+                <p>
+                  Data residency:{' '}
+                  <span className="text-foreground">{researchedResidency(researched)}</span>
+                </p>
+                {researched.gaps.length > 0 && (
+                  <p className="mt-0.5 text-amber-600">Still missing: {researched.gaps.join(', ')}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={resetAdd}>
+            Cancel
+          </Button>
+          <Button disabled={!vendorName.trim() || addPending} onClick={addVendor}>
+            {addPending ? 'Drafting…' : 'Add'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ScoreChip({ label, value }: { label: string; value: number | null | undefined }) {
   const v = typeof value === 'number' ? value : null;
   const tone =
@@ -111,12 +275,7 @@ export function EvaluationDetailPage({ id }: { id: string }) {
           toast.success('Fetched the vendor page — review the provenanced facts below');
         },
         onError: (e) => {
-          const msg = getErrorMessage(e);
-          toast.error(
-            /disabled/i.test(msg)
-              ? 'Web research is turned off for this environment'
-              : msg
-          );
+          toast.error(researchErrorMessage(getErrorMessage(e)));
         },
       }
     );
@@ -187,28 +346,40 @@ export function EvaluationDetailPage({ id }: { id: string }) {
             .sort((a, b) => (rankById.get(a.id)?.rank ?? 99) - (rankById.get(b.id)?.rank ?? 99))
             .map((c) => {
               const r = rankById.get(c.id);
-              const isLeader = r?.rank === 1 && (r?.scored.total ?? 0) > 0;
-              const subs = c.proposal?.subcontractors;
-              const needsVendorEvidence = !(Array.isArray(subs) && subs.length > 0);
+              const {
+                isLeader,
+                scoreTotal,
+                completeness,
+                needsVendorEvidence,
+                isSelected,
+                isRejected,
+                cardClass,
+              } = candidateView(c, r);
+              const { saveDisabled, selectDisabled, selectTitle } = candidateControls({
+                savePending: setScores.isPending,
+                hasEdits: !!edits[c.id],
+                needsEntity,
+                selectPending: selectWinner.isPending,
+              });
               return (
-                <Card key={c.id} className={`p-4 ${c.status === 'selected' ? 'border-green-300' : ''}`}>
+                <Card key={c.id} className={`p-4 ${cardClass}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       {isLeader && <Trophy className="h-4 w-4 text-amber-500" aria-label="Top-ranked" />}
                       <span className="font-semibold">{c.vendorName}</span>
-                      {c.status === 'selected' && (
+                      {isSelected && (
                         <Badge variant="outline" className="border-green-200 bg-green-100 text-[10px] text-green-700">selected</Badge>
                       )}
-                      {c.status === 'rejected' && (
+                      {isRejected && (
                         <Badge variant="outline" className="text-[10px] text-muted-foreground">not chosen</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <span className="text-muted-foreground">
-                        score <span className="font-semibold tabular-nums text-foreground">{r?.scored.total ?? 0}</span>/100
+                        score <span className="font-semibold tabular-nums text-foreground">{scoreTotal}</span>/100
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        {Math.round((r?.scored.completeness ?? 0) * 100)}% scored
+                        {Math.round(completeness * 100)}% scored
                       </span>
                     </div>
                   </div>
@@ -254,7 +425,7 @@ export function EvaluationDetailPage({ id }: { id: string }) {
                           size="sm"
                           variant="outline"
                           className="h-8 w-full"
-                          disabled={setScores.isPending || !edits[c.id]}
+                          disabled={saveDisabled}
                           onClick={() => saveScores(c.id)}
                         >
                           Save
@@ -267,8 +438,8 @@ export function EvaluationDetailPage({ id }: { id: string }) {
                     <div className="mt-3 flex justify-end">
                       <Button
                         size="sm"
-                        disabled={needsEntity || selectWinner.isPending}
-                        title={needsEntity ? 'Set the legal entity first' : 'Select as the winner'}
+                        disabled={selectDisabled}
+                        title={selectTitle}
                         onClick={() => select(c)}
                       >
                         <Trophy className="mr-1.5 h-3.5 w-3.5" /> Select winner
@@ -282,93 +453,21 @@ export function EvaluationDetailPage({ id }: { id: string }) {
       )}
 
       {/* add candidate */}
-      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetAdd(); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add a candidate vendor</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="cand-vendor">Vendor *</Label>
-              <Input
-                id="cand-vendor"
-                placeholder="e.g. Notion"
-                value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cand-doc">Vendor documents (optional)</Label>
-              <Input
-                id="cand-doc"
-                type="file"
-                accept=".pdf,.docx,.xlsx"
-                onChange={(e) => setDoc(e.target.files?.[0] ?? null)}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                SOC 2 / DPA / sub-processor list — grounds the vendor facts. Anything not evidenced stays flagged, never guessed.
-              </p>
-            </div>
-
-            {/* E5 — research the vendor's public trust page (egress-gated; disabled → a toast) */}
-            <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
-              <Label htmlFor="cand-url" className="flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5" /> …or fetch from the web (optional)
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="cand-url"
-                  placeholder="https://trust.notion.so/…"
-                  value={researchUrl}
-                  onChange={(e) => setResearchUrl(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!vendorName.trim() || !researchUrl.trim() || research.isPending}
-                  onClick={runResearch}
-                >
-                  {research.isPending ? 'Fetching…' : 'Research'}
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Fetches the vendor&apos;s own trust-centre / sub-processor page (allow-listed domains only).
-                Facts are shown with their source for you to verify — never auto-applied.
-              </p>
-              {researched && (
-                <div className="mt-1 rounded bg-muted/50 p-2 text-[11px]">
-                  <p className="text-muted-foreground">
-                    From <span className="text-foreground">{researched.provenance.host}</span>:
-                  </p>
-                  <p className="mt-0.5">
-                    Sub-processors:{' '}
-                    <span className="text-foreground">
-                      {researched.proposal.subcontractors?.length
-                        ? researched.proposal.subcontractors.join(', ')
-                        : '— none evidenced'}
-                    </span>
-                  </p>
-                  <p>
-                    Data residency:{' '}
-                    <span className="text-foreground">{researched.proposal.dataResidency || '— not stated'}</span>
-                  </p>
-                  {researched.gaps.length > 0 && (
-                    <p className="mt-0.5 text-amber-600">Still missing: {researched.gaps.join(', ')}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={resetAdd}>
-              Cancel
-            </Button>
-            <Button disabled={!vendorName.trim() || addCandidate.isPending} onClick={addVendor}>
-              {addCandidate.isPending ? 'Drafting…' : 'Add'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {renderAddCandidateDialog({
+        open,
+        setOpen,
+        resetAdd,
+        vendorName,
+        setVendorName,
+        setDoc,
+        researchUrl,
+        setResearchUrl,
+        researchPending: research.isPending,
+        researched,
+        runResearch,
+        addPending: addCandidate.isPending,
+        addVendor,
+      })}
     </div>
   );
 }

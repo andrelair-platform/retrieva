@@ -55,6 +55,32 @@ interface WorkspaceSettingsFormProps {
   isQuestionnaireLoading: boolean;
 }
 
+type BadgeVariant = 'default' | 'secondary' | 'destructive';
+
+/** Q-score risk band → the text colour, badge variant, and label key (≥70 low, ≥40 medium, else high). */
+function qScoreBand(score: number): {
+  colorClass: string;
+  badgeVariant: BadgeVariant;
+  labelKey: string;
+} {
+  if (score >= 70) {
+    return { colorClass: 'text-success', badgeVariant: 'default', labelKey: 'workspaces.settingsForm.lowRisk' };
+  }
+  if (score >= 40) {
+    return { colorClass: 'text-warning', badgeVariant: 'secondary', labelKey: 'workspaces.settingsForm.mediumRisk' };
+  }
+  return { colorClass: 'text-destructive', badgeVariant: 'destructive', labelKey: 'workspaces.settingsForm.highRisk' };
+}
+
+/** The questionnaire card's render state. */
+type QScoreState = 'loading' | 'result' | 'empty';
+
+function qScoreState(isLoading: boolean, questionnaire: VendorQuestionnaire | null | undefined): QScoreState {
+  if (isLoading) return 'loading';
+  if (questionnaire) return 'result';
+  return 'empty';
+}
+
 export function WorkspaceSettingsForm({
   workspace,
   workspaceId,
@@ -68,6 +94,8 @@ export function WorkspaceSettingsForm({
 }: WorkspaceSettingsFormProps) {
   const { t } = useTranslation();
   const { fields, append, remove } = certificationsFieldArray;
+  const qState = qScoreState(isQuestionnaireLoading, latestQuestionnaire);
+  const qBand = latestQuestionnaire ? qScoreBand(latestQuestionnaire.overallScore ?? 0) : null;
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -400,42 +428,22 @@ export function WorkspaceSettingsForm({
           <CardDescription>{t('workspaces.settingsForm.qScoreDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
-          {isQuestionnaireLoading ? (
+          {qState === 'loading' ? (
             <div className="space-y-2">
               <Skeleton className="h-6 w-32" />
               <Skeleton className="h-4 w-48" />
             </div>
-          ) : latestQuestionnaire ? (
+          ) : latestQuestionnaire && qBand ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <span
-                  className={`text-4xl font-bold ${
-                    (latestQuestionnaire.overallScore ?? 0) >= 70
-                      ? 'text-success'
-                      : (latestQuestionnaire.overallScore ?? 0) >= 40
-                        ? 'text-warning'
-                        : 'text-destructive'
-                  }`}
-                >
+                <span className={`text-4xl font-bold ${qBand.colorClass}`}>
                   {latestQuestionnaire.overallScore ?? '—'}
                 </span>
                 <div>
                   <span className="text-muted-foreground">/100</span>
                   <div className="mt-1">
-                    <Badge
-                      variant={
-                        (latestQuestionnaire.overallScore ?? 0) >= 70
-                          ? 'default'
-                          : (latestQuestionnaire.overallScore ?? 0) >= 40
-                            ? 'secondary'
-                            : 'destructive'
-                      }
-                    >
-                      {(latestQuestionnaire.overallScore ?? 0) >= 70
-                        ? t('workspaces.settingsForm.lowRisk')
-                        : (latestQuestionnaire.overallScore ?? 0) >= 40
-                          ? t('workspaces.settingsForm.mediumRisk')
-                          : t('workspaces.settingsForm.highRisk')}
+                    <Badge variant={qBand.badgeVariant}>
+                      {t(qBand.labelKey)}
                     </Badge>
                   </div>
                 </div>

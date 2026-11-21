@@ -42,6 +42,30 @@ interface Props {
 
 const NONE = '__none__';
 
+// Parse a comma-separated input into a trimmed, non-empty list.
+const parseCsvList = (raw: string): string[] =>
+  raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const canConfirmProposal = (proposal: ArrangementProposal | null, pending: boolean): boolean =>
+  Boolean(proposal?.providerName) &&
+  Boolean(proposal?.legalEntityName) &&
+  Boolean(proposal?.businessFunctionName) &&
+  !pending;
+
+// Form display values for a proposal (defaults applied once, keeping the render free of `??` branches).
+const proposalView = (p: ArrangementProposal) => ({
+  providerName: p.providerName ?? '',
+  legalEntityName: p.legalEntityName ?? '',
+  businessFunctionName: p.businessFunctionName ?? '',
+  ictServiceName: p.ictServiceName ?? '',
+  arrangementType: p.arrangementType ?? 'external',
+  criticality: p.criticality ?? NONE,
+  dataResidency: p.dataResidency ?? '',
+});
+
 export function IntakeDialog({ open, onOpenChange }: Props) {
   const qc = useQueryClient();
   const [proposal, setProposal] = useState<ArrangementProposal | null>(null);
@@ -70,7 +94,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     mutationFn: () => arrangementsApi.confirmIntake(proposal as ArrangementProposal, source, trigger),
     onSuccess: async () => {
       toast.success('Arrangement proposal submitted for independent review');
-      qc.invalidateQueries({ queryKey: ['arrangement-proposals'] });
+      void qc.invalidateQueries({ queryKey: ['arrangement-proposals'] });
       onOpenChange(false);
       reset();
     },
@@ -105,8 +129,8 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
     onOpenChange(o);
   };
 
-  const canConfirm =
-    proposal?.providerName && proposal?.legalEntityName && proposal?.businessFunctionName && !confirm.isPending;
+  const canConfirm = canConfirmProposal(proposal, confirm.isPending);
+  const pv = proposal ? proposalView(proposal) : null;
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -165,19 +189,19 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
                 <Label>Provider *</Label>
-                <Input value={proposal.providerName ?? ''} onChange={(e) => set('providerName', e.target.value)} />
+                <Input value={pv!.providerName} onChange={(e) => set('providerName', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Legal entity *</Label>
-                <Input value={proposal.legalEntityName ?? ''} onChange={(e) => set('legalEntityName', e.target.value)} />
+                <Input value={pv!.legalEntityName} onChange={(e) => set('legalEntityName', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Business function *</Label>
-                <Input value={proposal.businessFunctionName ?? ''} onChange={(e) => set('businessFunctionName', e.target.value)} />
+                <Input value={pv!.businessFunctionName} onChange={(e) => set('businessFunctionName', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>ICT service</Label>
-                <Input value={proposal.ictServiceName ?? ''} onChange={(e) => set('ictServiceName', e.target.value)} />
+                <Input value={pv!.ictServiceName} onChange={(e) => set('ictServiceName', e.target.value)} />
               </div>
               <div className="flex items-center gap-2 pt-6">
                 <Switch checked={proposal.criticalOrImportant === true} onCheckedChange={(v) => set('criticalOrImportant', v)} id="cif2" />
@@ -187,13 +211,13 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
                 <Label>Subcontractors (nth-party)</Label>
                 <Input
                   value={proposal.subcontractors.join(', ')}
-                  onChange={(e) => set('subcontractors', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                  onChange={(e) => set('subcontractors', parseCsvList(e.target.value))}
                   placeholder="comma-separated"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Type</Label>
-                <Select value={proposal.arrangementType ?? 'external'} onValueChange={(v) => set('arrangementType', v as ArrangementType)}>
+                <Select value={pv!.arrangementType} onValueChange={(v) => set('arrangementType', v as ArrangementType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="external">External</SelectItem>
@@ -203,7 +227,7 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label>Criticality</Label>
-                <Select value={proposal.criticality ?? NONE} onValueChange={(v) => set('criticality', v === NONE ? null : (v as Criticality))}>
+                <Select value={pv!.criticality} onValueChange={(v) => set('criticality', v === NONE ? null : (v as Criticality))}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>—</SelectItem>
@@ -215,13 +239,13 @@ export function IntakeDialog({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label>Data residency</Label>
-                <Input value={proposal.dataResidency ?? ''} onChange={(e) => set('dataResidency', e.target.value)} />
+                <Input value={pv!.dataResidency} onChange={(e) => set('dataResidency', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Data classes</Label>
                 <Input
                   value={proposal.dataClasses.join(', ')}
-                  onChange={(e) => set('dataClasses', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                  onChange={(e) => set('dataClasses', parseCsvList(e.target.value))}
                 />
               </div>
             </div>

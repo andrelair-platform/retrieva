@@ -87,14 +87,204 @@ interface MonitoringCardProps {
   assessments: Assessment[];
 }
 
+type SignalStatus = MonitoringSignal['status'];
+type TFunc = (key: string, opts?: Record<string, unknown>) => string;
+
+/** Count missing + partial gaps from an assessment's gap list. */
+function countGaps(gaps: NonNullable<Assessment['results']>['gaps'] | undefined): {
+  missing: number;
+  partial: number;
+} {
+  let missing = 0;
+  let partial = 0;
+  for (const gap of gaps ?? []) {
+    if (gap.gapLevel === 'missing') missing++;
+    else if (gap.gapLevel === 'partial') partial++;
+  }
+  return { missing, partial };
+}
+
+/** Summary of the latest assessment's risk + gap counts for the footer row. */
+function lastAssessmentSummary(lastAssessment: Assessment | null): {
+  lastRiskLabel: string;
+  showGaps: boolean;
+  gapsMissing: number;
+  gapsPartial: number;
+} {
+  const gaps = lastAssessment?.results?.gaps;
+  const { missing: gapsMissing, partial: gapsPartial } = countGaps(gaps);
+  return {
+    lastRiskLabel: lastAssessment?.results?.overallRisk ?? '—',
+    showGaps: gaps?.length != null,
+    gapsMissing,
+    gapsPartial,
+  };
+}
+
+/** Whether the workspace has any monitoring signal configured (certs / review / contract end). */
+function isMonitoringConfigured(workspace: WorkspaceWithMembership): boolean {
+  const hasCerts = (workspace.certifications?.length ?? 0) > 0;
+  return hasCerts || !!workspace.nextReviewDate || !!workspace.contractEnd;
+}
+
+/** Status band for a cert expiry (critical ≤30d or overdue, warning ≤90d). */
+function certStatus(days: number | null): SignalStatus {
+  if (days === null) return 'missing';
+  if (days < 0 || days <= 30) return 'critical';
+  if (days <= 90) return 'warning';
+  return 'ok';
+}
+
+/** Status band for contract renewal (critical ≤30d or overdue, warning ≤60d). */
+function contractStatus(days: number | null): SignalStatus {
+  if (days === null) return 'missing';
+  if (days < 0 || days <= 30) return 'critical';
+  if (days <= 60) return 'warning';
+  return 'ok';
+}
+
+/** Status band for the annual review (critical if overdue, warning ≤30d). */
+function reviewStatus(days: number | null): SignalStatus {
+  if (days === null) return 'missing';
+  if (days < 0) return 'critical';
+  if (days <= 30) return 'warning';
+  return 'ok';
+}
+
+/** Most recent completed assessment + how many days ago it ran. */
+function latestAssessment(assessments: Assessment[]): {
+  lastAssessment: Assessment | null;
+  daysAgo: number | null;
+} {
+  const lastAssessment =
+    assessments
+      .filter((assessment) => assessment.status === 'complete')
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ??
+    null;
+  const daysAgo = lastAssessment
+    ? Math.floor((new Date().getTime() - new Date(lastAssessment.createdAt).getTime()) / 86_400_000)
+    : null;
+  return { lastAssessment, daysAgo };
+}
+
+/** The "last assessment" signal row (run date / none, stale > 1yr → warning). */
+function lastAssessmentSignal(
+  lastAssessment: Assessment | null,
+  daysAgo: number | null,
+  t: TFunc
+): MonitoringSignal {
+  const value = lastAssessment
+    ? t('workspaces.monitoring.assessmentRun', {
+        date: format(new Date(lastAssessment.createdAt), 'dd MMM yyyy'),
+        days: daysAgo,
+      })
+    : t('workspaces.monitoring.noAssessment');
+  const stale = (daysAgo ?? 0) > 365;
+  return {
+    label: t('workspaces.monitoring.lastAssessment'),
+    value,
+    days: lastAssessment ? -(daysAgo ?? 0) : null,
+    status: !lastAssessment ? 'missing' : stale ? 'warning' : 'ok',
+  };
+}
+
+/** Build the full monitoring signal list for a workspace. */
+function buildSignals(
+  workspace: WorkspaceWithMembership,
+  lastAssessment: Assessment | null,
+  daysAgo: number | null,
+  t: TFunc
+): MonitoringSignal[] {
+  const signals: MonitoringSignal[] = [];
+
+  for (const cert of workspace.certifications ?? []) {
+    const days = daysFrom(cert.validUntil);
+    signals.push({
+      label: cert.type,
+      value: cert.validUntil
+        ? t('workspaces.monitoring.certExpires', {
+            date: format(new Date(cert.validUntil), 'dd MMM yyyy'),
+          })
+        : '',
+      days,
+      status: certStatus(days),
+    });
+  }
+
+  if (workspace.contractEnd) {
+    const days = daysFrom(workspace.contractEnd);
+    signals.push({
+      label: t('workspaces.monitoring.contractRenewal'),
+      value: t('workspaces.monitoring.contractEnds', {
+        date: format(new Date(workspace.contractEnd), 'dd MMM yyyy'),
+      }),
+      days,
+      status: contractStatus(days),
+    });
+  }
+
+  if (workspace.nextReviewDate) {
+    const days = daysFrom(workspace.nextReviewDate);
+    signals.push({
+      label: t('workspaces.monitoring.annualReview'),
+      value: t('workspaces.monitoring.reviewDue', {
+        date: format(new Date(workspace.nextReviewDate), 'dd MMM yyyy'),
+      }),
+      days,
+      status: reviewStatus(days),
+    });
+  }
+
+  signals.push(lastAssessmentSignal(lastAssessment, daysAgo, t));
+
+  return signals;
+}
+
+/** Badge chrome (class + variant + i18n label key) for the overall monitoring status. */
+function overallBadge(overallStatus: 'critical' | 'warning' | 'ok'): {
+  className: string;
+  variant: 'destructive' | 'outline';
+  labelKey: string;
+} {
+  if (overallStatus === 'ok') {
+    return {
+      className: 'bg-success-muted text-success border-success-muted hover:bg-success-muted text-xs',
+      variant: 'outline',
+      labelKey: 'workspaces.monitoring.statusActive',
+    };
+  }
+  if (overallStatus === 'warning') {
+    return {
+      className: 'bg-warning-muted text-warning border-warning-muted hover:bg-warning-muted text-xs',
+      variant: 'outline',
+      labelKey: 'workspaces.monitoring.statusAttention',
+    };
+  }
+  return {
+    className: 'text-xs',
+    variant: 'destructive',
+    labelKey: 'workspaces.monitoring.statusActionRequired',
+  };
+}
+
+/** Roll the per-signal statuses up into an overall badge status + counts. */
+function overallSignalStatus(signals: MonitoringSignal[]): {
+  criticalCount: number;
+  warningCount: number;
+  overallStatus: 'critical' | 'warning' | 'ok';
+  showCounts: boolean;
+} {
+  const criticalCount = signals.filter((signal) => signal.status === 'critical').length;
+  const warningCount = signals.filter((signal) => signal.status === 'warning').length;
+  const overallStatus = criticalCount > 0 ? 'critical' : warningCount > 0 ? 'warning' : 'ok';
+  return { criticalCount, warningCount, overallStatus, showCounts: criticalCount > 0 || warningCount > 0 };
+}
+
 export function MonitoringCard({ workspace, assessments }: MonitoringCardProps) {
   const { t } = useTranslation();
   const workspaceId = workspace.id;
-  const hasCerts = (workspace.certifications?.length ?? 0) > 0;
-  const hasReview = !!workspace.nextReviewDate;
-  const isConfigured = hasCerts || hasReview || !!workspace.contractEnd;
 
-  if (!isConfigured) {
+  if (!isMonitoringConfigured(workspace)) {
     return (
       <Card className="mb-4 border-dashed">
         <CardContent className="flex flex-col items-center justify-center gap-3 py-8 text-center">
@@ -116,60 +306,11 @@ export function MonitoringCard({ workspace, assessments }: MonitoringCardProps) 
     );
   }
 
-  const signals: MonitoringSignal[] = [];
-
-  for (const cert of workspace.certifications ?? []) {
-    const days = daysFrom(cert.validUntil);
-    signals.push({
-      label: cert.type,
-      value: cert.validUntil ? t('workspaces.monitoring.certExpires', { date: format(new Date(cert.validUntil), 'dd MMM yyyy') }) : '',
-      days,
-      status:
-        days === null ? 'missing' : days < 0 ? 'critical' : days <= 30 ? 'critical' : days <= 90 ? 'warning' : 'ok',
-    });
-  }
-
-  if (workspace.contractEnd) {
-    const days = daysFrom(workspace.contractEnd);
-    signals.push({
-      label: t('workspaces.monitoring.contractRenewal'),
-      value: t('workspaces.monitoring.contractEnds', { date: format(new Date(workspace.contractEnd), 'dd MMM yyyy') }),
-      days,
-      status:
-        days === null ? 'missing' : days < 0 ? 'critical' : days <= 30 ? 'critical' : days <= 60 ? 'warning' : 'ok',
-    });
-  }
-
-  if (workspace.nextReviewDate) {
-    const days = daysFrom(workspace.nextReviewDate);
-    signals.push({
-      label: t('workspaces.monitoring.annualReview'),
-      value: t('workspaces.monitoring.reviewDue', { date: format(new Date(workspace.nextReviewDate), 'dd MMM yyyy') }),
-      days,
-      status: days === null ? 'missing' : days < 0 ? 'critical' : days <= 30 ? 'warning' : 'ok',
-    });
-  }
-
-  const lastAssessment =
-    assessments
-      .filter((assessment) => assessment.status === 'complete')
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
-  const assessmentDaysAgo = lastAssessment
-    ? Math.floor((new Date().getTime() - new Date(lastAssessment.createdAt).getTime()) / 86_400_000)
-    : null;
-
-  signals.push({
-    label: t('workspaces.monitoring.lastAssessment'),
-    value: lastAssessment
-      ? t('workspaces.monitoring.assessmentRun', { date: format(new Date(lastAssessment.createdAt), 'dd MMM yyyy'), days: assessmentDaysAgo })
-      : t('workspaces.monitoring.noAssessment'),
-    days: lastAssessment ? -(assessmentDaysAgo ?? 0) : null,
-    status: !lastAssessment ? 'missing' : (assessmentDaysAgo ?? 0) > 365 ? 'warning' : 'ok',
-  });
-
-  const criticalCount = signals.filter((signal) => signal.status === 'critical').length;
-  const warningCount = signals.filter((signal) => signal.status === 'warning').length;
-  const overallStatus = criticalCount > 0 ? 'critical' : warningCount > 0 ? 'warning' : 'ok';
+  const { lastAssessment, daysAgo: assessmentDaysAgo } = latestAssessment(assessments);
+  const signals = buildSignals(workspace, lastAssessment, assessmentDaysAgo, t);
+  const { criticalCount, warningCount, overallStatus, showCounts } = overallSignalStatus(signals);
+  const badge = overallBadge(overallStatus);
+  const { lastRiskLabel, showGaps, gapsMissing, gapsPartial } = lastAssessmentSummary(lastAssessment);
 
   return (
     <Card className="mb-4">
@@ -179,21 +320,8 @@ export function MonitoringCard({ workspace, assessments }: MonitoringCardProps) 
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               {t('workspaces.monitoring.title')}
             </CardTitle>
-            <Badge
-              className={
-                overallStatus === 'ok'
-                  ? 'bg-success-muted text-success border-success-muted hover:bg-success-muted text-xs'
-                  : overallStatus === 'warning'
-                    ? 'bg-warning-muted text-warning border-warning-muted hover:bg-warning-muted text-xs'
-                    : 'text-xs'
-              }
-              variant={overallStatus === 'critical' ? 'destructive' : 'outline'}
-            >
-              {overallStatus === 'ok'
-                ? t('workspaces.monitoring.statusActive')
-                : overallStatus === 'warning'
-                  ? t('workspaces.monitoring.statusAttention')
-                  : t('workspaces.monitoring.statusActionRequired')}
+            <Badge className={badge.className} variant={badge.variant}>
+              {t(badge.labelKey)}
             </Badge>
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -201,7 +329,7 @@ export function MonitoringCard({ workspace, assessments }: MonitoringCardProps) 
             {t('workspaces.monitoring.scan')}
           </div>
         </div>
-        {(criticalCount > 0 || warningCount > 0) && (
+        {showCounts && (
           <p className="text-xs text-muted-foreground mt-1">
             {criticalCount > 0 && (
               <span className="text-destructive font-medium">{t('workspaces.monitoring.criticalCount', { count: criticalCount })}</span>
@@ -221,12 +349,12 @@ export function MonitoringCard({ workspace, assessments }: MonitoringCardProps) 
           <div className="pt-3 flex items-center justify-between">
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              {t('workspaces.monitoring.lastRisk')} <strong className="ml-1">{lastAssessment.results?.overallRisk ?? '—'}</strong>
-              {lastAssessment.results?.gaps?.length != null && (
+              {t('workspaces.monitoring.lastRisk')} <strong className="ml-1">{lastRiskLabel}</strong>
+              {showGaps && (
                 <span className="ml-2 text-muted-foreground">
                   {t('workspaces.monitoring.gapsSummary', {
-                    missing: lastAssessment.results.gaps.filter((gap) => gap.gapLevel === 'missing').length,
-                    partial: lastAssessment.results.gaps.filter((gap) => gap.gapLevel === 'partial').length,
+                    missing: gapsMissing,
+                    partial: gapsPartial,
                   })}
                 </span>
               )}

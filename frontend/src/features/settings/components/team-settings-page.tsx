@@ -147,6 +147,66 @@ function tierForDomainRole(role: DomainRole): 'org_admin' | 'analyst' | 'viewer'
   return DOMAIN_ROLE_CONFIG[role].tier;
 }
 
+/** Extract a server error message from an axios-shaped error, falling back to a default. */
+function errorMessage(err: unknown, fallback: string): string {
+  return (
+    (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
+  );
+}
+
+/** Split a member list into active vs pending buckets. */
+function splitMembers(members: OrgMember[]): {
+  activeMembers: OrgMember[];
+  pendingMembers: OrgMember[];
+} {
+  return {
+    activeMembers: members.filter((m) => m.status === 'active'),
+    pendingMembers: members.filter((m) => m.status === 'pending'),
+  };
+}
+
+/** True if any of the given pending flags is set. */
+function anyPending(...flags: boolean[]): boolean {
+  return flags.some(Boolean);
+}
+
+type OrgPayload = Awaited<ReturnType<typeof organizationsApi.getMe>>['data'];
+
+/** Derive the org entity + the current user's admin tier from the /organizations/me payload. */
+function deriveOrgState(payload: OrgPayload | undefined) {
+  const org = payload?.organization ?? null;
+  const myRole = (payload?.role ?? null) as RoleKey | null;
+  return { org, myRole, isAdmin: myRole === 'org_admin' };
+}
+
+/** Which role widget an active-member row renders. */
+type RoleSection = 'manager' | 'badges' | 'tier';
+
+interface MemberRowContext {
+  currentEmail: string | undefined;
+  isAdmin: boolean;
+  removingId: string | null;
+  removePending: boolean;
+}
+
+/** Derived primitives for one active-member row (keeps the JSX render branch-light). */
+function activeMemberView(member: OrgMember, ctx: MemberRowContext) {
+  const { currentEmail, isAdmin, removingId, removePending } = ctx;
+  const name = member.user?.name;
+  const roles = member.domainRoles ?? [];
+  const roleSection: RoleSection = isAdmin ? 'manager' : roles.length > 0 ? 'badges' : 'tier';
+  const isSelf = currentEmail === member.email;
+  return {
+    isSelf,
+    roles,
+    displayName: name ?? member.email,
+    hasName: Boolean(name),
+    roleSection,
+    canRemove: isAdmin && !isSelf,
+    isRemoving: removePending && removingId === member.id,
+  };
+}
+
 function RoleBadge({ role }: { role: RoleKey }) {
   const { t } = useTranslation();
   const cfg = ROLE_CONFIG[role] ?? ROLE_CONFIG.viewer;
@@ -258,7 +318,7 @@ function MemberRoleManager({
 export function TeamSettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
+  const currentEmail = useAuthStore((state) => state.user?.email);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const { data: orgData, isLoading: orgLoading } = useQuery({
@@ -266,24 +326,20 @@ export function TeamSettingsPage() {
     queryFn: () => organizationsApi.getMe(),
   });
 
+  const { org, isAdmin } = deriveOrgState(orgData?.data);
+
   const { data: membersData, isLoading: membersLoading } = useQuery({
     queryKey: ['org-members'],
     queryFn: () => organizationsApi.getMembers(),
-    enabled: !!orgData?.data?.organization,
+    enabled: !!org,
   });
 
-  const isLoading = orgLoading || membersLoading;
-  const org = orgData?.data?.organization ?? null;
-  const myRole = orgData?.data?.role as RoleKey | null;
-  const isAdmin = myRole === 'org_admin';
+  const isLoading = anyPending(orgLoading, membersLoading);
 
-  const { activeMembers, pendingMembers } = useMemo(() => {
-    const members: OrgMember[] = membersData?.data?.members ?? [];
-    return {
-      activeMembers: members.filter((m) => m.status === 'active'),
-      pendingMembers: members.filter((m) => m.status === 'pending'),
-    };
-  }, [membersData]);
+  const { activeMembers, pendingMembers } = useMemo(
+    () => splitMembers(membersData?.data?.members ?? []),
+    [membersData],
+  );
 
   const form = useForm<InviteFormData>({
     resolver: zodResolver(inviteSchema),
@@ -298,22 +354,19 @@ export function TeamSettingsPage() {
         domainRole: data.role,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-members'] });
+      void queryClient.invalidateQueries({ queryKey: ['org-members'] });
       toast.success(t('settings.team.toastInviteSent'));
       form.reset();
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('settings.team.toastInviteFailed');
-      toast.error(msg);
+      toast.error(errorMessage(err, t('settings.team.toastInviteFailed')));
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (memberId: string) => organizationsApi.removeMember(memberId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-members'] });
+      void queryClient.invalidateQueries({ queryKey: ['org-members'] });
       toast.success(t('settings.team.toastMemberRemoved'));
       setRemovingId(null);
     },
@@ -323,30 +376,32 @@ export function TeamSettingsPage() {
   const assignRoleMutation = useMutation({
     mutationFn: (v: { userId: string; role: DomainRole }) => organizationsApi.assignRole(v),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-members'] });
+      void queryClient.invalidateQueries({ queryKey: ['org-members'] });
       toast.success(t('settings.team.toastRoleAssigned'));
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('settings.team.toastRoleFailed');
-      toast.error(msg);
+      toast.error(errorMessage(err, t('settings.team.toastRoleFailed')));
     },
   });
 
   const revokeRoleMutation = useMutation({
     mutationFn: (v: { userId: string; role: DomainRole }) => organizationsApi.revokeRole(v),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-members'] });
+      void queryClient.invalidateQueries({ queryKey: ['org-members'] });
       toast.success(t('settings.team.toastRoleRevoked'));
     },
     onError: (err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t('settings.team.toastRoleFailed');
-      toast.error(msg);
+      toast.error(errorMessage(err, t('settings.team.toastRoleFailed')));
     },
   });
+
+  const rolesPending = anyPending(assignRoleMutation.isPending, revokeRoleMutation.isPending);
+  const memberRowCtx: MemberRowContext = {
+    currentEmail,
+    isAdmin,
+    removingId,
+    removePending: removeMutation.isPending,
+  };
 
   if (isLoading) {
     return (
@@ -417,8 +472,15 @@ export function TeamSettingsPage() {
             <p className="text-sm text-muted-foreground">{t('settings.team.noActiveMembers')}</p>
           ) : (
             activeMembers.map((member, idx) => {
-              const isSelf = user?.email === member.email;
-              const roles = member.domainRoles ?? [];
+              const {
+                isSelf,
+                roles,
+                displayName,
+                hasName,
+                roleSection,
+                canRemove,
+                isRemoving,
+              } = activeMemberView(member, memberRowCtx);
               return (
                 <div key={member.id}>
                   {idx > 0 && <Separator className="my-2" />}
@@ -428,25 +490,25 @@ export function TeamSettingsPage() {
                     </Avatar>
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <p className="text-sm font-medium truncate">
-                        {member.user?.name ?? member.email}
+                        {displayName}
                         {isSelf && (
                           <span className="ml-1.5 text-xs text-muted-foreground">
                             {t('settings.team.you')}
                           </span>
                         )}
                       </p>
-                      {member.user?.name && (
+                      {hasName && (
                         <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                       )}
                       {/* Domain roles: editable for admins, read-only badges otherwise */}
-                      {isAdmin ? (
+                      {roleSection === 'manager' ? (
                         <MemberRoleManager
                           member={member}
                           onAssign={(userId, role) => assignRoleMutation.mutate({ userId, role })}
                           onRevoke={(userId, role) => revokeRoleMutation.mutate({ userId, role })}
-                          pending={assignRoleMutation.isPending || revokeRoleMutation.isPending}
+                          pending={rolesPending}
                         />
-                      ) : roles.length > 0 ? (
+                      ) : roleSection === 'badges' ? (
                         <div className="flex flex-wrap items-center gap-1.5">
                           {roles.map((r) => (
                             <DomainRoleBadge key={r} role={r} />
@@ -463,7 +525,7 @@ export function TeamSettingsPage() {
                         })}
                       </span>
                     )}
-                    {isAdmin && !isSelf && (
+                    {canRemove && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -480,7 +542,7 @@ export function TeamSettingsPage() {
                             <AlertDialogTitle>{t('settings.team.removeTitle')}</AlertDialogTitle>
                             <AlertDialogDescription>
                               {t('settings.team.removeDesc1', {
-                                name: member.user?.name ?? member.email,
+                                name: displayName,
                               })}
                               <strong>{org.name}</strong>
                               {t('settings.team.removeDesc2')}
@@ -493,9 +555,9 @@ export function TeamSettingsPage() {
                             <AlertDialogAction
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               onClick={() => removeMutation.mutate(member.id)}
-                              disabled={removeMutation.isPending && removingId === member.id}
+                              disabled={isRemoving}
                             >
-                              {removeMutation.isPending && removingId === member.id ? (
+                              {isRemoving ? (
                                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                               ) : null}
                               {t('settings.team.remove')}

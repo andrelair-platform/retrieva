@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { authApi } from '@/shared/api';
+import type { User as AppUser } from '@/types';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -46,6 +47,81 @@ const profileSchema = z.object({
 const RESEND_COOLDOWN_SECONDS = 60;
 
 type ProfileFormData = z.infer<typeof profileSchema>;
+
+/** True if any of the given boolean flags is set. */
+function anyTrue(...flags: boolean[]): boolean {
+  return flags.some(Boolean);
+}
+
+/** Profile form defaults from the current user (empty strings when absent). */
+function profileDefaults(user: AppUser | null): ProfileFormData {
+  return {
+    name: user?.name || '',
+    email: user?.email || '',
+  };
+}
+
+/** Display primitives for the current user (keeps the render branch-light). */
+function userView(user: AppUser | null) {
+  return {
+    name: user?.name,
+    email: user?.email,
+    verified: Boolean(user?.isEmailVerified),
+    initials: userInitials(user?.name),
+  };
+}
+
+/** Two-letter avatar initials derived from a display name (falls back to 'U'). */
+function userInitials(name: string | undefined): string {
+  return (
+    name
+      ?.split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'U'
+  );
+}
+
+/** How a resend-verification error should surface to the user. */
+interface ResendErrorOutcome {
+  /** True when the 429 rate-limit hit → the caller restarts the cooldown. */
+  startCooldown: boolean;
+  /** Toast style: 400 (already-verified) uses info, everything else uses error. */
+  toastKind: 'error' | 'info';
+  /** i18n key / backend message to display. */
+  message: string;
+}
+
+/** Classify a resend-verification mutation error into a user-facing outcome. */
+function classifyResendError(
+  error: unknown,
+  t: (key: string) => string,
+): ResendErrorOutcome {
+  if (!axios.isAxiosError(error) || !error.response) {
+    return { startCooldown: false, toastKind: 'error', message: t('settings.emailVerify.toastSendFailed') };
+  }
+  const backendMessage = error.response.data?.message;
+  if (error.response.status === 429) {
+    return {
+      startCooldown: true,
+      toastKind: 'error',
+      message: backendMessage ?? t('settings.emailVerify.toastWaitDefault'),
+    };
+  }
+  if (error.response.status === 400) {
+    return {
+      startCooldown: false,
+      toastKind: 'info',
+      message: backendMessage ?? t('settings.emailVerify.toastUnable'),
+    };
+  }
+  return {
+    startCooldown: false,
+    toastKind: 'error',
+    message: backendMessage ?? t('settings.emailVerify.toastSendFailed'),
+  };
+}
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -98,10 +174,7 @@ export default function SettingsPage() {
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      name: user?.name || '',
-      email: user?.email || '',
-    },
+    defaultValues: profileDefaults(user),
   });
 
   // Reset form when user data becomes available
@@ -140,38 +213,21 @@ export default function SettingsPage() {
       toast.success(t('settings.emailVerify.toastSent'));
     },
     onError: (error: unknown) => {
-      if (axios.isAxiosError(error) && error.response) {
-        // Handle rate limiting (429)
-        if (error.response.status === 429) {
-          startResendCooldown();
-          const message = error.response.data?.message ??
-            t('settings.emailVerify.toastWaitDefault');
-          toast.error(message);
-          return;
-        }
-        // Handle already verified (400) or other errors with backend message
-        if (error.response.status === 400) {
-          const message = error.response.data?.message ?? t('settings.emailVerify.toastUnable');
-          toast.info(message); // Use info toast for "already verified" messages
-          return;
-        }
-        // Handle other errors with backend message if available
-        const message = error.response.data?.message ?? t('settings.emailVerify.toastSendFailed');
-        toast.error(message);
-        return;
+      const outcome = classifyResendError(error, t);
+      if (outcome.startCooldown) {
+        startResendCooldown();
       }
-      toast.error(t('settings.emailVerify.toastSendFailed'));
+      if (outcome.toastKind === 'info') {
+        toast.info(outcome.message);
+      } else {
+        toast.error(outcome.message);
+      }
     },
   });
 
-  const isResendButtonDisabled = resendVerificationMutation.isPending || cooldownRemaining > 0;
-
-  const initials = user?.name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const inCooldown = cooldownRemaining > 0;
+  const isResendButtonDisabled = anyTrue(resendVerificationMutation.isPending, inCooldown);
+  const { name: userName, email: userEmail, verified: emailVerified, initials } = userView(user);
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -199,8 +255,8 @@ export default function SettingsPage() {
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">{user?.name}</p>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
+              <p className="font-medium">{userName}</p>
+              <p className="text-sm text-muted-foreground">{userEmail}</p>
             </div>
           </div>
 
@@ -255,7 +311,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Email Verification Status */}
-      {!user?.isEmailVerified && (
+      {!emailVerified && (
         <Card className="mb-6 border-warning/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -272,7 +328,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              {t('settings.emailVerify.sentTo1')}<strong>{user?.email}</strong>{t('settings.emailVerify.sentTo2')}
+              {t('settings.emailVerify.sentTo1')}<strong>{userEmail}</strong>{t('settings.emailVerify.sentTo2')}
             </p>
             <Button
               variant="outline"
@@ -284,11 +340,11 @@ export default function SettingsPage() {
               ) : (
                 <Mail className="h-4 w-4 mr-2" />
               )}
-              {cooldownRemaining > 0
+              {inCooldown
                 ? t('settings.emailVerify.pleaseWait', { seconds: cooldownRemaining })
                 : t('settings.emailVerify.resend')}
             </Button>
-            {cooldownRemaining > 0 && (
+            {inCooldown && (
               <p className="text-xs text-muted-foreground mt-2">
                 {t('settings.emailVerify.rateLimitNote')}
               </p>
@@ -297,7 +353,7 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {user?.isEmailVerified && (
+      {emailVerified && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

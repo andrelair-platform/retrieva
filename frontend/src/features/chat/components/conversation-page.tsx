@@ -16,6 +16,61 @@ interface ConversationPageProps {
   params: Promise<{ id: string }>;
 }
 
+type RawConversation = NonNullable<
+  Awaited<ReturnType<typeof conversationsApi.get>>['data']
+>['conversation'];
+type RawMessage = NonNullable<
+  NonNullable<Awaited<ReturnType<typeof conversationsApi.get>>['data']>['messages']
+>[number];
+
+function conversationTimestamps(conv: RawConversation | undefined): {
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+} {
+  const now = new Date().toISOString();
+  return {
+    lastMessageAt: conv?.lastMessageAt || now,
+    createdAt: conv?.createdAt || now,
+    updatedAt: conv?.updatedAt || now,
+  };
+}
+
+function conversationMeta(conv: RawConversation | undefined): {
+  title: string;
+  workspaceId: string;
+  userId: string;
+  messageCount: number;
+} {
+  return {
+    title: conv?.title || 'Untitled',
+    workspaceId: conv?.workspaceId || '',
+    userId: conv?.userId || '',
+    messageCount: conv?.messageCount || 0,
+  };
+}
+
+function toConversation(conv: RawConversation | undefined, id: string): Conversation {
+  return {
+    id: String(conv?.id || id),
+    isPinned: false,
+    ...conversationMeta(conv),
+    ...conversationTimestamps(conv),
+  };
+}
+
+function toMessage(message: RawMessage, conversationId: string): Message {
+  return {
+    id: String(message.id),
+    conversationId,
+    role: message.role as 'user' | 'assistant',
+    content: message.content,
+    sources: message.sources || undefined,
+    createdAt: message.createdAt || message.timestamp || new Date().toISOString(),
+    feedback: null,
+  };
+}
+
 export function ConversationPage({ params }: ConversationPageProps) {
   const { t } = useTranslation();
   const { id } = use(params);
@@ -29,27 +84,10 @@ export function ConversationPage({ params }: ConversationPageProps) {
       const conv = response.data?.conversation;
       const rawMessages = response.data?.messages || [];
 
-      const conversation: Conversation = {
-        id: String(conv?.id || id),
-        title: conv?.title || 'Untitled',
-        workspaceId: conv?.workspaceId || '',
-        userId: conv?.userId || '',
-        isPinned: false,
-        messageCount: conv?.messageCount || 0,
-        lastMessageAt: conv?.lastMessageAt || new Date().toISOString(),
-        createdAt: conv?.createdAt || new Date().toISOString(),
-        updatedAt: conv?.updatedAt || new Date().toISOString(),
-      };
-
-      const messages: Message[] = rawMessages.map((message) => ({
-        id: String(message.id),
-        conversationId: String(conv?.id || id),
-        role: message.role as 'user' | 'assistant',
-        content: message.content,
-        sources: message.sources || undefined,
-        createdAt: message.createdAt || message.timestamp || new Date().toISOString(),
-        feedback: null,
-      }));
+      const conversation = toConversation(conv, id);
+      const messages: Message[] = rawMessages.map((message) =>
+        toMessage(message, conversation.id)
+      );
 
       return { conversation, messages };
     },

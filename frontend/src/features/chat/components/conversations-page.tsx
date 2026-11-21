@@ -37,11 +37,58 @@ import { useActiveWorkspace, useWorkspaceListQuery } from '@/lib/hooks';
 import { destructiveActionClasses } from '@/lib/styles/status-colors';
 import type { Conversation } from '@/types';
 
+/** True if any of the given boolean flags is set. */
+function anyTrue(...flags: boolean[]): boolean {
+  return flags.some(Boolean);
+}
+
+/** Split the loaded conversations into pinned/recent buckets + presence flags. */
+function partitionConversations(data: Conversation[] | undefined) {
+  const conversations: Conversation[] = data || [];
+  const pinnedConversations = conversations.filter((conversation) => conversation.isPinned);
+  const recentConversations = conversations.filter((conversation) => !conversation.isPinned);
+  return {
+    conversations,
+    pinnedConversations,
+    recentConversations,
+    hasConversations: conversations.length > 0,
+    hasPinned: pinnedConversations.length > 0,
+    hasRecent: recentConversations.length > 0,
+  };
+}
+
+/** i18n key for the "no active workspace" message, by workspace count. */
+function noWorkspaceMessageKey(workspaceCount: number): string {
+  return workspaceCount === 0 ? 'chat.createWorkspace' : 'chat.selectWorkspaceConv';
+}
+
+/** The mutually-exclusive render state of the conversation list body. */
+type ListState = 'loading' | 'error' | 'empty' | 'list';
+
+function listState(isLoading: boolean, error: unknown, count: number): ListState {
+  if (isLoading) return 'loading';
+  if (error) return 'error';
+  if (count === 0) return 'empty';
+  return 'list';
+}
+
+/** The selection toolbar shows only in selection mode with at least one item picked. */
+function isSelecting(selectionMode: boolean, selectedCount: number): boolean {
+  return selectionMode && selectedCount > 0;
+}
+
+/** Button variant for the select-mode toggle. */
+function selectModeVariant(selectionMode: boolean): 'secondary' | 'outline' {
+  return selectionMode ? 'secondary' : 'outline';
+}
+
+// eslint-disable-next-line complexity -- residual count is irreducible JSX conditional rendering (loading/error/empty/list branches + selection-mode toggles); non-JSX logic already extracted to helpers and rule 3 forbids splitting the JSX into sub-components; tracked minicloud-gitops#2353
 export function ConversationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const activeWorkspace = useActiveWorkspace();
+  const workspaceId = activeWorkspace?.id;
   const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaceListQuery();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -49,18 +96,18 @@ export function ConversationsPage() {
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['conversations', activeWorkspace?.id],
+    queryKey: ['conversations', workspaceId],
     queryFn: async () => {
       const response = await conversationsApi.list({ limit: 100 });
       return response.data?.conversations || [];
     },
-    enabled: !!activeWorkspace?.id,
+    enabled: Boolean(workspaceId),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => conversationsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast.success(t('chat.list.toast.deleted'));
       setConversationToDelete(null);
     },
@@ -72,7 +119,7 @@ export function ConversationsPage() {
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => conversationsApi.bulkDelete(ids),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast.success(t('chat.list.toast.bulkDeleted', { count: response.data?.deletedCount || 0 }));
       setSelectedIds(new Set());
       setIsSelectionMode(false);
@@ -83,9 +130,13 @@ export function ConversationsPage() {
     },
   });
 
-  const conversations: Conversation[] = data || [];
-  const pinnedConversations = conversations.filter((conversation) => conversation.isPinned);
-  const recentConversations = conversations.filter((conversation) => !conversation.isPinned);
+  const { conversations, pinnedConversations, recentConversations, hasConversations, hasPinned, hasRecent } =
+    partitionConversations(data);
+  const bodyState = listState(isLoading, error, conversations.length);
+  const isDeleting = anyTrue(deleteMutation.isPending, bulkDeleteMutation.isPending);
+  const showSelectionBar = isSelecting(isSelectionMode, selectedIds.size);
+  const confirmingSingle = Boolean(conversationToDelete);
+  const selectButtonVariant = selectModeVariant(isSelectionMode);
 
   const toggleSelection = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -130,11 +181,7 @@ export function ConversationsPage() {
   if (!activeWorkspace) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-muted-foreground">
-          {workspaces.length === 0
-            ? t('chat.createWorkspace')
-            : t('chat.selectWorkspaceConv')}
-        </p>
+        <p className="text-muted-foreground">{t(noWorkspaceMessageKey(workspaces.length))}</p>
       </div>
     );
   }
@@ -149,9 +196,9 @@ export function ConversationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {conversations.length > 0 && (
+          {hasConversations && (
             <Button
-              variant={isSelectionMode ? 'secondary' : 'outline'}
+              variant={selectButtonVariant}
               onClick={() => {
                 setIsSelectionMode(!isSelectionMode);
                 if (isSelectionMode) {
@@ -179,7 +226,7 @@ export function ConversationsPage() {
         </div>
       </div>
 
-      {isSelectionMode && selectedIds.size > 0 && (
+      {showSelectionBar && (
         <div className="mb-4 p-3 bg-muted rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">{t('chat.list.selectedCount', { count: selectedIds.size })}</span>
@@ -202,7 +249,7 @@ export function ConversationsPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {bodyState === 'loading' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, index) => (
             <Card key={index}>
@@ -213,11 +260,11 @@ export function ConversationsPage() {
             </Card>
           ))}
         </div>
-      ) : error ? (
+      ) : bodyState === 'error' ? (
         <div className="text-center py-12">
           <p className="text-destructive">{t('chat.list.failedLoad')}</p>
         </div>
-      ) : conversations.length === 0 ? (
+      ) : bodyState === 'empty' ? (
         <EmptyState
           icon={MessageSquare}
           heading={t('chat.list.empty.heading')}
@@ -228,7 +275,7 @@ export function ConversationsPage() {
         />
       ) : (
         <div className="space-y-6">
-          {pinnedConversations.length > 0 && (
+          {hasPinned && (
             <div>
               <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <Pin className="h-4 w-4" />
@@ -292,7 +339,7 @@ export function ConversationsPage() {
             </div>
           )}
 
-          {recentConversations.length > 0 && (
+          {hasRecent && (
             <div>
               <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <MessageCircle className="h-4 w-4" />
@@ -361,10 +408,10 @@ export function ConversationsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {conversationToDelete ? t('chat.list.deleteOne') : t('chat.list.deleteMany', { count: selectedIds.size })}
+              {confirmingSingle ? t('chat.list.deleteOne') : t('chat.list.deleteMany', { count: selectedIds.size })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {conversationToDelete
+              {confirmingSingle
                 ? t('chat.list.deleteOneDesc')
                 : t('chat.list.deleteManyDesc', { count: selectedIds.size })}
             </AlertDialogDescription>
@@ -381,9 +428,9 @@ export function ConversationsPage() {
             <AlertDialogAction
               onClick={confirmDelete}
               className={destructiveActionClasses}
-              disabled={deleteMutation.isPending || bulkDeleteMutation.isPending}
+              disabled={isDeleting}
             >
-              {(deleteMutation.isPending || bulkDeleteMutation.isPending) ? (
+              {isDeleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 t('common.delete')

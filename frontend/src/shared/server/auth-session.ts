@@ -32,26 +32,8 @@ async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T | nu
   }
 }
 
-export async function getServerSessionUser(): Promise<User | null> {
-  noStore();
-
-  const cookieStore = await cookies();
-  const cookieHeader = buildCookieHeader(cookieStore);
-
-  if (!cookieHeader) {
-    return null;
-  }
-
-  const meResponse = await fetchJson<{ data?: { user?: User } }>(`${API_BASE_URL}/auth/me`, {
-    headers: {
-      cookie: cookieHeader,
-    },
-  });
-
-  if (meResponse?.data?.user) {
-    return meResponse.data.user;
-  }
-
+/** Refresh the access token then re-fetch /auth/me with it; null if refresh fails. */
+async function fetchUserAfterRefresh(cookieHeader: string): Promise<User | null> {
   const refreshResponse = await fetchJson<{
     data?: { accessToken?: string };
   }>(`${API_BASE_URL}/auth/refresh`, {
@@ -78,4 +60,27 @@ export async function getServerSessionUser(): Promise<User | null> {
   );
 
   return refreshedMeResponse?.data?.user ?? null;
+}
+
+export async function getServerSessionUser(): Promise<User | null> {
+  noStore();
+
+  const cookieStore = await cookies();
+  const cookieHeader = buildCookieHeader(cookieStore);
+
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const meResponse = await fetchJson<{ data?: { user?: User } }>(`${API_BASE_URL}/auth/me`, {
+    headers: {
+      cookie: cookieHeader,
+    },
+  });
+
+  if (meResponse?.data?.user) {
+    return meResponse.data.user;
+  }
+
+  return fetchUserAfterRefresh(cookieHeader);
 }

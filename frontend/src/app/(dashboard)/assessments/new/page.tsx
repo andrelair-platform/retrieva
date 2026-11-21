@@ -67,6 +67,42 @@ function buildAssessmentName(
   return `${vendor.trim() || vendorFallback} — ${typeLabel} ${month} ${year}`;
 }
 
+interface FormFlagInput {
+  recommendedKeys: string[];
+  missingKeys: string[];
+  fileCount: number;
+  pending: boolean;
+  isError: boolean;
+  nameIsAuto: boolean;
+}
+
+/** Derived render flags for the new-assessment form (keeps the component branch-light). */
+function deriveFormFlags(input: FormFlagInput) {
+  const { recommendedKeys, missingKeys, fileCount, pending, isError, nameIsAuto } = input;
+  const noFiles = fileCount === 0;
+  return {
+    coveredCount: recommendedKeys.length - missingKeys.length,
+    submitDisabled: pending || noFiles,
+    showUploadError: noFiles && isError,
+    showMissingWarning: fileCount >= 1 && missingKeys.length > 0,
+    nameDescKey: nameIsAuto ? 'assessments.form.nameDescAuto' : 'assessments.form.nameDescCustom',
+  };
+}
+
+type Framework = 'DORA' | 'CONTRACT_A30';
+
+/** The per-framework i18n label keys used across the form (DORA vs Art.30). */
+function frameworkLabels(framework: Framework) {
+  const isA30 = framework === 'CONTRACT_A30';
+  return {
+    isA30,
+    fwKey: isA30 ? 'a30' : 'dora',
+    titleKey: isA30 ? 'assessments.form.titleA30' : 'assessments.form.titleDora',
+    subtitleKey: isA30 ? 'assessments.form.subtitleA30' : 'assessments.form.subtitleDora',
+    docsKey: isA30 ? 'assessments.form.docsA30' : 'assessments.form.docsDora',
+  };
+}
+
 export default function NewAssessmentPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -138,7 +174,7 @@ export default function NewAssessmentPage() {
   }
 
   // Category tagging + coverage (issue #395).
-  const fwKey = framework === 'CONTRACT_A30' ? 'a30' : 'dora';
+  const { isA30, fwKey, titleKey, subtitleKey, docsKey } = frameworkLabels(framework);
   const recommendedKeys = RECOMMENDED_DOC_KEYS[framework];
   const categoryOptions = [
     ...recommendedKeys.map((key) => ({
@@ -151,7 +187,15 @@ export default function NewAssessmentPage() {
     files.map((f) => f.category).filter((c): c is string => !!c && c !== 'other')
   );
   const missingKeys = recommendedKeys.filter((k) => !taggedCategories.has(k));
-  const coveredCount = recommendedKeys.length - missingKeys.length;
+  const { coveredCount, submitDisabled, showUploadError, showMissingWarning, nameDescKey } =
+    deriveFormFlags({
+      recommendedKeys,
+      missingKeys,
+      fileCount: files.length,
+      pending: createMutation.isPending,
+      isError: createMutation.isError,
+      nameIsAuto,
+    });
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
@@ -167,16 +211,8 @@ export default function NewAssessmentPage() {
       </Button>
 
       <PageHeader
-        title={
-          framework === 'CONTRACT_A30'
-            ? t('assessments.form.titleA30')
-            : t('assessments.form.titleDora')
-        }
-        description={
-          framework === 'CONTRACT_A30'
-            ? t('assessments.form.subtitleA30')
-            : t('assessments.form.subtitleDora')
-        }
+        title={t(titleKey)}
+        description={t(subtitleKey)}
       />
 
       {/* Form */}
@@ -191,7 +227,7 @@ export default function NewAssessmentPage() {
             <div className="flex gap-2">
               <Button
                 type="button"
-                variant={framework === 'DORA' ? 'default' : 'outline'}
+                variant={isA30 ? 'outline' : 'default'}
                 size="sm"
                 onClick={() => setFramework('DORA')}
               >
@@ -199,7 +235,7 @@ export default function NewAssessmentPage() {
               </Button>
               <Button
                 type="button"
-                variant={framework === 'CONTRACT_A30' ? 'default' : 'outline'}
+                variant={isA30 ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFramework('CONTRACT_A30')}
               >
@@ -256,9 +292,7 @@ export default function NewAssessmentPage() {
                   />
                 </FormControl>
                 <FormDescription>
-                  {nameIsAuto
-                    ? t('assessments.form.nameDescAuto')
-                    : t('assessments.form.nameDescCustom')}
+                  {t(nameDescKey)}
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -268,12 +302,10 @@ export default function NewAssessmentPage() {
           {/* File upload */}
           <div className="space-y-2">
             <p className="text-sm font-medium leading-none">
-              {framework === 'CONTRACT_A30'
-                ? t('assessments.form.docsA30')
-                : t('assessments.form.docsDora')}
+              {t(docsKey)}
             </p>
             <FileUploadZone files={files} onChange={setFiles} categories={categoryOptions} />
-            {files.length === 0 && createMutation.isError && (
+            {showUploadError && (
               <p className="text-xs text-destructive">
                 {t('assessments.form.uploadAtLeastOne')}
               </p>
@@ -315,7 +347,7 @@ export default function NewAssessmentPage() {
             <p className="text-xs text-muted-foreground">
               {t('assessments.form.recommendedDocs.tagPrompt')}
             </p>
-            {files.length >= 1 && missingKeys.length > 0 && (
+            {showMissingWarning && (
               <div className="flex gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
@@ -340,7 +372,7 @@ export default function NewAssessmentPage() {
             </Button>
             <Button
               type="submit"
-              disabled={createMutation.isPending || files.length === 0}
+              disabled={submitDisabled}
             >
               {createMutation.isPending ? (
                 <>
